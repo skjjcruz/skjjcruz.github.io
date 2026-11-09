@@ -1,0 +1,1691 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="dhq-build" content="b194a-5b47a363b3">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com data:; img-src 'self' data: blob: https:; connect-src 'self' https://sxshiqyxhhifvtfqawbq.supabase.co https://api.sleeper.app https://api.myfantasyleague.com https://*.myfantasyleague.com https://lm-api-reads.fantasy.espn.com https://fantasysports.yahooapis.com https://*.sentry.io; worker-src 'self' blob:; frame-ancestors 'none'; base-uri 'self'; object-src 'none';">
+<title>Dynasty HQ — Generic advice stops here.</title>
+  <meta name="description" content="Dynasty HQ reads your Sleeper, MFL or ESPN league and shows you who to start, which trades your leaguemates will take, and where you really stand. Free this season.">
+<link rel="icon" href="icon-192.png">
+<link rel="apple-touch-icon" href="img/logo.png">
+  <style id="preboot-hide">html{visibility:hidden!important}</style>
+  <noscript><style>html{visibility:visible!important}</style></noscript>
+  <!-- Owner-stamped device identity (DHQ-Shared identity.js): sign-in reconcile + the one sign-out clear. -->
+  <script src="reconai-shared/identity.js?v=7f29fd0d9a"></script>
+  <script>
+    (function () {
+      function reveal(){ var s=document.getElementById('preboot-hide'); if(s&&s.parentNode){ s.parentNode.removeChild(s); } }
+      function showSigningIn(){
+        try {
+          var d = document.createElement('div');
+          d.id = 'wr-signing-in';
+          // visibility:visible overrides the hidden <html>, so this splash shows
+          // while the marketing page underneath stays hidden. Includes the same
+          // subdued DHQ watermark used in-app / on the Sleeper-connect page.
+          d.setAttribute('style', 'visibility:visible!important;position:fixed;inset:0;z-index:99999;display:flex;align-items:center;justify-content:center;overflow:hidden;background:#0A0A0A');
+          d.innerHTML =
+            '<div style="position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);width:clamp(400px,60vw,1000px);height:clamp(400px,60vw,1000px);background:url(icon-192.png) center/contain no-repeat;opacity:.05;filter:brightness(1.2);pointer-events:none"></div>' +
+            '<div style="position:relative;color:#E8B23A;font:600 15px/1.4 Inter,system-ui,sans-serif;letter-spacing:.02em">Signing you in…</div>';
+          (document.body || document.documentElement).appendChild(d);
+        } catch (e) {}
+      }
+      try {
+        var q = new URLSearchParams(window.location.search);
+        // Session handoff from the marketing site (dhqfootball.com): it signs the
+        // user in on its own origin, then sends them here with the app session in
+        // the URL fragment (never sent to the server, same trick as OAuth).
+        // Ingest it before the session checks below so the user lands signed in.
+        var hs = (window.location.hash || '').match(/[#&]dhq_session=([^&]+)/);
+        var handedIsNew = false;
+        if (hs) {
+          try {
+            var b64 = hs[1].replace(/-/g, '+').replace(/_/g, '/');
+            while (b64.length % 4) b64 += '=';
+            var handed = JSON.parse(decodeURIComponent(escape(window.atob(b64))));
+            // Only ingest complete sessions. A stale cached copy of the
+            // marketing page can still hand off records without user.id (the
+            // Jul 9–11 sign-in bug shape), which the shared client resolves
+            // to the free tier — storing one would re-poison this origin.
+            if (handed && handed.token && handed.user && handed.user.id) {
+              // isNew is a one-shot routing hint, not session state — consume
+              // it here so later visits don't re-trigger onboarding.
+              handedIsNew = handed.isNew === true;
+              delete handed.isNew;
+              var handedPlatforms = handed.platformUsernames;
+              delete handed.platformUsernames;
+              localStorage.setItem('fw_session_v1', JSON.stringify(handed));
+              // A sign-in: the body reconciles the device identity against the
+              // account (OD.identity.reconcileAfterSignIn), then routes.
+              window.__dhqHandoff = { isNew: handedIsNew, session: Object.assign({}, handed, handedPlatforms !== undefined ? { platformUsernames: handedPlatforms } : {}) };
+            }
+          } catch (e) {}
+          try { history.replaceState(null, '', window.location.pathname + window.location.search); } catch (e) {}
+          if (window.__dhqHandoff && window.OD && window.OD.identity) { showSigningIn(); setTimeout(function () { var sp = document.getElementById('wr-signing-in'); if (sp && sp.parentNode) sp.parentNode.removeChild(sp); reveal(); }, 10000); return; }
+        }
+        // Editor preview, explicit sign-out, and ?home (the league hub's
+        // brand icon — a deliberate visit to this page) stay on this page.
+        // Without the ?home escape this head-level check bounces a signed-in
+        // visitor back into the app before the body's STAY_HOME-aware
+        // handlers ever run, making the hub logo appear to do nothing.
+        if (q.has('landingPreview') || q.has('signout') || q.has('home')) { reveal(); return; }
+        // OAuth return: Supabase brings us back here with the session in the URL
+        // (hash #access_token=… for implicit, ?code=… for PKCE) BEFORE the page's
+        // callback handler has stored it. Show a neutral splash, not the marketing
+        // page; the handler stores the session and redirects to step 2 shortly.
+        var hash = window.location.hash || '';
+        var oauthReturn = hash.indexOf('access_token=') !== -1 || /[?&]code=/.test(window.location.search);
+        var oauthError  = hash.indexOf('error=') !== -1 || q.has('error');
+        if (oauthReturn && !oauthError) {
+          showSigningIn();
+          // Fallback: if the callback never redirects, drop the splash + reveal the
+          // page after a few seconds so no one is trapped on a blank screen.
+          setTimeout(function () {
+            var sp = document.getElementById('wr-signing-in');
+            if (sp && sp.parentNode) sp.parentNode.removeChild(sp);
+            reveal();
+          }, 8000);
+          return;
+        }
+        // ?signin / ?reauth: someone asked for the sign-in sheet (a guest
+        // tapping "Create a free account", a lapsed session). Never bounce
+        // them back into the app as a guest first — that was the only way
+        // out of the guest lane (the hub logo's ?home).
+        var wantsSignIn = q.has('signin') || q.has('reauth');
+        // Returning guest: a guest with a connected league goes straight in
+        // (restored 2026-08-21 — same line the pre-swap page carried; MFL-only
+        // guests count too, 2026-08-31). od_auth_v1 has two shapes.
+        var ga = null; try { ga = JSON.parse(localStorage.getItem('od_auth_v1') || 'null'); } catch (e) {}
+        if (!wantsSignIn && localStorage.getItem('wr_guest_v1') === '1' && ((ga && (ga.username || ga.sleeperUsername)) || localStorage.getItem('mfl_league_id') || localStorage.getItem('espn_league_id'))) { window.location.replace('index.html'); return; }
+        // Guest mid-setup (flag set, no league yet): resume at the connect
+        // page instead of stranding them on the marketing page. An app
+        // relaunch between tapping Guest and connecting a league used to
+        // land exactly here (owner bug report 2026-08-31). Sign out on the
+        // connect page clears the flag, so this can't loop.
+        if (!wantsSignIn && localStorage.getItem('wr_guest_v1') === '1') { window.location.replace('connect-sleeper.html'); return; }
+        // ?reauth: the app said the session ended (a revoked token can still
+        // look valid locally — an AI 401). Show the sign-in sheet; never route
+        // back into the app on the stored session.
+        if (q.has('reauth')) { reveal(); return; }
+        var sess = JSON.parse(localStorage.getItem('fw_session_v1') || 'null');
+        if (!sess || !sess.token) { reveal(); return; } // not signed in -> show landing
+        // The device's identity cache belongs to someone other than this
+        // session (or predates owner stamping): don't route on it. The body
+        // reconciles against the account first (checkSession).
+        var idn = window.OD && window.OD.identity;
+        if (idn && idn.accountToken(sess) && idn.getStamp() !== idn.sessionOwner(sess)) {
+          showSigningIn();
+          setTimeout(function () { var sp = document.getElementById('wr-signing-in'); if (sp && sp.parentNode) sp.parentNode.removeChild(sp); reveal(); }, 10000);
+          return;
+        }
+        var profile = JSON.parse(localStorage.getItem('od_profile_v1') || 'null');
+        var legacy  = JSON.parse(localStorage.getItem('od_auth_v1') || 'null');
+        var onboarded = (profile && (profile.onboardingComplete === true || profile.sleeperUsername))
+          || (legacy && (legacy.username || legacy.sleeperUsername))
+          || localStorage.getItem('mfl_league_id')
+          || localStorage.getItem('espn_league_id');
+        if (!onboarded) { window.location.replace('connect-sleeper.html'); return; }
+        // Scout was retired 2026-11-09; an old 'scout' preference lands here too.
+        window.location.replace('index.html');
+      } catch (e) { reveal(); }
+    })();
+  </script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@400;500;600&family=Rajdhani:wght@600;700&display=swap" rel="stylesheet">
+<!-- One-page front door (owner ruling 2026-09-24). The head routing script
+     above is carried over verbatim from the previous landing page: session
+     handoff, ?signout / ?home, the OAuth return splash, returning and
+     mid-setup guests, and brand-new accounts all route exactly as before. -->
+<style>
+  :root {
+    color-scheme: dark;
+    --bg: #08090C;
+    --bg-1: #12151B;
+    --bg-2: #1A1F27;
+    --border: #232932;
+    --border-strong: #333A45;
+    --text-1: #E6E9ED;
+    --text-2: #98A1AD;
+    --text-3: #5A626E;
+    --forge: #E8B23A;
+    --forge-bright: #F6CF5A;
+    --forge-tint: rgba(232,178,58,.12);
+    --pos: #2FBF88;
+    --r-xs: 5px; --r-sm: 8px; --r: 10px; --r-lg: 14px;
+    --display: 'Rajdhani', 'Arial Narrow', system-ui, sans-serif;
+    --sans: 'IBM Plex Sans', system-ui, -apple-system, 'Segoe UI', sans-serif;
+    --mono: 'IBM Plex Mono', ui-monospace, 'SF Mono', Menlo, monospace;
+    /* iOS safe-area insets (notch / Dynamic Island / home indicator). They
+       read 0 in a normal browser, so these only move things in the app shell
+       (viewport-fit=cover above is what makes env() report them). */
+    --sat: env(safe-area-inset-top, 0px);
+    --sab: env(safe-area-inset-bottom, 0px);
+    --sal: env(safe-area-inset-left, 0px);
+    --sar: env(safe-area-inset-right, 0px);
+  }
+  * { box-sizing: border-box; }
+  [hidden] { display: none !important; }
+  html, body { background: var(--bg); }
+  body { margin: 0; }
+  img { max-width: 100%; }
+  body {
+    color: var(--text-1);
+    font: 16px/1.55 var(--sans);
+    padding-inline: max(20px, var(--sal)) max(20px, var(--sar));
+    padding-block: 0;
+    -webkit-font-smoothing: antialiased;
+  }
+  .wrap { max-width: 1120px; margin: 0 auto; }
+  /* The DHQ crest as a gold ghost behind the whole page, same treatment as
+     the live landing: screen blend drops the starfield so only the gold glows. */
+  .brandwash {
+    position: fixed; inset: 0; z-index: 0; pointer-events: none;
+    background: url("img/logo.png") no-repeat center 16% / min(720px, 86vw) auto;
+    opacity: .13; mix-blend-mode: screen; filter: blur(4px);
+    -webkit-mask-image: radial-gradient(125% 105% at 50% 20%, #000 26%, transparent 74%);
+    mask-image: radial-gradient(125% 105% at 50% 20%, #000 26%, transparent 74%);
+  }
+  .wrap { position: relative; z-index: 1; }
+  main { overflow-x: clip; }
+
+
+  header.top { display: flex; align-items: center; justify-content: space-between; padding-block: calc(18px + var(--sat)) 18px; }
+  .brand { display: flex; align-items: center; gap: 10px; text-decoration: none; color: var(--text-1); }
+  .brand img { width: 36px; height: 36px; border-radius: var(--r-sm); }
+  .brand span { font: 700 20px/1 var(--display); letter-spacing: .06em; }
+  .signin { cursor: pointer; background: transparent; font: 500 14px/1 var(--sans); color: var(--text-2); text-decoration: none; padding: 10px 14px; border: 1px solid var(--border); border-radius: var(--r-sm); }
+  .signin:hover, .signin:focus-visible { color: var(--text-1); border-color: var(--border-strong); }
+
+  .hero {
+    display: grid; grid-template-columns: 1.05fr .95fr; gap: 0 48px; align-items: center;
+    padding-block: 8px 64px;
+  }
+  /* "New" announcement (owner ask 2026-10-10): pops, but stays classy. */
+  .announce { display: flex; width: fit-content; max-width: 100%; align-items: center; gap: 14px; margin: 0 0 22px; padding: 10px 18px 10px 12px; border: 1px solid rgba(232,178,58,.4); border-radius: var(--r-lg, 14px); background: linear-gradient(180deg, rgba(232,178,58,.13), rgba(232,178,58,.04)); box-shadow: 0 6px 24px rgba(0,0,0,.25); color: var(--text-1); text-decoration: none; transition: border-color .15s, background .15s; }
+  .announce-text { display: flex; flex-direction: column; gap: 4px; min-width: 0; }
+  .announce-title { font: 700 17px/1.1 var(--display); letter-spacing: .05em; text-transform: uppercase; color: var(--text-1); }
+  .announce-sub { font: 500 13px/1.3 var(--sans); color: var(--text-2); }
+  .announce:hover, .announce:focus-visible { border-color: var(--forge); background: linear-gradient(180deg, rgba(232,178,58,.18), rgba(232,178,58,.06)); }
+  .announce:focus-visible { outline: 2px solid var(--forge-bright); outline-offset: 3px; }
+  .announce-tag { flex: none; padding: 5px 9px; border-radius: 999px; background: var(--forge); color: #15120a; font: 700 11px/1 var(--mono); letter-spacing: .12em; text-transform: uppercase; }
+  .announce-go { flex: none; color: var(--forge); font: 600 18px/1 var(--sans); }
+  /* Owner ask 2026-10-10: banner top right, level with the hero's top line.
+     Phones stack it above the eyebrow. */
+  .hero-top { grid-column: 1 / -1; display: flex; align-items: center; justify-content: space-between; gap: 24px; }
+  .hero-top .announce { margin: 0; }
+  @media (max-width: 880px) { .hero-top { flex-direction: column-reverse; align-items: flex-start; gap: 22px; } }
+  .eyebrow { display: inline-flex; align-items: center; gap: 8px; font: 500 12px/1 var(--mono); letter-spacing: .14em; text-transform: uppercase; color: var(--forge); }
+  .eyebrow::before { content: ""; width: 8px; height: 8px; border-radius: 50%; background: var(--pos); box-shadow: 0 0 0 4px rgba(47,191,136,.15); }
+  h1 {
+    font: 700 clamp(44px, 6.4vw, 76px)/.95 var(--display);
+    letter-spacing: -.005em; text-transform: uppercase; margin: 18px 0 18px;
+    text-wrap: balance;
+  }
+  h1 em { font-style: normal; color: var(--forge); }
+  .lede { color: var(--text-2); font-size: 18px; max-width: 30em; margin: 0 0 28px; }
+  .lede .win { color: var(--forge); font-weight: 600; white-space: nowrap; }
+  .lede .kicker { display: block; color: var(--text-1); font-weight: 600; font-size: 20px; margin-bottom: 6px; }
+
+  .platform {
+    display: inline-grid; grid-template-columns: repeat(3, 1fr); gap: 4px; padding: 4px; margin-bottom: 10px;
+    background: var(--bg-1); border: 1px solid var(--border-strong); border-radius: var(--r-sm);
+  }
+  .platform button {
+    min-width: 92px; height: 36px; padding: 0 14px; border: 1px solid transparent; border-radius: var(--r-xs);
+    background: transparent; color: var(--text-2); cursor: pointer;
+    font: 700 15px/1 var(--display); letter-spacing: .1em; text-transform: uppercase;
+  }
+  .platform button:hover { color: var(--text-1); }
+  .platform button[aria-pressed="true"] { background: var(--bg-2); color: var(--forge); border-color: rgba(232,178,58,.45); }
+  .platform button:focus-visible { outline: 2px solid var(--forge-bright); outline-offset: 2px; }
+  #key-hint { margin-top: 10px; }
+  .signup { margin: 18px 0 0; max-width: 480px; padding-top: 16px; border-top: 1px solid var(--border); font-size: 14px; line-height: 1.55; color: var(--text-2); }
+  .signup strong { color: var(--text-1); font-weight: 600; }
+  .signup a, .signup button.linklike { color: var(--forge); font-weight: 600; text-decoration: none; white-space: nowrap; }
+  .signup a:hover, .signup a:focus-visible { color: var(--forge-bright); text-decoration: underline; }
+  form.go { display: flex; gap: 10px; max-width: 480px; }
+  .field { flex: 1; position: relative; }
+  .field label { position: absolute; left: -9999px; }
+  .field input {
+    width: 100%; height: 56px; padding: 0 16px 0 44px;
+    background: var(--bg-1); color: var(--text-1);
+    border: 1px solid var(--border-strong); border-radius: var(--r-sm);
+    font: 500 17px/1 var(--sans);
+  }
+  .field input::placeholder { color: var(--text-3); }
+  .field input:focus { outline: none; border-color: var(--forge); box-shadow: 0 0 0 3px var(--forge-tint); }
+  .field svg { position: absolute; left: 15px; top: 50%; transform: translateY(-50%); width: 18px; height: 18px; color: var(--text-3); }
+  button.cta {
+    height: 56px; padding: 0 22px; border: 0; border-radius: var(--r-sm);
+    background: var(--forge); color: #15110A; cursor: pointer;
+    font: 700 17px/1 var(--display); letter-spacing: .08em; text-transform: uppercase; white-space: nowrap;
+  }
+  button.cta:hover { background: var(--forge-bright); }
+  button.cta:focus-visible { outline: 2px solid var(--forge-bright); outline-offset: 3px; }
+  .fine { margin: 14px 0 0; font: 400 13px/1.5 var(--mono); color: var(--text-3); }
+  .fine b { color: var(--text-2); font-weight: 500; }
+  .note {
+    margin-top: 16px; max-width: 480px; padding: 12px 14px;
+    background: var(--forge-tint); border: 1px solid rgba(232,178,58,.35); border-radius: var(--r-sm);
+    font-size: 14px; color: var(--text-1);
+  }
+
+  .phone {
+    position: relative; justify-self: center; width: min(100%, 340px);
+    border-radius: 38px; padding: 10px; background: #0E1015;
+    border: 1px solid var(--border-strong);
+    box-shadow: 0 40px 80px -30px rgba(0,0,0,.8), 0 0 0 6px #0B0D11;
+  }
+  .phone img { display: block; width: 100%; height: auto; border-radius: 29px; }
+  .hero-art { position: relative; display: grid; }
+  .hero-art::before {
+    content: ""; position: absolute; inset: 8% 0 8% 0;
+    background: radial-gradient(closest-side, rgba(232,178,58,.20), transparent 70%);
+    pointer-events: none;
+  }
+  .hero-art .phone img { max-height: 620px; object-fit: cover; object-position: top; }
+
+  section.show { padding-block: 16px 72px; border-top: 1px solid var(--border); }
+  .show-head { display: flex; align-items: baseline; justify-content: space-between; gap: 16px; padding-block: 28px 24px; flex-wrap: wrap; }
+  .show-head h2 { font: 700 30px/1 var(--display); text-transform: uppercase; letter-spacing: .02em; margin: 0; }
+  .show-head p { margin: 0; font: 400 13px/1.4 var(--mono); color: var(--text-3); }
+  .rail { display: grid; grid-template-columns: repeat(3, 1fr); gap: 24px; }
+  .tile { display: grid; gap: 16px; align-content: start; }
+  .tile .phone { width: 100%; border-radius: 30px; padding: 8px; }
+  .tile .phone img { border-radius: 23px; aspect-ratio: 520 / 700; object-fit: cover; object-position: top; }
+  .tile h3 { font: 700 22px/1.1 var(--display); text-transform: uppercase; letter-spacing: .03em; margin: 0 0 6px; }
+  .tile .tag { font: 500 11px/1 var(--mono); letter-spacing: .14em; text-transform: uppercase; color: var(--forge); margin-bottom: 8px; display: block; }
+  .tile p { margin: 0; color: var(--text-2); font-size: 15px; }
+
+  footer { border-top: 1px solid var(--border); padding-block: 28px calc(40px + var(--sab)); display: flex; flex-wrap: wrap; gap: 14px 24px; align-items: center; justify-content: space-between; }
+  footer nav { display: flex; flex-wrap: wrap; gap: 8px 22px; }
+  footer a { color: var(--text-2); text-decoration: none; font-size: 14px; }
+  footer a:hover, footer a:focus-visible { color: var(--text-1); }
+  footer small { color: var(--text-3); font: 400 12px/1 var(--mono); }
+
+  @media (max-width: 880px) {
+    .hero { grid-template-columns: 1fr; gap: 0 36px; padding-block: 12px 48px; }
+    .hero-art { margin-top: 36px; }
+    .hero-art .phone { width: min(100%, 300px); }
+    .hero-art .phone img { max-height: 420px; }
+    .rail {
+      grid-template-columns: none; grid-auto-flow: column; grid-auto-columns: 78%;
+      overflow-x: auto; scroll-snap-type: x mandatory; padding-bottom: 8px;
+      margin-inline: -20px; padding-inline: 20px; scroll-padding-inline: 20px;
+    }
+    .tile { scroll-snap-align: start; }
+  }
+  @media (max-width: 480px) {
+    .eyebrow { font-size: 11px; letter-spacing: .09em; white-space: nowrap; }
+    .announce { gap: 10px; padding: 9px 14px 9px 10px; }
+    .announce-title { font-size: 15px; }
+    .announce-sub { font-size: 12px; }
+    form.go { flex-direction: column; }
+    button.cta { width: 100%; }
+    .lede { font-size: 17px; }
+  }
+  @media (prefers-reduced-motion: no-preference) {
+    .brandwash { animation: washfloat 44s ease-in-out infinite alternate; }
+    @keyframes washfloat { 0% { background-position: center 15%; } 100% { background-position: center 20%; } }
+    .tile .phone { transition: transform .28s cubic-bezier(.25,.1,.25,1); }
+    .tile:hover .phone { transform: translateY(-4px); }
+  }
+
+  footer .foot-btn { background: none; border: 0; padding: 0; cursor: pointer; color: var(--text-2); font: inherit; font-size: 14px; }
+  footer .foot-btn:hover, footer .foot-btn:focus-visible { color: var(--text-1); }
+
+  /* ── Sign-up sheet ── */
+  body.sheet-open { overflow: hidden; }
+  .sheet { position: fixed; inset: 0; z-index: 50; display: grid; place-items: center; padding: calc(16px + var(--sat)) 16px calc(16px + var(--sab)); }
+  .sheet-backdrop { position: absolute; inset: 0; background: rgba(4,5,7,.74); -webkit-backdrop-filter: blur(4px); backdrop-filter: blur(4px); }
+  .sheet-panel {
+    position: relative; width: min(100%, 440px); max-height: calc(100% - 32px); overflow-y: auto;
+    background: var(--bg-1); border: 1px solid var(--border-strong); border-radius: var(--r-lg);
+    padding: 28px 24px 22px; box-shadow: 0 30px 80px -20px rgba(0,0,0,.8);
+  }
+  .sheet-close {
+    position: absolute; top: 10px; right: 10px; width: 36px; height: 36px; border-radius: var(--r-sm);
+    border: 1px solid var(--border); background: transparent; color: var(--text-2); font-size: 20px; line-height: 1; cursor: pointer;
+  }
+  .sheet-close:hover, .sheet-close:focus-visible { color: var(--text-1); border-color: var(--border-strong); }
+  .auth-crest { display: block; width: 52px; height: 52px; border-radius: 12px; margin: 0 auto 14px; box-shadow: 0 4px 20px rgba(212,175,55,.2); }
+  .auth-sub { text-align: center; font-size: 14px; color: var(--text-2); line-height: 1.55; margin: -10px 0 20px; }
+  .auth-hint { text-align: center; font-size: 12px; color: var(--text-3); margin: 12px 0 0; }
+  .auth-links { text-align: center; margin-top: 14px; font-size: 13px; display: flex; gap: 14px; justify-content: center; flex-wrap: wrap; }
+  @media (max-width: 560px) {
+    .sheet { place-items: end center; padding: var(--sat) 0 0; }
+    .sheet-panel { width: 100%; max-height: 92%; border-radius: 18px 18px 0 0; padding-bottom: calc(22px + var(--sab)); overscroll-behavior: contain; }
+  }
+
+  /* Sign-in form styles, carried from the previous landing page's #auth. */
+  :root { --accent: var(--forge); --accent-bright: var(--forge-bright); --radius: 10px; --muted: var(--text-3); --silver: var(--text-2);
+          --font-mono: var(--mono); --bg-inset: #0C0E13; --bg-0: var(--bg); --neg: #F0495C; }
+  .auth { max-width: none; margin: 0; padding: 0; }
+  .auth-title { text-align: center; font-family: var(--display); font-size: 26px; font-weight: 700; letter-spacing: .04em; text-transform: uppercase; margin: 0 0 18px; color: var(--text-1); }
+  .auth-input { width: 100%; min-height: 46px; padding: 0 14px; font-size: 16px; font-family: var(--font-mono); background: var(--bg-inset); border: 1px solid var(--border); border-radius: var(--radius); color: var(--text-1); margin-bottom: 10px; outline: none; box-sizing: border-box; transition: border-color 90ms ease; }
+  .auth-input:focus { border-color: var(--accent); }
+  .auth-input::placeholder { color: var(--text-3); }
+  .auth-submit { width: 100%; min-height: 48px; font-family: var(--font-mono); font-size: 14px; font-weight: 600; letter-spacing: .03em; border-radius: var(--radius); border: 1px solid var(--accent); background: var(--accent); color: var(--bg-0); margin-top: 4px; cursor: pointer; transition: background 90ms ease; }
+  .auth-submit:hover { background: var(--accent-bright); border-color: var(--accent-bright); }
+  .alert { font-size: 13px; padding: 10px 14px; border-radius: var(--radius); margin-bottom: 12px; display: none; font-family: var(--font-mono); }
+  .alert.show { display: block; }
+  .alert-error { background: rgba(240,73,92,.08); color: var(--neg); border: 1px solid rgba(240,73,92,.3); }
+  .alert-success { background: rgba(47,191,136,.08); color: var(--pos); border: 1px solid rgba(47,191,136,.3); }
+  .auth-google { width: 100%; display: flex; align-items: center; justify-content: center; gap: 10px; min-height: 48px; border-radius: 10px; border: 1px solid var(--border); background: #fff; color: #1f2328; font-size: 15px; font-weight: 700; cursor: pointer; margin-bottom: 6px; }
+  .auth-google:hover { box-shadow: 0 4px 14px rgba(0,0,0,.25); }
+  .auth-apple { width: 100%; display: flex; align-items: center; justify-content: center; gap: 10px; min-height: 48px; border-radius: 10px; border: 1px solid #000; background: #000; color: #fff; font-size: 15px; font-weight: 700; cursor: pointer; margin-bottom: 6px; }
+  .auth-apple:hover { box-shadow: 0 4px 14px rgba(0,0,0,.4); }
+  .auth-or { display: flex; align-items: center; text-align: center; color: var(--muted); font-size: 12px; margin: 14px 0; gap: 10px; }
+  .auth-or::before, .auth-or::after { content: ''; flex: 1; height: 1px; background: var(--border); }
+  .auth-linkbtn { background: none; border: none; color: var(--muted); font-size: 13px; cursor: pointer; text-decoration: underline; font-family: inherit; }
+  .auth-linkbtn:hover { color: var(--accent); }
+
+  /* ── Lab sign-up (owner ask 2026-10-10): the league account step and the
+     guest's carried-over league (live everywhere since 2026-10-12). ── */
+  .auth-step { font: 500 11px/1 var(--mono); letter-spacing: .14em; text-transform: uppercase; color: var(--forge); margin: 4px 0 10px; }
+  .auth-step + .auth-step, .auth-league + .auth-step { margin-top: 18px; }
+  .auth-platform { display: grid; grid-template-columns: repeat(3, 1fr); gap: 4px; padding: 4px; margin-bottom: 10px; background: var(--bg-inset); border: 1px solid var(--border-strong); border-radius: var(--r-sm); }
+  .auth-platform button { height: 34px; padding: 0 8px; border: 1px solid transparent; border-radius: var(--r-xs); background: transparent; color: var(--text-2); cursor: pointer; font: 700 14px/1 var(--display); letter-spacing: .1em; text-transform: uppercase; }
+  .auth-platform button:hover { color: var(--text-1); }
+  .auth-platform button[aria-pressed="true"] { background: var(--bg-2); color: var(--forge); border-color: rgba(232,178,58,.45); }
+  .auth-platform button:focus-visible { outline: 2px solid var(--forge-bright); outline-offset: 2px; }
+  .auth-league .auth-input { margin-bottom: 6px; }
+  .auth-league-hint { margin: 0 0 4px; font-size: 12px; line-height: 1.45; color: var(--text-3); }
+  .auth-league-hint b { color: var(--text-2); font-weight: 500; }
+  .auth-linked { display: flex; align-items: center; gap: 10px; margin: 0 0 16px; padding: 10px 12px; border: 1px solid rgba(47,191,136,.3); border-radius: var(--r-sm); background: rgba(47,191,136,.07); font-size: 13px; line-height: 1.4; color: var(--text-2); }
+  .auth-linked strong { color: var(--text-1); font-weight: 600; }
+  .auth-linked-tick { flex: none; width: 22px; height: 22px; border-radius: 50%; background: var(--pos); color: #062015; font: 800 13px/22px var(--sans); text-align: center; }
+  .auth-back { display: none; margin: 0 0 6px; color: var(--text-2); font-size: 13px; text-decoration: none; }
+  .auth-back:hover, .auth-back:focus-visible { color: var(--text-1); }
+  /* A guest coming from their leagues page gets sign-up as its own page:
+     no marketing page behind it, and "Back to my leagues" instead of ×. */
+  body.auth-page .wrap, body.auth-page .brandwash { visibility: hidden; }
+  body.auth-page .sheet-backdrop { background: var(--bg); -webkit-backdrop-filter: none; backdrop-filter: none; }
+  body.auth-page .sheet-close { display: none; }
+  body.auth-page .auth-back { display: inline-block; }
+  @media (max-width: 560px) {
+    body.auth-page .sheet { place-items: start center; padding: calc(12px + var(--sat)) 0 0; }
+    body.auth-page .sheet-panel { max-height: 100%; border: 0; border-radius: 0; box-shadow: none; background: var(--bg); }
+  }
+
+  /* ── Phone fit (2026-09-26) ── */
+  /* Short viewports (a phone with the keyboard up, or a landscape phone):
+     compact the sheet header so the email field, password and submit fit
+     above the keyboard. The crest is decorative (alt=""). */
+  @media (max-width: 560px) and (max-height: 600px) {
+    .sheet-panel { max-height: calc(100% - 20px); padding-top: 16px; }
+    .auth-crest { display: none; }
+    .auth-title { font-size: 22px; margin-bottom: 10px; padding-inline: 36px; }
+    .auth-sub { font-size: 13px; line-height: 1.45; margin: -4px 0 12px; }
+    .auth-or { margin: 10px 0; }
+  }
+  @media (max-width: 480px) {
+    /* Platform toggle spans the same width as the input and button below. */
+    .platform { display: grid; width: 100%; }
+    .platform button { min-width: 0; padding: 0 8px; }
+  }
+  @media (max-width: 560px) {
+    /* Tap targets ≥ 40px. Padding grows the hit area; the negative margin
+       keeps the text exactly where it was. */
+    .signup a.hero-secondary { display: inline-block; padding-block: 11px; margin-block: -11px; }
+    footer nav { gap: 0 22px; }
+    footer a, footer .foot-btn { display: inline-block; padding-block: 10px; }
+    footer { padding-top: 18px; }
+    .auth-links { gap: 0 14px; margin-top: 6px; }
+    .auth-linkbtn { min-height: 40px; padding: 0 6px; }
+  }
+</style>
+<!-- Live update: reloads onto a new deploy at a safe moment (js/shared/live-update.js) -->
+<script src="js/shared/live-update.js?v=f09653177c"></script>
+</head>
+<body>
+<div class="brandwash" aria-hidden="true"></div>
+
+<div class="wrap">
+  <header class="top">
+    <a class="brand" href="#top" aria-label="Dynasty HQ">
+      <img src="img/logo.png" alt="" width="36" height="36">
+      <span>DYNASTY HQ</span>
+    </a>
+    <button class="signin nav-btn" id="navSignin" type="button" data-open-sheet="signin">Sign in</button>
+  </header>
+
+  <main id="top">
+    <section class="hero">
+      <!-- Owner ask 2026-10-10: the hero's top line sits level with the AI banner. -->
+      <div class="hero-top">
+        <span class="eyebrow">Built for Sleeper, MFL and ESPN leagues</span>
+        <a class="announce" href="#auth" data-open-sheet="signup"><span class="announce-tag">New</span><span class="announce-text"><span class="announce-title">Bring your own AI to the fight</span><span class="announce-sub">Your AI. Your league data. Your competitive edge.</span></span><span class="announce-go" aria-hidden="true">&rarr;</span></a>
+      </div>
+      <div>
+        <h1>Generic advice <em>stops here.</em></h1>
+        <p class="lede"><strong class="kicker">Stop playing by other people's rules.</strong> <span id="ask">Type your Sleeper name.</span> DHQ reads your league and shows you who to start, which trades your leaguemates will take, and where you really stand. <span class="win">Because Winning Matters 🏆</span></p>
+        <div class="platform" role="group" aria-label="Where your league lives">
+          <button type="button" id="pick-sleeper" data-platform="sleeper" aria-pressed="true">Sleeper</button>
+          <button type="button" id="pick-mfl" data-platform="mfl" aria-pressed="false">MFL</button>
+          <button type="button" id="pick-espn" data-platform="espn" aria-pressed="false">ESPN</button>
+        </div>
+        <form class="go" id="go" novalidate>
+          <div class="field">
+            <label for="league-key" id="league-key-label">Your Sleeper username</label>
+            <svg id="ico-user" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="8" r="4"/><path d="M4 21c0-4 3.6-7 8-7s8 3 8 7"/></svg>
+            <svg id="ico-hash" hidden viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M5 9h14M5 15h14M10 4 8 20M16 4l-2 16"/></svg>
+            <input id="league-key" name="league-key" type="text" autocomplete="username" autocapitalize="none" spellcheck="false" placeholder="Your Sleeper username">
+          </div>
+          <!-- The guest lane (Apple 5.1.1(v): registration must stay optional). -->
+          <button class="cta hero-cta" id="btnGuest" type="submit">See my league</button>
+        </form>
+        <p class="fine" id="key-hint" hidden></p>
+        <div class="note" id="note" role="alert" hidden></div>
+        <p class="fine"><b>Free.</b> No account, no password. Dynasty, redraft, superflex and IDP.</p>
+        <p class="signup"><strong>Become a founding member.</strong> Everything in DHQ is free this season. Create a free account before March 1, 2027 and your first year of full DHQ is free when paid plans start. <a href="#auth" class="hero-secondary" id="signup-link" data-open-sheet="signup">Create free account&nbsp;&rarr;</a></p>
+        <p class="signup" style="border-top:0;padding-top:0;margin-top:12px"><strong>New: bring your own AI.</strong> Members ask about their league in plain English, right in the app, with their own ChatGPT, Claude or Gemini, powered by DHQ's numbers. No extra cost from us. <a href="#auth" class="hero-secondary" data-open-sheet="signup">Join free&nbsp;&rarr;</a></p>
+      </div>
+
+      <div class="hero-art">
+        <div class="phone"><img src="img/landing/briefing.jpg" width="780" height="1060" alt="DHQ home screen: an intelligence briefing for GoldJacket, ranked 2nd with a health score of 89, contender tier."></div>
+      </div>
+    </section>
+
+    <section class="show" aria-labelledby="show-title">
+      <div class="show-head">
+        <h2 id="show-title">What you get</h2>
+        <p>Real app screens · names changed · Week 3</p>
+      </div>
+      <div class="rail">
+        <article class="tile">
+          <div class="phone"><img src="img/landing/game-day.jpg" width="780" height="1282" loading="lazy" alt="Game Day: an Alex note, the optimizer confirming the lineup is already optimal at 89.3 projected points, and graded starters including Ja'Marr Chase and Puka Nacua."></div>
+          <div>
+            <span class="tag">Game Day</span>
+            <h3>Start the Right Players</h3>
+            <p>Sleeper's own projections for your scoring, a matchup grade on every starter, and the exact swaps that add points.</p>
+          </div>
+        </article>
+        <article class="tile">
+          <div class="phone"><img src="img/landing/trade-center.jpg" width="780" height="1320" loading="lazy" alt="Trade Center finder rows: two B-grade offers to FourthAndLong for Jonathan Taylor and Bhayshul Tuten, with acceptance odds and value difference."></div>
+          <div>
+            <span class="tag">Trade Center</span>
+            <h3>Trades Opponents will Take</h3>
+            <p>Offers built around what you need and what each owner in your league tends to accept.</p>
+          </div>
+        </article>
+        <article class="tile">
+          <div class="phone"><img src="img/landing/power-rankings.jpg" width="780" height="1220" loading="lazy" alt="Power Rankings for an 18-team league, with GoldJacket highlighted at number 2."></div>
+          <div>
+            <span class="tag">Power Rankings</span>
+            <h3>Know where you stand</h3>
+            <p>Every team in your league ranked, with your spot highlighted. Updated every week.</p>
+          </div>
+        </article>
+      </div>
+    </section>
+  </main>
+
+  <footer>
+    <nav aria-label="Footer">
+      <button class="foot-btn" type="button" data-open-sheet="signin">Sign in</button>
+      <a href="https://discord.gg/3VFRJbWVnH" target="_blank" rel="noopener">Discord</a>
+      <a href="our-vision.html">Our vision</a>
+      <a href="legal/privacy-policy.html">Privacy</a>
+      <a href="legal/terms-of-service.html">Terms</a>
+      <a id="contactLink" href="#">Contact</a>
+      <script>/* the address is put together here so Cloudflare's email obfuscation has nothing to rewrite in the HTML */document.getElementById('contactLink').href = 'mailto:' + ['admin', 'c2football.com'].join('@');</script>
+    </nav>
+    <small>© 2026 C2 Football LLC</small>
+  </footer>
+</div>
+
+<!-- Sign-up / sign-in sheet -->
+<div class="sheet" id="authSheet" hidden>
+  <div class="sheet-backdrop" data-close-sheet></div>
+  <div class="sheet-panel" role="dialog" aria-modal="true" aria-labelledby="authTitle">
+    <button class="sheet-close" type="button" aria-label="Close" data-close-sheet>&times;</button>
+    <section class="auth" id="auth">
+      <a class="auth-back" id="authBack" href="index.html">&larr; Back to my leagues</a>
+      <img class="auth-crest" src="img/dhq-crest.jpg" alt="" width="52" height="52">
+      <h2 class="auth-title" id="authTitle">Create your account</h2>
+      <p class="auth-sub" id="authSub">Become a founding member. Your first year of full DHQ is free when paid plans start.</p>
+
+      <div class="alert" id="alertJoin"></div>
+
+      <!-- Lab sign-up (owner ask 2026-10-10). Hidden on the website; the Lab
+           script below shows one of these two in sign-up mode:
+           - a guest (already in the app) sees the league they connected,
+             which comes with them — nothing to retype;
+           - a new visitor links their league account here, then makes the
+             account. No AI key anywhere in sign-up: that lives on the
+             leagues page ("Add my AI key") and in Ask your AI. -->
+      <div class="auth-linked" id="authLinked" hidden>
+        <span class="auth-linked-tick" aria-hidden="true">&#10003;</span>
+        <span>Your leagues come with you: <strong id="authLinkedName"></strong></span>
+      </div>
+      <div class="auth-league" id="authLeague" hidden>
+        <div class="auth-step">1 · Your league account</div>
+        <div class="auth-platform" role="group" aria-label="Where your league lives">
+          <button type="button" data-auth-platform="sleeper" aria-pressed="true">Sleeper</button>
+          <button type="button" data-auth-platform="mfl" aria-pressed="false">MFL</button>
+          <button type="button" data-auth-platform="espn" aria-pressed="false">ESPN</button>
+        </div>
+        <input class="auth-input" id="authLeagueKey" type="text" autocomplete="username" autocapitalize="none" spellcheck="false" placeholder="Your Sleeper username" aria-label="Your Sleeper username">
+        <p class="auth-league-hint" id="authLeagueHint">Your <b>username</b> on Sleeper, not your email. All your Sleeper leagues come in.</p>
+      </div>
+      <div class="auth-step" id="authStepAccount" hidden>2 · Your account</div>
+
+
+    <button id="btnGoogle" class="auth-google" onclick="handleGoogle()">
+      <svg viewBox="0 0 48 48" width="18" height="18" aria-hidden="true"><path fill="#FFC107" d="M43.6 20.5H42V20H24v8h11.3C33.7 32.4 29.3 35 24 35c-6.1 0-11-4.9-11-11s4.9-11 11-11c2.8 0 5.4 1.1 7.3 2.8l5.7-5.7C33.6 6.1 29.1 4 24 4 12.9 4 4 12.9 4 24s8.9 20 20 20 20-8.9 20-20c0-1.3-.1-2.3-.4-3.5z"/><path fill="#FF3D00" d="M6.3 14.7l6.6 4.8C14.7 16 19 13 24 13c2.8 0 5.4 1.1 7.3 2.8l5.7-5.7C33.6 6.1 29.1 4 24 4 16.3 4 9.7 8.3 6.3 14.7z"/><path fill="#4CAF50" d="M24 44c5.2 0 9.9-2 13.4-5.2l-6.2-5.2C29.2 35 26.7 36 24 36c-5.3 0-9.7-2.6-11.3-7l-6.6 5.1C9.6 39.6 16.2 44 24 44z"/><path fill="#1976D2" d="M43.6 20.5H42V20H24v8h11.3c-.8 2.2-2.2 4.1-4.1 5.6l6.2 5.2C39.9 36 44 30.6 44 24c0-1.3-.1-2.3-.4-3.5z"/></svg>
+      Continue with Google
+    </button>
+
+    <!-- Apple -->
+    <button id="btnApple" class="auth-apple" onclick="handleApple()">
+      <svg viewBox="0 0 24 24" width="17" height="17" aria-hidden="true" fill="currentColor"><path d="M17.05 12.04c-.03-2.65 2.16-3.92 2.26-3.98-1.23-1.8-3.15-2.05-3.83-2.08-1.63-.16-3.18.96-4.01.96-.82 0-2.1-.94-3.46-.91-1.78.03-3.42 1.03-4.34 2.62-1.85 3.21-.47 7.95 1.33 10.55.88 1.27 1.93 2.7 3.3 2.65 1.32-.05 1.82-.85 3.42-.85 1.59 0 2.04.85 3.44.82 1.42-.02 2.32-1.3 3.19-2.58 1-1.47 1.42-2.89 1.44-2.97-.03-.01-2.76-1.06-2.79-4.2zM14.6 4.48c.73-.89 1.22-2.12 1.08-3.35-1.05.04-2.32.7-3.07 1.58-.67.78-1.26 2.03-1.1 3.23 1.17.09 2.36-.6 3.09-1.46z"/></svg>
+      Continue with Apple
+    </button>
+
+
+      <div class="auth-or"><span>or</span></div>
+
+      <!-- Email signup / signin -->
+      <input class="auth-input" type="email" id="acctEmail" placeholder="Email" autocomplete="email" autocapitalize="off">
+      <input class="auth-input" type="password" id="acctPassword" placeholder="Password (8+ characters)" autocomplete="current-password">
+      <button class="auth-submit" id="btnJoin" onclick="handleEmailAuth()">Create account →</button>
+
+      <p class="auth-hint">
+        <span id="sleeperHint">Step 1 of 2 — next you'll connect your leagues (Sleeper, MFL or ESPN).</span>
+      </p>
+      <div class="auth-links">
+        <button class="auth-linkbtn" id="toggleMode" onclick="toggleAuthMode()">Already have an account? Sign in</button>
+        <button class="auth-linkbtn" id="forgotBtn" onclick="handleForgot()" style="display:none">Forgot password?</button>
+      </div>
+    </section>
+  </div>
+</div>
+  <script src="vendor/supabase.min.js?v=7d46902303"></script>
+  <script>
+    const FW_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InN4c2hpcXl4aGhpZnZ0ZnFhd2JxIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzI3MTExMzAsImV4cCI6MjA4ODI4NzEzMH0.zJi9W986ZLaANiZN6pt6ReFwaQU6yPeidsERIWo2ibI';
+    const SUPABASE_URL = 'https://sxshiqyxhhifvtfqawbq.supabase.co';
+    const SESSION_KEY = 'fw_session_v1';
+    const LANDING_EDITOR_PREVIEW = new URLSearchParams(window.location.search).has('landingPreview');
+    // ?signout — arrive here from the DHQ logo to land on the sign-in page and
+    // stay put. Suppresses the auto-redirects below and clears the session.
+    const FORCE_SIGNOUT = new URLSearchParams(window.location.search).has('signout');
+    // ?home: deliberate visit to this page (league hub brand icon) — stay here
+    // instead of bouncing a signed-in visitor straight back into the app.
+    const STAY_HOME = new URLSearchParams(window.location.search).has('home');
+
+    // Supabase client — used only for lightweight landing analytics below.
+    let _sbClient = null;
+    function getSbClient() {
+      if (!_sbClient && window.supabase) {
+        _sbClient = window.supabase.createClient(SUPABASE_URL, FW_ANON_KEY);
+      }
+      return _sbClient;
+    }
+
+    const LANDING_ANALYTICS_SESSION_KEY = 'fw_landing_analytics_session_v1';
+    function landingAnalyticsSessionId() {
+      try {
+        let sid = sessionStorage.getItem(LANDING_ANALYTICS_SESSION_KEY);
+        if (!sid) {
+          sid = 'sess_' + Date.now().toString(36) + '_' + Math.random().toString(36).slice(2, 8);
+          sessionStorage.setItem(LANDING_ANALYTICS_SESSION_KEY, sid);
+        }
+        return sid;
+      } catch {
+        return 'sess_' + Date.now().toString(36);
+      }
+    }
+    // iOS/iPadOS browsers all carry a Safari/ UA token; the app shell's bare
+    // WKWebView does not. iPads in desktop mode report "Macintosh", so a Mac
+    // UA counts only with touch (MacIntel + maxTouchPoints > 1): a Mac app's
+    // webview is not the iOS app (same rule as js/shared/live-update.js).
+    function detectSurface() {
+      try {
+        const ua = navigator.userAgent || '';
+        const ipadDesktop = navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1;
+        const apple = /iPhone|iPad|iPod/.test(ua) || ipadDesktop;
+        return apple && /AppleWebKit/.test(ua) && !/Safari\//.test(ua) ? 'ios_app' : 'web';
+      } catch { return 'web'; }
+    }
+    // Test-traffic stamp (owner ask 2026-09-27: "filter out test traffic").
+    // Robots (automated browsers) and the owners' own devices tag every event
+    // so Mission Control can leave them out. A device becomes an owner device
+    // once an owner's Sleeper name is used on it (sticky, survives sign-out);
+    // ?dhq_internal=1 / ?dhq_internal=0 marks or clears a device by hand.
+    const DHQ_OWNER_HANDLES = ['skjjcruz', 'bigloco'];
+    function dhqInternalTag() {
+      try {
+        const q = new URLSearchParams(location.search).get('dhq_internal');
+        if (q === '1') localStorage.setItem('dhq_internal_v1', 'owner');
+        else if (q === '0') localStorage.removeItem('dhq_internal_v1');
+      } catch (e) {}
+      try { if (navigator.webdriver) return 'automated'; } catch (e) {}
+      try {
+        if (localStorage.getItem('dhq_internal_v1')) return 'owner';
+        const auth = JSON.parse(localStorage.getItem('od_auth_v1') || 'null');
+        const prof = JSON.parse(localStorage.getItem('od_profile_v1') || 'null');
+        const names = [auth && auth.username, auth && auth.sleeperUsername, prof && prof.sleeperUsername].map(n => String(n || '').toLowerCase());
+        if (names.some(n => DHQ_OWNER_HANDLES.includes(n))) { localStorage.setItem('dhq_internal_v1', 'owner'); return 'owner'; }
+      } catch (e) {}
+      return null;
+    }
+    function safeLandingMeta(meta) {
+      const out = {
+        route: window.location.pathname || '/landing.html',
+        surface: detectSurface(),
+        host: window.location.hostname || null,
+      };
+      const internal = dhqInternalTag();
+      if (internal) out.internal = internal;
+      // The deploy stamps (scripts/build-deploy.cjs);
+      // no stamp (local dev) → no field.
+      try {
+        const b = window.DHQ_BUILD || (document.querySelector('meta[name="dhq-build"]') || {}).content;
+        if (typeof b === 'string' && b.trim()) out.build = b.trim().slice(0, 80);
+      } catch (e) {}
+      Object.entries(meta || {}).forEach(([key, value]) => {
+        if (/email|password|token|secret|message|content|body/i.test(key)) return;
+        if (key === 'accountId') return; // first-class column now, not metadata
+        if (value == null) return;
+        if (['string', 'number', 'boolean'].includes(typeof value)) out[key] = value;
+      });
+      return out;
+    }
+    function safeReferrerHost() {
+      try { return document.referrer ? new URL(document.referrer).hostname : null; }
+      catch { return null; }
+    }
+    // Returns a promise that settles when the insert lands (or after 900ms,
+    // whichever is first) so critical-path callers can await it BEFORE
+    // navigating away. Fire-and-forget callers are unaffected. Without this,
+    // signup_succeeded died in flight when the OAuth callback immediately
+    // redirected to the connect page — a REAL Apple signup on 9/1 landed an
+    // account at 14:20:52 and the funnel still read "Signup succeeded: 0"
+    // (owner deep dive 2026-09-02).
+    // Landing events carried no account id, so Mission Control could only ever
+    // say "3 people signed up with google" — naming them meant hand-matching
+    // signups to accounts by timestamp (owner ask 2026-09-09). Pass
+    // metadata.accountId on the success paths and the row identifies itself.
+    function trackLandingEvent(eventName, metadata = {}) {
+      try {
+        if (LANDING_EDITOR_PREVIEW) return Promise.resolve();
+        const db = getSbClient();
+        if (!db || !eventName) return Promise.resolve();
+        let accountId = metadata.accountId || null;
+        if (!accountId) {
+          // Fall back to the stored session, so every later landing event on
+          // an authenticated device is attributable too.
+          try {
+            const sess = JSON.parse(localStorage.getItem(SESSION_KEY) || 'null');
+            accountId = sess?.user?.id || null;
+          } catch (e) { accountId = null; }
+        }
+        const insert = db.from('analytics_events').insert([{
+          event_id: 'evt_' + Date.now().toString(36) + '_' + Math.random().toString(36).slice(2, 10),
+          username: null,
+          user_id: accountId,
+          league_id: null,
+          session_id: landingAnalyticsSessionId(),
+          platform: 'warroom',
+          module: 'landing',
+          widget: metadata.widget || null,
+          event_name: eventName,
+          event_ts: new Date().toISOString(),
+          entity_type: metadata.entityType || null,
+          entity_id: metadata.entityId || null,
+          metadata: safeLandingMeta(metadata),
+        }]).then(() => {}).catch(() => {});
+        return Promise.race([insert, new Promise(r => setTimeout(r, 900))]);
+      } catch { return Promise.resolve(); }
+    }
+    trackLandingEvent('landing_viewed', {
+      referrerHost: safeReferrerHost(),
+      viewport: window.innerWidth < 768 ? 'mobile' : 'desktop',
+    });
+    document.addEventListener('click', (evt) => {
+      const target = evt.target.closest?.('.hero-cta,.hero-secondary,.price-btn,.nav-btn,.auth-submit,.btn--primary,.btn--secondary');
+      if (!target) return;
+      trackLandingEvent('landing_cta_clicked', {
+        widget: target.className.split(/\s+/)[0],
+        entityType: 'cta',
+        entityId: target.id || target.className.split(/\s+/)[0],
+      });
+    }, { capture: true });
+
+    const WARROOM_URL = 'index.html';
+    const AUTH_KEY = 'od_auth_v1';
+    const PROFILE_KEY = 'od_profile_v1';
+
+    // A brand-new account must walk the full funnel (plan -> Sleeper connect)
+    // even on a device where a previous account already finished onboarding —
+    // that progress is per DEVICE, and inheriting it skips the journey.
+    function resetDeviceOnboardingForNewAccount() {
+      try {
+        const prof = JSON.parse(localStorage.getItem(PROFILE_KEY) || 'null') || {};
+        delete prof.sleeperUsername;
+        delete prof.sleeperUserId;
+        prof.onboardingComplete = false;
+        localStorage.setItem(PROFILE_KEY, JSON.stringify(prof));
+      } catch {}
+      try { localStorage.removeItem(AUTH_KEY); } catch {}
+      try { localStorage.removeItem('od_locked_username_v2'); } catch {}
+      try { localStorage.removeItem('dynastyhq_username'); } catch {}
+      try { localStorage.removeItem('mfl_league_id'); } catch {}
+      try { localStorage.removeItem('mfl_year'); } catch {}
+      try { localStorage.removeItem('mfl_franchise_id'); } catch {}
+      try { localStorage.removeItem('espn_league_id'); } catch {}
+      try { localStorage.removeItem('espn_year'); } catch {}
+      try { localStorage.removeItem('espn_team_id'); } catch {}
+      try { sessionStorage.removeItem('espn_s2'); sessionStorage.removeItem('espn_swid'); } catch {}
+    }
+    const FW_API_BASE = SUPABASE_URL + '/functions/v1';
+
+    let authMode = 'signup'; // 'signup' | 'signin'
+
+    // ── Lab sign-up (owner ask 2026-10-10) ─────────────────────────────────
+    // Two clean paths, no AI key anywhere in sign-up (it lives on the leagues
+    // page and in Ask your AI):
+    //  1. A guest (already in the app with a league) signs up from the
+    //     leagues page: account only. Their league comes with them through
+    //     the existing reconcile (identity.js adopts a guest's handle and
+    //     league pointers onto the new account), so nothing is retyped and
+    //     they land back on the leagues page signed in.
+    //  2. A new visitor links their league account (Sleeper / MFL / ESPN)
+    //     on the sign-up sheet itself. It is checked here and left as the
+    //     same one-time note the front-page box leaves; once the account
+    //     exists the connect page consumes it behind its loading screen,
+    //     links it to the account and goes straight in.
+    // Live on the website too since 2026-10-12 (was Lab only).
+    const LAB_SIGNUP = true;
+    const PREFILL_KEY = 'dhq_connect_prefill';
+    const JUST_JOINED_KEY = 'dhq_just_joined_v1'; // the leagues page greets a new member once
+    const LAB_COPY = {
+      sleeper: { placeholder: 'Your Sleeper username', mode: 'text', auto: 'username',
+                 hint: 'Your <b>username</b> on Sleeper, not your email. All your Sleeper leagues come in.' },
+      mfl: { placeholder: 'Your MFL league ID', mode: 'numeric', auto: 'off',
+             hint: 'The number after <b>L=</b> in your MFL web address. Next you pick which team is yours.' },
+      espn: { placeholder: 'Your ESPN league ID', mode: 'numeric', auto: 'off',
+              hint: 'The number after <b>leagueId=</b> in your ESPN league\'s web address (pasting the link works). Next you pick which team is yours.' },
+    };
+    let labPlatform = 'sleeper';
+    let labLeagueChecked = false;
+    // The league(s) a guest already connected on this device, as one line,
+    // or null when this visitor is not a guest with a league.
+    function labGuestLeague() {
+      try {
+        if (localStorage.getItem('wr_guest_v1') !== '1') return null;
+        let handle = null;
+        try { handle = window.OD?.identity?.localHandle ? window.OD.identity.localHandle() : null; } catch { handle = null; }
+        if (!handle) {
+          const a = JSON.parse(localStorage.getItem(AUTH_KEY) || 'null');
+          handle = (a && (a.sleeperUsername || a.username)) || null;
+        }
+        const names = [];
+        if (handle) names.push('@' + handle + ' on Sleeper');
+        const mfl = localStorage.getItem('mfl_league_id');
+        if (mfl) names.push('MFL league ' + mfl);
+        const espn = localStorage.getItem('espn_league_id');
+        if (espn) names.push('ESPN league ' + espn);
+        return names.length ? names.join(', ') : null;
+      } catch { return null; }
+    }
+    function labSetPlatform(next) {
+      const c = LAB_COPY[next];
+      if (!c) return;
+      labPlatform = next;
+      const input = document.getElementById('authLeagueKey');
+      document.querySelectorAll('[data-auth-platform]').forEach(b => b.setAttribute('aria-pressed', String(b.dataset.authPlatform === next)));
+      input.placeholder = c.placeholder;
+      input.setAttribute('aria-label', c.placeholder);
+      input.inputMode = c.mode;
+      input.setAttribute('autocomplete', c.auto);
+      input.value = '';
+      document.getElementById('authLeagueHint').innerHTML = c.hint;
+    }
+    // Show the right league block for the sheet's mode (sign-up only).
+    function syncLabSignup() {
+      if (!LAB_SIGNUP) return;
+      const signup = authMode === 'signup';
+      const guest = signup ? labGuestLeague() : null;
+      document.getElementById('authLinked').hidden = !guest;
+      if (guest) document.getElementById('authLinkedName').textContent = guest;
+      const league = document.getElementById('authLeague');
+      league.hidden = !signup || !!guest;
+      document.getElementById('authStepAccount').hidden = league.hidden;
+      document.getElementById('sleeperHint').textContent = guest
+        ? 'Next: straight back to your leagues, signed in. Add your AI key there.'
+        : 'Next: your leagues, where you add your AI key with one tap.';
+    }
+    // Whatever was already typed in the front-page box goes along.
+    function labPrefillFromHero() {
+      const box = document.getElementById('authLeagueKey');
+      const hero = document.getElementById('league-key');
+      if (!box || box.value.trim() || !hero || !hero.value.trim()) return;
+      const pressed = document.querySelector('.platform button[aria-pressed="true"]');
+      if (pressed && LAB_COPY[pressed.dataset.platform]) labSetPlatform(pressed.dataset.platform);
+      box.value = hero.value.trim();
+    }
+    function labForgetPrefill() { try { sessionStorage.removeItem(PREFILL_KEY); } catch {} }
+    // Resolves true to go ahead with the sign-up. A new visitor's league is
+    // checked (a Sleeper name must exist; an ID must look like one) and left
+    // as the one-time note for the connect page.
+    async function labLeagueStep() {
+      if (!LAB_SIGNUP || authMode !== 'signup' || labGuestLeague()) return true;
+      const input = document.getElementById('authLeagueKey');
+      let v = (input.value || '').trim();
+      const p = labPlatform;
+      if (p === 'sleeper') {
+        v = v.replace(/^@/, '');
+        if (!v) { showAlert('error', 'Type your Sleeper username first. It is the name on your Sleeper profile, not your email.'); input.focus(); return false; }
+        try {
+          const r = await fetch('https://api.sleeper.app/v1/user/' + encodeURIComponent(v));
+          const u = r.ok ? await r.json().catch(() => null) : null;
+          if (r.status === 404 || (r.ok && !(u && u.user_id))) {
+            showAlert('error', "We couldn't find that Sleeper username. Check the spelling and try again.");
+            input.focus(); return false;
+          }
+        } catch { /* Sleeper unreachable: the connect step checks it again */ }
+      } else {
+        // A pasted league link: MFL's ?L= or its /<season>/home/<id> page;
+        // ESPN's leagueId=. Otherwise just the digits typed.
+        const inLink = p === 'mfl' ? (v.match(/[?&]L=(\d+)/i) || v.match(/\/home\/(\d+)/i)) : v.match(/leagueId=(\d+)/i);
+        v = inLink ? inLink[1] : v.replace(/\D/g, '');
+        if (!/^\d{3,12}$/.test(v)) {
+          showAlert('error', p === 'mfl'
+            ? 'Type your MFL league ID. It is the number after L= in your MFL web address, like 41208.'
+            : "Type your ESPN league ID. It is the number after leagueId= in your ESPN league's web address.");
+          input.focus(); return false;
+        }
+      }
+      try { sessionStorage.setItem(PREFILL_KEY, JSON.stringify({ platform: p, value: v, ts: Date.now() })); } catch {}
+      return true;
+    }
+    // Google / Apple: check the league first, then go to the provider (the
+    // note survives the round trip in this tab's sessionStorage).
+    function labNeedsLeagueFirst(run) {
+      if (!LAB_SIGNUP || authMode !== 'signup' || labGuestLeague() || labLeagueChecked) return false;
+      labLeagueStep().then(ok => {
+        if (!ok) return;
+        labLeagueChecked = true;
+        try { run(); } finally { labLeagueChecked = false; }
+      });
+      return true;
+    }
+    // After a sign-in / sign-up routes: a note the connect page won't read
+    // (the account already has its leagues) is dropped; a new member is
+    // greeted once on the leagues page.
+    function labAfterAuth(dest, isNew) {
+      if (!LAB_SIGNUP) return;
+      if (dest !== CONNECT_URL) labForgetPrefill();
+      if (isNew) { try { sessionStorage.setItem(JUST_JOINED_KEY, '1'); } catch {} }
+    }
+    if (LAB_SIGNUP) {
+      // A league error goes away as soon as the visitor fixes it.
+      const clearLeagueError = () => { const a = document.getElementById('alertJoin'); if (a && a.classList.contains('alert-error')) a.classList.remove('show'); };
+      document.querySelectorAll('[data-auth-platform]').forEach(b => b.addEventListener('click', () => {
+        labSetPlatform(b.dataset.authPlatform);
+        clearLeagueError();
+        document.getElementById('authLeagueKey').focus();
+      }));
+      document.getElementById('authLeagueKey').addEventListener('input', clearLeagueError);
+    }
+
+    // ── Sign-up sheet (one-page front door, owner ruling 2026-09-24) ──────
+    // Declared here, ahead of the OAuth callback below: that callback can
+    // report a provider error synchronously while this script is still
+    // running, and showAlert opens the sheet.
+    // The sign-in / create-account form lives in a sheet instead of a page
+    // section. Every id the handlers above read (authTitle, authSub,
+    // sleeperHint, btnJoin, btnGoogle, btnApple, toggleMode, forgotBtn,
+    // acctEmail, acctPassword, alertJoin) is inside it.
+    let _sheetReturnFocus = null;
+    function openAuthSheet(mode) {
+      const sheet = document.getElementById('authSheet');
+      if (!sheet) return;
+      if ((mode === 'signup' || mode === 'signin') && mode !== authMode) toggleAuthMode();
+      if (LAB_SIGNUP) { syncLabSignup(); if (authMode === 'signup') labPrefillFromHero(); }
+      if (!sheet.hidden) return;
+      _sheetReturnFocus = document.activeElement;
+      sheet.hidden = false;
+      document.body.classList.add('sheet-open');
+      // Lab: a guest with leagues came here from the app — sign-up is its
+      // own page, and leaving it goes back to their leagues.
+      if (LAB_SIGNUP && labGuestLeague()) document.body.classList.add('auth-page');
+      setTimeout(() => { try { document.getElementById('btnGoogle').focus(); } catch {} }, 30);
+    }
+    function closeAuthSheet() {
+      const sheet = document.getElementById('authSheet');
+      if (!sheet || sheet.hidden) return;
+      if (document.body.classList.contains('auth-page')) { window.location.href = 'index.html'; return; }
+      sheet.hidden = true;
+      document.body.classList.remove('sheet-open');
+      try { if (_sheetReturnFocus && _sheetReturnFocus.focus) _sheetReturnFocus.focus(); } catch {}
+    }
+    document.addEventListener('click', (e) => {
+      if (e.target.closest && e.target.closest('[data-close-sheet]')) closeAuthSheet();
+      const opener = e.target.closest && e.target.closest('[data-open-sheet]');
+      if (opener) { e.preventDefault(); openAuthSheet(opener.getAttribute('data-open-sheet')); }
+    });
+    document.addEventListener('keydown', (e) => { if (e.key === 'Escape') closeAuthSheet(); });
+
+    function destForUser() {
+      const pref = localStorage.getItem('fw_preferred_view');
+      if (pref === 'warroom') return WARROOM_URL;
+      // Deterministic default: always the War Room league picker. (Previously this
+      // keyed off window.innerWidth, which made iPads flip between Scout and War
+      // Room by orientation.) Scout was retired 2026-11-09, so an old 'scout'
+      // preference lands here too.
+      return WARROOM_URL;
+    }
+
+    const CONNECT_URL = 'connect-sleeper.html';
+
+    function showAlert(type, message) {
+      // Every sign-in message lives in the sheet — open it so an OAuth
+      // return error (or any auth message) is never shown to a closed sheet.
+      openAuthSheet();
+      const el = document.getElementById('alertJoin');
+      el.className = 'alert alert-' + type + ' show';
+      el.textContent = message;
+      if (type !== 'success') setTimeout(() => el.classList.remove('show'), 6000);
+    }
+
+    // Where to send a signed-in user: the connect-your-leagues page until a
+    // league source (Sleeper, MFL or ESPN) is bound; the app once one is.
+    // Reads both od_auth_v1 shapes ({username} / {sleeperUsername}).
+    function nextAfterAuth() {
+      try {
+        if (window.OD?.identity) return window.OD.identity.localOnboarded() ? destForUser() : CONNECT_URL;
+        const profile = JSON.parse(localStorage.getItem(PROFILE_KEY) || 'null');
+        const legacy = JSON.parse(localStorage.getItem(AUTH_KEY) || 'null');
+        if (profile?.onboardingComplete === true || profile?.sleeperUsername || legacy?.username || legacy?.sleeperUsername
+          || localStorage.getItem('mfl_league_id') || localStorage.getItem('espn_league_id')) return destForUser();
+      } catch {}
+      return CONNECT_URL;
+    }
+
+    // After EVERY successful sign-in (email, Google/Apple return, handoff,
+    // repaired session): reconcile the device's identity cache with the
+    // account (DHQ-Shared identity.js — a previous owner's cache is cleared,
+    // the server's Sleeper handle wins, a handle only this device knew is
+    // uploaded), then route on what the account actually has: the app when a
+    // league source is bound, the connect page when not. Never on a stale
+    // onboardingComplete another person left on this device.
+    async function destAfterSignIn(session, opts) {
+      try {
+        const idn = window.OD?.identity;
+        if (idn) {
+          const r = await idn.reconcileAfterSignIn(session || null, opts || {});
+          // needsConfirm: this device remembers a handle / league the account
+          // doesn't have — the connect page offers it for a one-tap confirm.
+          return r.needsConfirm ? CONNECT_URL : (r.onboarded ? destForUser() : CONNECT_URL);
+        }
+      } catch (e) { console.warn('[WR] identity reconcile:', e); }
+      return (opts && opts.isNew) ? CONNECT_URL : nextAfterAuth();
+    }
+    async function routeSignedIn(session, opts) {
+      window.location.href = await destAfterSignIn(session, opts);
+    }
+    // The stored copy never keeps platformUsernames (it would go stale); the
+    // reconcile gets it from the response itself.
+    function storeSession(data) {
+      const copy = Object.assign({}, data);
+      delete copy.platformUsernames;
+      delete copy.isNew;
+      localStorage.setItem(SESSION_KEY, JSON.stringify(copy));
+    }
+
+    function toggleAuthMode() {
+      authMode = authMode === 'signup' ? 'signin' : 'signup';
+      const signup = authMode === 'signup';
+      document.getElementById('authTitle').textContent = signup ? 'Create your account' : 'Welcome back';
+      document.getElementById('authSub').textContent = signup
+        ? 'Become a founding member. Your first year of full DHQ is free when paid plans start.'
+        : 'Sign in to your Dynasty HQ account.';
+      document.getElementById('sleeperHint').parentElement.style.display = signup ? '' : 'none';
+      document.getElementById('btnJoin').textContent = signup ? 'Create account \u2192' : 'Sign in \u2192';
+      document.getElementById('btnGoogle').lastChild.textContent = signup ? ' Continue with Google' : ' Sign in with Google';
+      document.getElementById('btnApple').lastChild.textContent = signup ? ' Continue with Apple' : ' Sign in with Apple';
+      document.getElementById('toggleMode').textContent = signup ? 'Already have an account? Sign in' : 'Need an account? Sign up';
+      document.getElementById('forgotBtn').style.display = signup ? 'none' : '';
+      syncLabSignup();
+    }
+
+    // \u2500\u2500 Email signup / signin (account only \u2014 Sleeper handled on step 2) \u2500
+    async function handleEmailAuth() {
+      const email = document.getElementById('acctEmail').value.trim();
+      const password = document.getElementById('acctPassword').value;
+      const btn = document.getElementById('btnJoin');
+      const signup = authMode === 'signup';
+      // Owner ask 2026-10-10: a new visitor who typed only their league name
+      // and hit Create account gets told plainly how to finish.
+      const labLeagueTyped = signup && LAB_SIGNUP && !!(document.getElementById('authLeagueKey') || {}).value;
+      if (!email || !password) {
+        showAlert('error', labLeagueTyped ? 'Sign-up isn\u2019t finished yet. Continue with Google or Apple, or enter your email and a password, then tap Create account.' : 'Email and password are required.');
+        (document.getElementById(!email ? 'acctEmail' : 'acctPassword') || {}).focus?.();
+        return;
+      }
+      if (signup && password.length < 8) { showAlert('error', 'Password must be at least 8 characters.'); return; }
+      // Lab: a new visitor's league account is checked before the account
+      // is made (a typo is fixed here, not after).
+      if (signup && LAB_SIGNUP) {
+        if (btn.disabled) return;
+        btn.disabled = true; btn.textContent = 'Checking your league…';
+        const go = await labLeagueStep();
+        btn.disabled = false; btn.textContent = 'Create account →';
+        if (!go) return;
+      }
+      trackLandingEvent(signup ? 'signup_started' : 'signin_started');
+      btn.disabled = true; btn.textContent = signup ? 'Creating account\u2026' : 'Signing in\u2026';
+      // Hold live-update reloads while the sign-in is in flight.
+      window.__dhqBusy = (window.__dhqBusy || 0) + 1;
+      try {
+        const path = signup ? 'fw-signup' : 'fw-signin';
+        const res = await fetch(`${FW_API_BASE}/${path}`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'apikey': FW_ANON_KEY, 'Authorization': `Bearer ${FW_ANON_KEY}` },
+          body: JSON.stringify({ email, password }),
+        });
+        const data = await res.json();
+        if (!res.ok || !data.token) {
+          trackLandingEvent(signup ? 'signup_failed' : 'signin_failed', { status: res.status });
+          showAlert('error', data.error || (signup ? 'Sign-up failed.' : 'Invalid email or password.'));
+          btn.disabled = false; btn.textContent = signup ? 'Create account \u2192' : 'Sign in \u2192';
+          return;
+        }
+        storeSession(data);
+        trackLandingEvent(signup ? 'signup_succeeded' : 'signin_succeeded', { accountId: data?.user?.id || null });
+        showAlert('success', signup ? (LAB_SIGNUP ? 'Account ready \u2014 taking you to your leagues\u2026' : 'Account ready \u2014 connect your leagues\u2026') : 'Welcome back\u2026');
+        // New accounts start at the connect-your-leagues page (a guest who
+        // signs up keeps the leagues they connected); returning sign-ins go
+        // wherever the account's own identity says.
+        if (!window.OD?.identity && signup) resetDeviceOnboardingForNewAccount();
+        const [dest] = await Promise.all([destAfterSignIn(data, { isNew: signup }), new Promise(r => setTimeout(r, 600))]);
+        labAfterAuth(dest, signup);
+        window.location.href = dest;
+      } catch (err) {
+        trackLandingEvent(signup ? 'signup_failed' : 'signin_failed', { reason: 'network' });
+        showAlert('error', 'Network error: ' + (err?.message || String(err)));
+        btn.disabled = false; btn.textContent = signup ? 'Create account \u2192' : 'Sign in \u2192';
+      } finally {
+        window.__dhqBusy = Math.max(0, (window.__dhqBusy || 1) - 1);
+      }
+    }
+
+    // \u2500\u2500 Google OAuth (account only) \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500
+    function handleGoogle() {
+      if (labNeedsLeagueFirst(handleGoogle)) return; // Lab: league account first
+      const db = getSbClient();
+      if (!db) { showAlert('error', 'Sign-in is still loading \u2014 try again in a moment.'); return; }
+      trackLandingEvent('oauth_started', { provider: 'google' });
+      // Mission Control's funnel counts signup_started/signup_succeeded.
+      // Without these a Google or Apple signup is invisible and the funnel
+      // reads 0 no matter how many people sign up (owner ask 2026-08-20).
+      trackLandingEvent(authMode === 'signup' ? 'signup_started' : 'signin_started', { method: 'google' });
+      markOAuthPending();
+      db.auth.signInWithOAuth({ provider: 'google', options: { redirectTo: window.location.origin + window.location.pathname.replace(/\/([^/.]+)$/, '/$1.html') } });
+    }
+
+    // ── Apple OAuth (account only) ──────────────────────────────────────────
+    function handleApple() {
+      if (labNeedsLeagueFirst(handleApple)) return; // Lab: league account first
+      const db = getSbClient();
+      if (!db) { showAlert('error', 'Sign-in is still loading — try again in a moment.'); return; }
+      trackLandingEvent('oauth_started', { provider: 'apple' });
+      // Mission Control's funnel counts signup_started/signup_succeeded.
+      // Without these a Google or Apple signup is invisible and the funnel
+      // reads 0 no matter how many people sign up (owner ask 2026-08-20).
+      trackLandingEvent(authMode === 'signup' ? 'signup_started' : 'signin_started', { method: 'apple' });
+      markOAuthPending();
+      db.auth.signInWithOAuth({ provider: 'apple', options: { redirectTo: window.location.origin + window.location.pathname.replace(/\/([^/.]+)$/, '/$1.html') } });
+    }
+
+    // Handle Google redirect back: store session, then route to step 2.
+    // Captured before Supabase's client consumes the URL: a fresh OAuth return
+    // must always re-sync and replace any stored session — the old "skip if a
+    // token already exists" rule meant a stale or malformed saved session
+    // could never be repaired by signing in again.
+    const FRESH_OAUTH_RETURN =
+      (window.location.hash || '').indexOf('access_token=') !== -1 ||
+      /[?&]code=/.test(window.location.search || '');
+    // A sign-in this tab started (or whose provider return it received) in the
+    // last 10 minutes and that hasn't finished: a reload in the middle of it
+    // (the provider token is already out of the URL) resumes it. This is
+    // what separates "finish my sign-in" from "a Supabase session merely
+    // lingering on this device", which must never sign anyone in.
+    const OAUTH_PENDING_KEY = 'dhq_oauth_pending_v1';
+    function markOAuthPending() { try { sessionStorage.setItem(OAUTH_PENDING_KEY, String(Date.now())); } catch {} }
+    function clearOAuthPending() { try { sessionStorage.removeItem(OAUTH_PENDING_KEY); } catch {} }
+    const RESUME_OAUTH = !FRESH_OAUTH_RETURN && (function () {
+      try { const t = Number(sessionStorage.getItem(OAUTH_PENDING_KEY) || 0); return t > 0 && Date.now() - t < 10 * 60 * 1000; } catch { return false; }
+    })();
+    if (FRESH_OAUTH_RETURN) markOAuthPending();
+
+    // Best-effort JWT expiry check (mirrors the shared client): true only when
+    // a decodable `exp` claim is in the past (30s skew).
+    function jwtExpired(token) {
+      try {
+        const part = String(token).split('.')[1];
+        if (!part) return false;
+        const claims = JSON.parse(atob(part.replace(/-/g, '+').replace(/_/g, '/')));
+        if (typeof claims?.exp !== 'number') return false;
+        return Date.now() >= claims.exp * 1000 - 30 * 1000;
+      } catch { return false; }
+    }
+    // A session is only worth acting on when it can pass the shared client's
+    // checks in the app: token present, not expired, and user.id attached
+    // (id-less sessions — the Jul 9–11 sign-in bug shape — resolve free).
+    function sessionHealthy(s) {
+      return !!(s?.token && s?.user?.id && !jwtExpired(s.token));
+    }
+    // Cover the OAuth landing bounce with a calm full-screen state instead of
+    // flashing the marketing page mid-redirect. Removed only on paths that
+    // stay on this page; successful sign-ins navigate away underneath it.
+    let _oauthOverlay = null;
+    if (FRESH_OAUTH_RETURN || RESUME_OAUTH) {
+      _oauthOverlay = document.createElement('div');
+      _oauthOverlay.style.cssText = 'position:fixed;inset:0;z-index:9999;background:#0a0c10;display:flex;align-items:center;justify-content:center;color:#e6e9ed;font-family:"JetBrains Mono",monospace;font-size:.85rem;letter-spacing:.12em;text-transform:uppercase';
+      _oauthOverlay.textContent = 'Signing you in…';
+      document.body.appendChild(_oauthOverlay);
+    }
+    function dropOAuthOverlay() {
+      try { if (_oauthOverlay) { _oauthOverlay.remove(); _oauthOverlay = null; } } catch {}
+    }
+    (async function handleOAuthCallback() {
+      let oauthBusy = false;
+      try {
+        if (LANDING_EDITOR_PREVIEW || FORCE_SIGNOUT || STAY_HOME) { dropOAuthOverlay(); return; }
+        const OAUTH_SIGNIN = FRESH_OAUTH_RETURN || RESUME_OAUTH;
+        // A provider bounced us back with an error in the URL — this used to
+        // fall through in complete silence (owner deep dive 2026-09-02:
+        // "Signup submitted… then nothing"). Now it reports itself.
+        const _urlErr = ((window.location.hash || '') + (window.location.search || '')).match(/[#?&]error(?:_description)?=([^&]+)/);
+        if (_urlErr) {
+          clearOAuthPending();
+          dropOAuthOverlay();
+          trackLandingEvent('oauth_returned_error', { detail: decodeURIComponent(_urlErr[1]).slice(0, 120) });
+          showAlert('error', 'Sign-in was cancelled or blocked by the provider. Please try again — or use email.');
+          return;
+        }
+        const db = getSbClient();
+        if (!db) { dropOAuthOverlay(); return; }
+        // A fresh provider return is a sign-in in flight: hold live-update
+        // reloads until it has landed (released in finally).
+        if (OAUTH_SIGNIN) { window.__dhqBusy = (window.__dhqBusy || 0) + 1; oauthBusy = true; }
+        const { data } = await db.auth.getSession();
+        if (!data?.session) {
+          dropOAuthOverlay();
+          if (OAUTH_SIGNIN) clearOAuthPending();
+          // Only a fresh OAuth return with no resulting session is a failure
+          // worth reporting — a plain landing view with no session is normal.
+          if (FRESH_OAUTH_RETURN) {
+            trackLandingEvent('oauth_no_session', {});
+            showAlert('error', 'Sign-in didn’t finish — the provider sent us back without a session. Please try again.');
+          }
+          return;
+        }
+        const user = data.session.user;
+        const oauthProvider = user.app_metadata?.provider || 'oauth';
+        const fallbackName = user.user_metadata?.full_name || user.user_metadata?.name || user.email;
+        const existing = JSON.parse(localStorage.getItem(SESSION_KEY) || 'null');
+        // Not a fresh provider return and the app session is fine: nothing to
+        // sign in. checkSession (or the handoff) routes this visit — this
+        // handler used to route it too, logging a phantom signin_succeeded.
+        // Only a FRESH provider return (or resuming one this tab started)
+        // signs anyone in. A Supabase session merely lingering on this device
+        // used to be re-synced whenever the app session was unhealthy — which
+        // silently re-minted a session after "sign out everywhere" / a
+        // password reset, and recreated an account deleted on another device.
+        // A damaged app session is repaired by checkSession
+        // (fw-refresh-session) or the user signs in again.
+        if (!OAUTH_SIGNIN) { dropOAuthOverlay(); return; }
+        let appSession = null;
+        // Re-sync on a fresh OAuth return, when nothing usable is stored, and
+        // also when the stored session is damaged (no user.id / expired) —
+        // a lingering Supabase session is exactly what lets us repair those.
+        if (OAUTH_SIGNIN || !sessionHealthy(existing)) {
+          // Exchange the Supabase OAuth token for a Dynasty HQ app session so the
+          // user is registered in app_users and accepted by authenticated APIs.
+          let accountDeleted = false;
+          let syncAnswered = false; // a network error (or the page unloading mid-request) keeps the resume marker
+          try {
+            const res = await fetch(`${FW_API_BASE}/fw-oauth-sync`, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${data.session.access_token}` },
+              body: JSON.stringify({ productSlug: 'war_room' }),
+            });
+            syncAnswered = true;
+            if (res.ok) appSession = await res.json();
+            else if (res.status === 410) {
+              const body = await res.json().catch(() => ({}));
+              accountDeleted = body?.code === 'account_deleted';
+            }
+          } catch (syncErr) { console.warn('[WR] OAuth sync error:', syncErr); }
+
+          if (!appSession && syncAnswered) clearOAuthPending();
+          if (accountDeleted) {
+            // The Google/Apple sign-in belongs to an account that was deleted.
+            // Drop the provider session on THIS device (local scope) so the
+            // next visit doesn't try again, and say what happened.
+            dropOAuthOverlay();
+            try { await Promise.race([db.auth.signOut({ scope: 'local' }), new Promise(r => setTimeout(r, 1500))]); } catch {}
+            try {
+              for (const k of Object.keys(localStorage)) if (/^sb-.+-auth-token/.test(k)) localStorage.removeItem(k);
+            } catch {}
+            trackLandingEvent('oauth_account_deleted', { provider: oauthProvider });
+            try { if (authMode !== 'signup') toggleAuthMode(); } catch {}
+            showAlert('error', 'This account was deleted. Sign up again to start fresh.');
+            return;
+          }
+
+          if (appSession?.token && appSession?.user?.id) {
+            // Store the WHOLE user record — id/tier/products included. The
+            // shared client refuses account sessions without user.id, so
+            // dropping the id here is what locked every Google sign-in to
+            // the free tier once gating went live.
+            localStorage.setItem(SESSION_KEY, JSON.stringify({
+              token: appSession.token,
+              user: Object.assign({}, appSession.user || {}, {
+                email: appSession.user.email || user.email,
+                displayName: appSession.user.displayName || fallbackName,
+              }),
+            }));
+          } else if (!sessionHealthy(existing)) {
+            // The sync failed and there is no healthy session to fall back
+            // on. Do NOT store the raw Supabase token: a session without
+            // user.id is refused by the shared client and reads as free
+            // tier — the exact shape that locked Google sign-ins to Scout.
+            // Stay here so the user can retry.
+            dropOAuthOverlay();
+            trackLandingEvent('oauth_sync_failed', { provider: oauthProvider });
+            showAlert('error', 'Sign-in hit a snag finishing your account setup. Please try again in a moment.');
+            return;
+          }
+        }
+        const oauthIsNew = !!(appSession && appSession.isNew === true);
+        // AWAITED so the success reaches the server before we navigate away —
+        // otherwise a successful signup reads as a funnel dropout.
+        const oauthAccountId = (appSession && appSession.user && appSession.user.id) || null;
+        await Promise.all([
+          trackLandingEvent('oauth_succeeded', { provider: oauthProvider, isNew: oauthIsNew, accountId: oauthAccountId }),
+          trackLandingEvent(oauthIsNew ? 'signup_succeeded' : 'signin_succeeded', { method: oauthProvider, accountId: oauthAccountId }),
+        ]);
+        // Reconcile the device identity with the account, then route: a
+        // first-ever sign-in (fw-oauth-sync just created the account) goes to
+        // the connect-your-leagues page unless it adopted a guest's leagues.
+        if (!window.OD?.identity && oauthIsNew) resetDeviceOnboardingForNewAccount();
+        const oauthDest = await destAfterSignIn(appSession || null, { isNew: oauthIsNew });
+        labAfterAuth(oauthDest, oauthIsNew);
+        clearOAuthPending();
+        window.location.href = oauthDest;
+      } catch (e) {
+        dropOAuthOverlay();
+        console.warn('[WR] OAuth callback error:', e);
+        trackLandingEvent('oauth_callback_error', { detail: String(e && e.message || e).slice(0, 120) });
+      } finally {
+        if (oauthBusy) window.__dhqBusy = Math.max(0, (window.__dhqBusy || 1) - 1);
+      }
+    })();
+
+    // \u2500\u2500 Forgot password \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500
+    async function handleForgot() {
+      const email = document.getElementById('acctEmail').value.trim();
+      if (!email) { showAlert('error', 'Enter your email first, then tap \u201cForgot password?\u201d'); document.getElementById('acctEmail').focus(); return; }
+      trackLandingEvent('password_reset_requested');
+      try {
+        await fetch(`${FW_API_BASE}/fw-request-password-reset`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'apikey': FW_ANON_KEY, 'Authorization': `Bearer ${FW_ANON_KEY}` },
+          body: JSON.stringify({ email }),
+        });
+      } catch {}
+      // Always show success \u2014 never reveal whether an email exists.
+      showAlert('success', 'If that email has an account, a password reset link is on the way.');
+    }
+
+    // If already signed in, skip ahead \u2014 to step 2 if Sleeper isn't bound yet,
+    // else straight into the app.
+    // Forced sign-out (DHQ logo → ?signout): clear local + Supabase sessions and
+    // stay on this page. The redirect guards above already bail on FORCE_SIGNOUT.
+    // The same one clear as every other sign-out (DHQ-Shared identity.js
+    // signOutClear): credentials only — sessions, the guest flag, the
+    // Google/Apple session (LOCAL scope: the user's other devices stay signed
+    // in), platform logins, AI keys. The owner-stamped identity cache (the
+    // Sleeper handle, league pointers) stays, so signing back in is never a
+    // full reconnect; the stamp clears it if someone else signs in.
+    (async function forceSignOut() {
+      if (!FORCE_SIGNOUT) return;
+      const idn = window.OD?.identity;
+      if (idn) {
+        try { await idn.signOutClear({ supabase: getSbClient() }); } catch {}
+      } else {
+        // identity.js missing (stale cache / partial deploy): the same keys by hand.
+        try { localStorage.removeItem(SESSION_KEY); } catch {}
+        try { localStorage.removeItem('od_session_v1'); } catch {}
+        try { localStorage.removeItem('wr_guest_v1'); } catch {}
+        // Platform logins + personal AI keys (same list as DHQ-Shared
+        // supabase-client.js DEVICE_SECRET_KEYS) leave with the person.
+        ['espn_s2','espn_swid','mfl_api_key','mfl_write_cookie','mfl_write_host','yahoo_session_id',
+ 'dynastyhq_ai_key','dynastyhq_xai_key','dynastyhq_gemini_key','dynastyhq_anthropic_key','dynastyhq_apikey',
+ 'dynastyhq_ai_provider','dynastyhq_ai_model','dhq_credentials_owner_v1'].forEach(k => { try { sessionStorage.removeItem(k); localStorage.removeItem(k); } catch (e) {} });
+        try { const db = getSbClient(); if (db) await Promise.race([db.auth.signOut({ scope: 'local' }), new Promise(r => setTimeout(r, 1500))]); } catch {}
+      }
+      try { if (authMode === 'signup') toggleAuthMode(); } catch {}
+      try { history.replaceState(null, '', window.location.pathname); } catch {}
+    })();
+    // Settings → Change password ends every session and lands here.
+    (function passwordChangedNotice() {
+      if (new URLSearchParams(window.location.search).get('password') !== 'changed') return;
+      try { openAuthSheet('signin'); } catch {}
+      try { showAlert('success', 'Password changed. Sign in with your new password.'); } catch {}
+      try { history.replaceState(null, '', window.location.pathname); } catch {}
+    })();
+
+    (function checkSession() {
+      try {
+        // STAY_HOME (?home): the league hub's brand icon lands here on
+        // purpose — a signed-in visitor must be able to look at this page
+        // without being bounced straight back into the app. Their way back
+        // in is the nav button, which flips from "Sign in" to "Open app".
+        if (LANDING_EDITOR_PREVIEW || FORCE_SIGNOUT || STAY_HOME) {
+          try {
+            const staySession = JSON.parse(localStorage.getItem(SESSION_KEY) || 'null');
+            const navBtn = document.getElementById('navSignin');
+            if (STAY_HOME && staySession?.token && navBtn) {
+              navBtn.textContent = 'Open app';
+              navBtn.removeAttribute('data-open-sheet'); // "Open app" opens the app, not the sign-in sheet
+              navBtn.onclick = () => { window.location.href = nextAfterAuth(); };
+            }
+          } catch {}
+          return;
+        }
+        if (FRESH_OAUTH_RETURN || RESUME_OAUTH) return; // the OAuth callback owns this visit
+        if (window.__dhqHandoff) return; // the handoff below owns this visit
+        if (new URLSearchParams(window.location.search).has('reauth')) return; // the sign-in sheet owns this visit
+        const session = JSON.parse(localStorage.getItem(SESSION_KEY) || 'null');
+        if (!session?.token) return;
+        const idn = window.OD?.identity;
+        // A legacy (Sleeper-username) login is not an app account: never send
+        // it to fw-refresh-session (401 → it was cleared here). Its own exp
+        // governs it; the app / login.html handle the rest.
+        if (idn && String(idn.sessionOwner(session) || '').indexOf('legacy:') === 0) {
+          if (!jwtExpired(session.token)) { window.location.href = nextAfterAuth(); }
+          return;
+        }
+        if (sessionHealthy(session)) {
+          trackLandingEvent('landing_existing_session_redirected');
+          // Stamp matches: the cache is this account's — route on it. A
+          // mismatch (another owner's cache, or a device from before owner
+          // stamping) reconciles against the account first.
+          if (!idn || idn.getStamp() === idn.sessionOwner(session)) window.location.href = nextAfterAuth();
+          else routeSignedIn(null, { boot: true }); // a session this device already held (not a sign-in)
+          return;
+        }
+        // Damaged (no user.id) or expired session: repair it through
+        // fw-refresh-session before entering the app — entering with it
+        // shows the account as free tier. Unrepairable ones are cleared so
+        // the normal sign-in flow is the recovery path.
+        (async () => {
+          if (!jwtExpired(session.token)) {
+            try {
+              const res = await fetch(`${FW_API_BASE}/fw-refresh-session`, {
+                method: 'POST',
+                headers: { 'Authorization': `Bearer ${session.token}`, 'apikey': FW_ANON_KEY },
+              });
+              if (res.ok) {
+                const data = await res.json();
+                if (data?.token && data?.user?.id) {
+                  localStorage.setItem(SESSION_KEY, JSON.stringify({ token: data.token, user: data.user }));
+                  trackLandingEvent('landing_session_repaired');
+                  await routeSignedIn(data, { boot: true }); // the device's own stored session, repaired
+                  return;
+                }
+              }
+            } catch {}
+          }
+          // Whose cache this is outlives the dead token (owner stamp).
+          try { window.OD?.identity?.stampFromSession(session); } catch {}
+          localStorage.removeItem(SESSION_KEY);
+          trackLandingEvent('landing_dead_session_cleared');
+        })();
+      } catch {}
+    })();
+
+    // Session handoff from the marketing site (head script ingested it).
+    (async function handoff() {
+      const h = window.__dhqHandoff;
+      if (!h || LANDING_EDITOR_PREVIEW) return;
+      await routeSignedIn(h.session, { isNew: h.isNew === true });
+    })();
+
+    // ?signin (a guest's "Create a free account", upgrade / AI setup pages)
+    // and ?reauth (a lapsed session, the app's "Your session ended" notice)
+    // open the sign-in sheet. A still-healthy session was routed above.
+    (function signInRequested() {
+      const q = new URLSearchParams(window.location.search);
+      if (!(q.has('signin') || q.has('reauth')) || FRESH_OAUTH_RETURN || RESUME_OAUTH || LANDING_EDITOR_PREVIEW) return;
+      // ?signin with a healthy session was routed into the app by the head;
+      // ?reauth always gets the sheet (the stored session may be revoked).
+      if (!q.has('reauth')) {
+        try {
+          const s = JSON.parse(localStorage.getItem(SESSION_KEY) || 'null');
+          if (sessionHealthy(s)) return;
+        } catch {}
+      }
+      // ?signin=new: a guest's "Create free account" opens on the sign-up side.
+      try { openAuthSheet(q.get('signin') === 'new' ? 'signup' : 'signin'); } catch {}
+      // &via=google|apple: the app's My Profile buttons go straight to that
+      // provider, through this page's own handlers (same OAuth return, same
+      // guest-league adoption). The flag is dropped from the URL first so a
+      // back-swipe from the provider can't fire it twice.
+      const via = q.get('via');
+      if (via === 'google' || via === 'apple') {
+        try { q.delete('via'); history.replaceState(null, '', location.pathname + (q.toString() ? '?' + q.toString() : '') + location.hash); } catch {}
+        let tries = 0;
+        (function go() {
+          if (getSbClient()) { try { (via === 'google' ? handleGoogle : handleApple)(); } catch {} return; }
+          if (++tries < 40) setTimeout(go, 150);
+        })();
+      }
+      if (q.has('reauth')) { try { showAlert('success', 'Your session ended. Sign in to pick up where you left off.'); } catch {} }
+    })();
+
+    document.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter' && ['acctEmail', 'acctPassword'].includes(document.activeElement?.id)) handleEmailAuth();
+      // Lab league step: Enter moves on to the account fields.
+      if (e.key === 'Enter' && document.activeElement?.id === 'authLeagueKey') { e.preventDefault(); document.getElementById('acctEmail').focus(); }
+    });
+    </script>
+
+<script>
+  // ── The one box: Sleeper username / MFL league ID / ESPN league ID ──────
+  // A visitor becomes a guest and lands on the connect page with what they
+  // typed already handed over (connect-sleeper.html reads the one-time
+  // 'dhq_connect_prefill' note and connects on its own), so nobody types it
+  // twice. Signing up stays optional — the sheet is the account path.
+  (function () {
+    var form = document.getElementById('go');
+    var input = document.getElementById('league-key');
+    var label = document.getElementById('league-key-label');
+    var note = document.getElementById('note');
+    var ask = document.getElementById('ask');
+    var hint = document.getElementById('key-hint');
+    var icoUser = document.getElementById('ico-user');
+    var icoHash = document.getElementById('ico-hash');
+    var buttons = document.querySelectorAll('.platform button');
+    var platform = 'sleeper';
+    var COPY = {
+      sleeper: { ask: 'Type your Sleeper name.', placeholder: 'Your Sleeper username', mode: 'text', auto: 'username' },
+      mfl: { ask: 'Type your MFL league ID.', placeholder: 'Your MFL league ID', mode: 'numeric', auto: 'off',
+             hint: 'Your league ID is the number after <b>L=</b> in your MFL web address.' },
+      espn: { ask: 'Type your ESPN league ID.', placeholder: 'Your ESPN league ID', mode: 'numeric', auto: 'off',
+              hint: 'Your league ID is the number after <b>leagueId=</b> in your ESPN league\'s web address. Pasting the whole link works too. Private leagues take one extra step.' }
+    };
+    function say(msg) { note.textContent = msg; note.hidden = false; }
+    function setPlatform(next) {
+      platform = next;
+      var c = COPY[next];
+      buttons.forEach(function (b) { b.setAttribute('aria-pressed', String(b.dataset.platform === next)); });
+      ask.textContent = c.ask;
+      input.placeholder = c.placeholder;
+      label.textContent = c.placeholder;
+      input.inputMode = c.mode;
+      input.setAttribute('autocomplete', c.auto);
+      input.value = '';
+      icoUser.toggleAttribute('hidden', next !== 'sleeper');
+      icoHash.toggleAttribute('hidden', next === 'sleeper');
+      hint.innerHTML = c.hint || '';
+      hint.hidden = !c.hint;
+      note.hidden = true;
+    }
+    buttons.forEach(function (b) {
+      b.addEventListener('click', function () { setPlatform(b.dataset.platform); input.focus(); });
+    });
+    // Live update (js/shared/live-update.js): what's typed here is not saved
+    // until submit, and the focus guard stops covering it once the visitor
+    // taps away — hold the silent reload while the box has text. (The auth
+    // sheet is a modal, which already holds it while open.)
+    try { window.App.LiveUpdate.hold('landing-form', function () { return !!(input.value || '').trim(); }); } catch (e) { /* updater absent */ }
+    form.addEventListener('submit', function (e) {
+      e.preventDefault();
+      var v = (input.value || '').trim();
+      if (platform === 'sleeper') {
+        v = v.replace(/^@/, '');
+        if (!v) { say('Type your Sleeper username first. It is the name on your Sleeper profile, not your email.'); input.focus(); return; }
+      } else {
+        // A pasted league link carries other numbers (the season, a team id),
+        // so take the league ID from its own key before stripping to digits.
+        var inLink = platform === 'mfl' ? v.match(/[?&]L=(\d+)/i) : v.match(/leagueId=(\d+)/i);
+        v = inLink ? inLink[1] : v.replace(/\D/g, '');
+        if (!/^\d{3,12}$/.test(v)) {
+          say(platform === 'mfl'
+            ? 'Type your MFL league ID. It is the number after L= in your MFL web address, like 41208.'
+            : "Type your ESPN league ID. It is the number after leagueId= in your ESPN league's web address.");
+          input.focus(); return;
+        }
+      }
+      note.hidden = true;
+      // No "Welcome back — sign in" detour, for anyone (owner ruling
+      // 2026-10-05): Go continues straight in.
+      //
+      // A member still signed in on this device (the hub's DHQ icon opens
+      // this page): their own Sleeper name goes straight back in as the
+      // member; an MFL / ESPN id connects to the account; any other Sleeper
+      // name signs the member out FIRST — and waits for the sign-out to
+      // finish — so the guest's league can never be written onto the
+      // member's account (2026-10-05 incident).
+      var idnL = window.OD && window.OD.identity;
+      if (idnL && typeof idnL.currentOwner === 'function') {
+        var liveOwner = null;
+        try { liveOwner = idnL.currentOwner(); } catch (err) { liveOwner = null; }
+        var liveSess = null;
+        try { liveSess = JSON.parse(localStorage.getItem('fw_session_v1') || 'null'); } catch (err) { liveSess = null; }
+        var liveTok = liveSess && liveSess.token && String(liveSess.token).split('.')[1];
+        var liveClaims = null;
+        try { liveClaims = liveTok ? JSON.parse(atob(liveTok.replace(/-/g, '+').replace(/_/g, '/'))) : null; } catch (err) { liveClaims = null; }
+        var liveOk = !!(liveClaims && (!liveClaims.exp || Number(liveClaims.exp) * 1000 > Date.now()));
+        // Any stored member login — live OR expired — is handled here: an
+        // expired one must be cleared too, or the next app load would adopt
+        // this guest's league onto that account (b154 review).
+        if (liveOwner && liveOwner !== 'guest' && liveSess && liveSess.token) {
+          var meta = (liveClaims && liveClaims.app_metadata) || {};
+          var sessHandle = (typeof meta.sleeper_username === 'string' && meta.sleeper_username) || (liveSess.user && liveSess.user.sleeperUsername) || null;
+          var myHandle = ((idnL.getStamp && idnL.getStamp() === liveOwner && idnL.localHandle) ? idnL.localHandle() : null) || sessHandle;
+          if (liveOk && platform !== 'sleeper') {
+            // A member adding an MFL / ESPN league: connect it to the account
+            // (?reconnect lets a member with leagues through the connect gate).
+            try { sessionStorage.setItem('dhq_connect_prefill', JSON.stringify({ platform: platform, value: v, ts: Date.now() })); } catch (err) {}
+            window.location.href = 'connect-sleeper.html?reconnect=' + platform;
+            return;
+          }
+          if (liveOk && myHandle && String(myHandle).toLowerCase() === v.toLowerCase()) { window.location.href = 'index.html'; return; }
+          try { localStorage.removeItem('dhq_remembered_member_v1'); } catch (err) {}
+          var outDone = null;
+          try { if (typeof idnL.signOutClear === 'function') outDone = idnL.signOutClear({ supabase: (typeof getSbClient === 'function' ? getSbClient() : null) }); } catch (err) { outDone = null; }
+          try { localStorage.removeItem('fw_session_v1'); localStorage.removeItem('od_session_v1'); } catch (err) {}
+          var resumed = false;
+          var resume = function () { if (resumed) return; resumed = true; continueIn(platform, v); };
+          Promise.resolve(outDone).then(resume, resume);
+          setTimeout(resume, 2000);
+          return;
+        }
+      }
+      continueIn(platform, v);
+    });
+
+    // Signed out (or just signed out): a member who signed out on this
+    // device and types their own Sleeper name is signed back in as that
+    // member (js/core.js remembers them); anyone else comes in as a guest.
+    function continueIn(platform, v) {
+      var idnC = window.OD && window.OD.identity;
+      try {
+        var rem = JSON.parse(localStorage.getItem('dhq_remembered_member_v1') || 'null');
+        var tok = rem && rem.session && rem.session.token;
+        var part = tok && String(tok).split('.')[1];
+        var claims = part ? JSON.parse(atob(part.replace(/-/g, '+').replace(/_/g, '/'))) : null;
+        var remMeta = (claims && claims.app_metadata) || {};
+        var remOwner = remMeta.user_id ? 'account:' + remMeta.user_id
+          : (typeof remMeta.sleeper_username === 'string' && remMeta.sleeper_username ? 'legacy:' + remMeta.sleeper_username.toLowerCase() : null);
+        // Restore only when the device still belongs to that member (no
+        // other guest has used it since — their leagues must never be
+        // adopted onto this account).
+        var stampNow = idnC && typeof idnC.getStamp === 'function' ? idnC.getStamp() : null;
+        if (platform === 'sleeper' && claims && Number(claims.exp) * 1000 > Date.now() && rem.handle
+            && String(rem.handle).toLowerCase() === v.toLowerCase() && remOwner && stampNow === remOwner) {
+          localStorage.setItem('fw_session_v1', JSON.stringify(rem.session));
+          localStorage.removeItem('wr_guest_v1');
+          localStorage.removeItem('dhq_remembered_member_v1');
+          window.location.href = 'index.html';
+          return;
+        }
+        // Any other entry — expired, another name, an MFL / ESPN guest —
+        // forgets the remembered member.
+        if (rem) localStorage.removeItem('dhq_remembered_member_v1');
+      } catch (err) { /* fall through to guest */ }
+      // The guest lane never runs on top of a stored member login.
+      try { localStorage.removeItem('fw_session_v1'); localStorage.removeItem('od_session_v1'); } catch (err) {}
+      var idn = window.OD && window.OD.identity;
+      try { sessionStorage.setItem('dhq_connect_prefill', JSON.stringify({ platform: platform, value: v, ts: Date.now() })); } catch (err) {}
+      // The Sleeper name goes along: the same person keeps their stuff.
+      try { if (idn) idn.beginGuest(platform === 'sleeper' ? v : undefined); } catch (err) {}
+      try{localStorage.setItem('wr_guest_v1','1')}catch(e){};window.location.href='connect-sleeper.html';
+    }
+  })();
+</script>
+<script>
+  // Sheet keyboard fit (layout only). iOS Safari overlays the keyboard on
+  // the page instead of resizing it, so pin the sheet to the visible area;
+  // then keep the focused field and the submit button in view.
+  (function () {
+    var sheet = document.getElementById('authSheet');
+    if (!sheet) return;
+    var panel = sheet.querySelector('.sheet-panel');
+    var vv = window.visualViewport;
+    function pin() {
+      if (!vv) return;
+      var covered = !sheet.hidden && window.innerHeight - vv.height > 1;
+      sheet.style.top = covered ? vv.offsetTop + 'px' : '';
+      sheet.style.height = covered ? vv.height + 'px' : '';
+      sheet.style.bottom = covered ? 'auto' : '';
+    }
+    function fit() {
+      var el = document.activeElement;
+      if (!el || !panel.contains(el) || !/^(INPUT|TEXTAREA)$/.test(el.tagName)) return;
+      var pr = panel.getBoundingClientRect(), er = el.getBoundingClientRect();
+      var sub = document.getElementById('btnJoin');
+      var top = er.top - 12, bottom = Math.max(er.bottom, sub ? sub.getBoundingClientRect().bottom : 0) + 12;
+      var d = 0;
+      if (bottom - top > pr.height || top < pr.top) d = top - pr.top;
+      else if (bottom > pr.bottom) d = bottom - pr.bottom;
+      if (Math.abs(d) > 1) panel.scrollTop += d;
+    }
+    function sync() { pin(); fit(); }
+    if (vv) { vv.addEventListener('resize', sync); vv.addEventListener('scroll', pin); }
+    window.addEventListener('resize', sync);
+    panel.addEventListener('focusin', function () { setTimeout(sync, 60); setTimeout(sync, 400); });
+  })();
+</script>
+</body>
+</html>
