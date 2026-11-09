@@ -1,2 +1,0 @@
-window.App=window.App||{};const _evLog=(o,n,s)=>window.dhqLog(o,n,s),_listeners={},DhqEvents={on(o,n){return _listeners[o]||(_listeners[o]=[]),_listeners[o].push(n),()=>DhqEvents.off(o,n)},off(o,n){_listeners[o]=(_listeners[o]||[]).filter(s=>s!==n)},emit(o,n){(_listeners[o]||[]).forEach(s=>{try{s(n)}catch(t){_evLog("event-bus",t,{event:o})}})},once(o,n){const s=DhqEvents.on(o,t=>{s(),n(t)});return s}};window.App.DhqEvents=DhqEvents,window.DhqEvents=DhqEvents;
-
