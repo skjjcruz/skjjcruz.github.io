@@ -311,6 +311,10 @@ dialog.wr-journal .wr-journal-bar{position:sticky;top:0;z-index:5}
 .wr-wire-rivalry-actions button{min-height:44px;padding:9px 14px}
 .wr-wire-rivalry-editor [role=alert]{color:var(--bad,#e74c3c)}
 .wr-wire-rivalry-editor [role=status]{color:var(--wj-live)}
+.wr-wire-headline-desk>summary{cursor:pointer;font:700 1.5rem var(--wj-display);color:var(--wj-ink)}
+.wr-wire-headline-desk>summary span{font:500 var(--text-label,.75rem) var(--wj-body);color:var(--wj-faint);margin-left:10px;letter-spacing:.04em}
+.wr-wire-headline-desk .is-wide{grid-column:1/-1}
+.wr-wire-headline-desk textarea{min-width:0;width:100%;min-height:96px;background:var(--wj-panel);color:var(--wj-ink);border:1px solid var(--wj-rule-strong);border-radius:var(--card-radius-sm,8px);padding:10px;font:inherit;font-size:16px;resize:vertical}
 .wr-all-wire-rivalries{margin-bottom:24px}
 .wr-all-wire-rivalries>label{max-width:400px;margin-bottom:16px}
 .wr-wire-rivalry-links{margin:0 0 24px}
