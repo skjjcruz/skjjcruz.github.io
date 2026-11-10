@@ -1,10 +1,10 @@
 {
   "build": "b194a-5b47a363b3",
   "tag": "b194a",
-  "builtAt": "2026-11-09T14:32:41.061Z",
+  "builtAt": "2026-11-10T15:17:25.831Z",
   "critical": false,
   "notes": "",
-  "commit": "95ec397f3432",
+  "commit": "75bf114a2683",
   "pages": {
     "index.html": [
       "js/shared/shared-loader.js?v=8ea9cd81af",
