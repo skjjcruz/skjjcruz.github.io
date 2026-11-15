@@ -1,10 +1,10 @@
 {
-  "build": "b194a-97cda233af",
+  "build": "b194a-d6a407d5dd",
   "tag": "b194a",
-  "builtAt": "2026-11-15T13:47:16.680Z",
+  "builtAt": "2026-11-15T14:31:59.081Z",
   "critical": false,
   "notes": "",
-  "commit": "64e2a603009e",
+  "commit": "a5d8a03f6571",
   "pages": {
     "index.html": [
       "js/shared/shared-loader.js?v=bd3fd3242c",
@@ -180,10 +180,10 @@
       "js/tabs/strategy-editor.js?v=d3f9750b0c",
       "js/league-detail.js?v=3989795c34",
       "js/app.js?v=d29ee1f479",
-      "js/shared/matchup-engine.js?v=5451512465",
-      "js/shared/dhq-baseline.js?v=5451512465",
-      "js/shared/matchup-feeds-espn.js?v=5451512465",
-      "js/shared/matchup-inputs.js?v=5451512465",
+      "js/shared/matchup-engine.js?v=15d59f6d2f",
+      "js/shared/dhq-baseline.js?v=15d59f6d2f",
+      "js/shared/matchup-feeds-espn.js?v=15d59f6d2f",
+      "js/shared/matchup-inputs.js?v=15d59f6d2f",
       "reconai-shared/ai-dispatch.js?v=2d7ec80fbe",
       "reconai-shared/alex-voice.js?v=2d7ec80fbe",
       "reconai-shared/analytics-engine.js?v=2d7ec80fbe",
@@ -418,7 +418,7 @@
     "js/shared/matchup-engine.js": "28d1dce7cd",
     "js/shared/dhq-baseline.js": "4666971ab7",
     "js/shared/matchup-feeds-espn.js": "c938b17e81",
-    "js/shared/matchup-inputs.js": "d604bb3a92",
+    "js/shared/matchup-inputs.js": "78232f4963",
     "reconai-shared/ai-dispatch.js": "d72094cca8",
     "reconai-shared/alex-voice.js": "50c02cbbff",
     "reconai-shared/analytics-engine.js": "8dcbe1aeae",
@@ -461,9 +461,9 @@
     "reconai-shared/utils.js": "d1d19fd122",
     "reconai-shared/weekly-proj.js": "14f37c2e1b",
     "reconai-shared/yahoo-api.js": "b875759b3a",
-    "index.html": "5e837b9666",
-    "landing.html": "0beb532653",
-    "connect-sleeper.html": "0a11595a83",
-    "upgrade.html": "89945f8e94"
+    "index.html": "3449df6d09",
+    "landing.html": "5d4d98f61e",
+    "connect-sleeper.html": "f925a49b89",
+    "upgrade.html": "25afd2320a"
   }
 }
