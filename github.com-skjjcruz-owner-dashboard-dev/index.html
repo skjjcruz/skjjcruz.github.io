@@ -3,11 +3,11 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="dhq-build" content="b194a-d6a407d5dd">
+    <meta name="dhq-build" content="b194a-b309696d0d">
     <meta name="dhq-engine-v" content="15d59f6d2f">
     <meta name="dhq-proj-model" content="00516df75ee1">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, minimum-scale=1.0, viewport-fit=cover">
-    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval' https://dhq-lab.pages.dev/data/; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com data:; img-src 'self' data: blob: https:; connect-src 'self' https://sxshiqyxhhifvtfqawbq.supabase.co https://hovnqztlbsgsywrbidbh.supabase.co https://api.openai.com https://api.anthropic.com https://generativelanguage.googleapis.com https://api.sleeper.app https://site.api.espn.com https://sports.core.api.espn.com https://api.myfantasyleague.com https://*.myfantasyleague.com https://lm-api-reads.fantasy.espn.com https://site.web.api.espn.com https://fantasysports.yahooapis.com https://api.fantasycalc.com https://*.sentry.io; worker-src 'self' blob:; frame-ancestors 'none'; base-uri 'self'; object-src 'none';">
+    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval' https://dhq-lab.pages.dev/data/; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com data:; img-src 'self' data: blob: https:; connect-src 'self' https://sxshiqyxhhifvtfqawbq.supabase.co https://hovnqztlbsgsywrbidbh.supabase.co https://api.openai.com https://api.anthropic.com https://generativelanguage.googleapis.com https://api.sleeper.app https://api.sleeper.com https://dhq-lab.pages.dev https://site.api.espn.com https://sports.core.api.espn.com https://api.myfantasyleague.com https://*.myfantasyleague.com https://lm-api-reads.fantasy.espn.com https://site.web.api.espn.com https://fantasysports.yahooapis.com https://api.fantasycalc.com https://*.sentry.io; worker-src 'self' blob:; frame-src https://www.youtube-nocookie.com; frame-ancestors 'none'; base-uri 'self'; object-src 'none';">
 
     <!-- Early auth gate: bounce signed-out visitors to the sign-in page BEFORE the
          React/Babel app (~80 modules, multi-second in-browser compile) loads, so
@@ -3198,8 +3198,15 @@ WRShared.preloadMany(WR_SHARED_FILES);
 <script src="js/components.js?v=aab6aa5c57"></script>
 <!-- 2b. Unified Player Card (SI-2) — window.WR.openPlayerCard — replaces CDN modal -->
 <!-- Shared visual primitives (WR.Card / Badge / Chip / ConfChip / DeltaLine / Kpi / InsightCard) -->
-<script src="js/components/wr-primitives.js?v=796916a9a1"></script>
-    <script src="js/components/player-card.js?v=7fb5402d76"></script>
+<script src="js/components/wr-primitives.js?v=1d003f8d28"></script>
+    <!-- The new player card (owner approved 2026-11-16): a framework-free drop-in,
+         copied as it is from lab/player-card/ on the Lab tools branch (docs/
+         player-card-handoff.md). WR.openPlayerCard (js/components/player-card.js)
+         opens it for everyone; window.DHQ_NEW_CARD = false brings the old
+         card back. Team defenses and unsigned players keep the old card. -->
+    <link rel="stylesheet" href="js/vendor/dhq-player-card.css?v=20261116card3">
+    <script src="js/vendor/dhq-player-card.js?v=c81a35ec31"></script>
+    <script src="js/components/player-card.js?v=0ca001e367"></script>
 <!-- 2c. Saved List Views (SI-1) — window.WR.SavedViews — shared across list surfaces -->
 <script src="js/shared/saved-views.js?v=48a1747f17"></script>
 <!-- 2c-2. Saved Alex Reports — window.WR.SavedReports — local cache + ai_analysis server sync -->
@@ -3287,7 +3294,7 @@ WRShared.preloadMany(WR_SHARED_FILES);
      group, when the owning surface first calls wrLoadModuleGroup('<group>'). -->
 <script src="js/module-loader.js?v=08959b8260"></script>
 <script src="js/settings.js?v=07c623f2c2"></script>
-<script type="text/wr-deferred" data-wr-defer="trade" src="js/trade-calc.js?v=a3e8ee5832"></script>
+<script type="text/wr-deferred" data-wr-defer="trade" src="js/trade-calc.js?v=d86869439b"></script>
 <script src="js/post-draft.js?v=61bcda3c71"></script>
 <!-- FA waiver tools (C2 wave): stat catalog + stat math, market display helpers, waiver engine (fa group, before free-agency.js) -->
 <script type="text/wr-deferred" data-wr-defer="fa" src="js/shared/stat-catalog.js?v=e7821fa56c"></script>
@@ -3301,7 +3308,7 @@ WRShared.preloadMany(WR_SHARED_FILES);
 <script src="js/components/chop-block-panel.js?v=8065ab0217"></script>
 <!-- Around the league (live scoreboard + standings) — must precede lineup.js in the group. -->
 <script type="text/wr-deferred" data-wr-defer="lineup" src="js/components/league-live-scoreboard.js?v=d7420b20bf"></script>
-<script type="text/wr-deferred" data-wr-defer="lineup" src="js/tabs/lineup.js?v=7fc0937b3d"></script>
+<script type="text/wr-deferred" data-wr-defer="lineup" src="js/tabs/lineup.js?v=1c8b5f69b3"></script>
 <!-- The Wire — league newspaper (C2 port 2026-09-27). ONE deferred group
      'wire', injected when the league "The Wire" tab first opens (LeagueWireTabLazy
      in league-detail.js). Plain-JS engines ride as text/babel so every pipeline
@@ -3401,7 +3408,7 @@ WRShared.preloadMany(WR_SHARED_FILES);
 <!-- Group "analysis": analytics.js embeds LeagueMapTab, so both defer together
      (league-map.js first — DOM order is execution order within a group). -->
 <script type="text/wr-deferred" data-wr-defer="analysis" src="js/tabs/league-map.js?v=c546cf86c9"></script>
-<script type="text/wr-deferred" data-wr-defer="myteam" src="js/tabs/my-team.js?v=e25431df82"></script>
+<script type="text/wr-deferred" data-wr-defer="myteam" src="js/tabs/my-team.js?v=a6750e63c9"></script>
 <!-- Compare: extracted from My Roster's former sub-view, now a top-level ROSTER-group tab. -->
 <script type="text/wr-deferred" data-wr-defer="compare" src="js/tabs/compare.js?v=3e0f57e48c"></script>
 <script type="text/wr-deferred" data-wr-defer="analysis" src="js/tabs/analytics.js?v=3dbbe51e8a"></script>
