@@ -1,10 +1,10 @@
 {
-  "build": "b194a-b309696d0d",
+  "build": "b194a-a7b53f2eb0",
   "tag": "b194a",
-  "builtAt": "2026-11-17T20:27:48.006Z",
+  "builtAt": "2026-11-19T14:21:30.917Z",
   "critical": false,
   "notes": "",
-  "commit": "2f6c6e29ee7c",
+  "commit": "c2e0a788edac",
   "pages": {
     "index.html": [
       "js/shared/shared-loader.js?v=bd3fd3242c",
@@ -12,7 +12,7 @@
       "js/shared/external-links.js?v=2b17f66d8f",
       "js/shared/adp-market.js?v=63f4a05ca2",
       "vendor/supabase.min.js?v=7d46902303",
-      "js/shared/pro-gate.js?v=36d43c7fde",
+      "js/shared/pro-gate.js?v=35695623ed",
       "js/pro-launch.js?v=9e7a0fc41c",
       "js/billing.js?v=129f5965c1",
       "college-stats.js?v=485bf53277",
@@ -33,6 +33,7 @@
       "js/components.js?v=aab6aa5c57",
       "js/components/wr-primitives.js?v=1d003f8d28",
       "js/vendor/dhq-player-card.js?v=c81a35ec31",
+      "js/vendor/dhq-compare.js?v=023f84f72a",
       "js/components/player-card.js?v=0ca001e367",
       "js/shared/saved-views.js?v=48a1747f17",
       "js/shared/saved-reports.js?v=cec4287744",
@@ -171,7 +172,7 @@
       "js/tabs/flash-brief.js?v=fa0c0b29f7",
       "js/tabs/league-map.js?v=c546cf86c9",
       "js/tabs/my-team.js?v=a6750e63c9",
-      "js/tabs/compare.js?v=3e0f57e48c",
+      "js/tabs/compare.js?v=cd4fe49413",
       "js/tabs/analytics.js?v=3dbbe51e8a",
       "js/tabs/trophy-room.js?v=784bd3612e",
       "js/tabs/calendar.js?v=275d34c7b2",
@@ -231,6 +232,9 @@
     "landing.html": [
       "reconai-shared/identity.js?v=7f29fd0d9a",
       "js/shared/live-update.js?v=f09653177c",
+      "reconai-shared/trade-engine.js?v=e66d5282bb",
+      "my-ai/ask.js?v=8998a82062",
+      "my-ai/panel.js?v=ab6ea8882f",
       "vendor/supabase.min.js?v=7d46902303"
     ],
     "connect-sleeper.html": [
@@ -248,7 +252,7 @@
     "js/shared/external-links.js": "2b17f66d8f",
     "js/shared/adp-market.js": "63f4a05ca2",
     "vendor/supabase.min.js": "7d46902303",
-    "js/shared/pro-gate.js": "36d43c7fde",
+    "js/shared/pro-gate.js": "35695623ed",
     "js/pro-launch.js": "9e7a0fc41c",
     "js/billing.js": "129f5965c1",
     "college-stats.js": "485bf53277",
@@ -269,6 +273,7 @@
     "js/components.js": "aab6aa5c57",
     "js/components/wr-primitives.js": "1d003f8d28",
     "js/vendor/dhq-player-card.js": "c81a35ec31",
+    "js/vendor/dhq-compare.js": "023f84f72a",
     "js/components/player-card.js": "0ca001e367",
     "js/shared/saved-views.js": "48a1747f17",
     "js/shared/saved-reports.js": "cec4287744",
@@ -407,7 +412,7 @@
     "js/tabs/flash-brief.js": "fa0c0b29f7",
     "js/tabs/league-map.js": "c546cf86c9",
     "js/tabs/my-team.js": "a6750e63c9",
-    "js/tabs/compare.js": "3e0f57e48c",
+    "js/tabs/compare.js": "cd4fe49413",
     "js/tabs/analytics.js": "3dbbe51e8a",
     "js/tabs/trophy-room.js": "784bd3612e",
     "js/tabs/calendar.js": "275d34c7b2",
@@ -463,9 +468,11 @@
     "reconai-shared/utils.js": "d1d19fd122",
     "reconai-shared/weekly-proj.js": "14f37c2e1b",
     "reconai-shared/yahoo-api.js": "b875759b3a",
-    "index.html": "312691f682",
-    "landing.html": "045870347a",
-    "connect-sleeper.html": "88c4a7049b",
-    "upgrade.html": "a9608446e5"
+    "index.html": "b33a063aec",
+    "my-ai/ask.js": "8998a82062",
+    "my-ai/panel.js": "ab6ea8882f",
+    "landing.html": "1e3d683635",
+    "connect-sleeper.html": "d8431a19a5",
+    "upgrade.html": "ed3e3f471c"
   }
 }

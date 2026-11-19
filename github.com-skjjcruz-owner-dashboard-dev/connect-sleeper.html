@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <meta name="dhq-build" content="b194a-b309696d0d">
+  <meta name="dhq-build" content="b194a-a7b53f2eb0">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, minimum-scale=1.0, viewport-fit=cover">
   <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com data:; img-src 'self' data: blob: https:; connect-src 'self' https://sxshiqyxhhifvtfqawbq.supabase.co https://api.sleeper.app https://api.myfantasyleague.com https://*.myfantasyleague.com https://lm-api-reads.fantasy.espn.com https://fantasysports.yahooapis.com https://*.sentry.io; worker-src 'self' blob:; frame-ancestors 'none'; base-uri 'self'; object-src 'none';">
   <title>Dynasty HQ — Connect your leagues</title>
@@ -121,6 +121,8 @@
     .freebar strong{color:var(--green)}
     .signout{margin-top:18px;background:none;border:none;color:var(--muted);font-size:12px;text-decoration:underline;cursor:pointer;font-family:inherit}
     .signout:hover{color:var(--gold)}
+    .skip-ai{display:block;margin-top:12px;min-height:40px;line-height:20px;padding:10px 0;color:var(--gold);font-size:13px;text-align:center;text-decoration:underline}
+    .skip-ai[hidden]{display:none}
     .espn-box{margin:4px 0 12px;padding:14px;border-radius:10px;background:var(--bg2);border:1px solid var(--border);text-align:left}
     .espn-box[hidden]{display:none}
     .espn-box h2{font-size:14px;font-weight:800;margin-bottom:6px}
@@ -240,6 +242,10 @@
          links leagues; members add their AI key on the leagues page ("Add my
          AI key") or from Ask your AI in any league (js/shared/ask-dhq.js). -->
     <button class="btn" id="enterBtn" onclick="enterApp()" disabled>Enter Dynasty HQ &rarr;</button>
+    <!-- Lab (owner ask 2026-11-17): a league is not required to use your own AI.
+         Signed-in members can skip to the "Add your AI key" page (the front page's AI box) and add a league later from the app. -->
+    <a class="skip-ai" id="skipAi" href="landing.html?home&ai=1" hidden>Just here to use your own AI? Skip this and add a league later</a>
+    <script>(function () { try { var s = JSON.parse(localStorage.getItem('fw_session_v1') || 'null'); if (s && s.token && localStorage.getItem('wr_guest_v1') !== '1') document.getElementById('skipAi').hidden = false; } catch (e) {} })();</script>
 
     <div class="freebar">You start <strong>free</strong> on every league — upgrade inside the app only if you want the full engine.</div>
 

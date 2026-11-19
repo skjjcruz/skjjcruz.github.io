@@ -1,0 +1,272 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data:; connect-src 'self'; base-uri 'self'; object-src 'none'; form-action 'none';">
+<meta name="color-scheme" content="dark">
+<title>The League Wire · sample edition · Dynasty HQ</title>
+<link rel="icon" href="icon-192.png">
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Rajdhani:wght@600;700&display=swap" rel="stylesheet">
+<!-- The League Wire, sample edition (owner ask 2026-11-18). The front page's "League Wire" button
+     opens this for a visitor with no league: a made-up league's weekly edition, what the Wire is
+     (it writes itself every week; commissioners can write the headline), and the usual Sleeper /
+     MFL / ESPN box. The box hands off to the front page's own War Room box (landing.html?home
+     &wirego=…) so every account / guest rule stays in one place, and the War Room opens the real
+     Wire when the league is in (sessionStorage dhq_open_wire_v1). Everything here is invented. -->
+<style>
+  :root {
+    --bg: #0A0A0C; --paper: #141418; --well: #0f0f13; --gold: #D4AF37; --forge: #D4AF37; --fg: #F2F2F2; --muted: #A9A9B3; --faint: #6B7280;
+    --line: rgba(255,255,255,0.10); --gold-line: rgba(212,175,55,0.40); --up: #34d399; --down: #f87171;
+    --card-radius-xs: 5px; --card-radius-sm: 8px; --card-radius: 10px; --card-radius-lg: 14px;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; background: var(--bg); color: var(--fg); }
+  body { font: 16px/1.55 "DM Sans", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; padding: 0 16px calc(48px + env(safe-area-inset-bottom)); }
+  a { color: var(--gold); }
+  .wrap { max-width: 1080px; margin: 0 auto; }
+  .top { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 18px 0; }
+  .brand { display: flex; align-items: center; gap: 10px; color: var(--fg); text-decoration: none; font: 700 18px/1 Rajdhani, "DM Sans", sans-serif; letter-spacing: .12em; text-transform: uppercase; }
+  .brand img { width: 40px; height: 40px; border-radius: var(--card-radius-sm, 8px); }
+  .back { color: var(--fg); text-decoration: none; border: 1px solid var(--line); border-radius: var(--card-radius-sm, 8px); padding: 9px 14px; font-size: 15px; }
+  .back:hover { border-color: var(--gold-line); }
+
+  /* What the Wire is + get yours */
+  .intro { display: grid; grid-template-columns: minmax(0, 1.25fr) minmax(0, 1fr); gap: 28px; align-items: center; padding: 22px; margin: 6px 0 22px; background: linear-gradient(180deg, rgba(212,175,55,.10), rgba(212,175,55,.04)); border: 1px solid var(--gold-line); border-radius: var(--card-radius-lg, 14px); }
+  .kick { display: inline-block; font: 700 11px/1 ui-monospace, Menlo, monospace; letter-spacing: .16em; text-transform: uppercase; color: #15110A; background: var(--forge); padding: 6px 8px; border-radius: var(--card-radius-xs, 5px); margin-bottom: 10px; }
+  .intro h1 { margin: 0 0 8px; font: 700 clamp(26px, 3.4vw, 36px)/1.1 Rajdhani, "DM Sans", sans-serif; letter-spacing: .02em; text-transform: uppercase; }
+  .intro h1 em { color: var(--gold); font-style: normal; }
+  .intro p { margin: 0 0 8px; color: #d9d6cf; }
+  .intro ul { margin: 6px 0 0; padding-left: 20px; color: var(--muted); font-size: 15px; }
+  .intro li { margin: 3px 0; }
+  .get { background: var(--paper); border: 1px solid var(--line); border-radius: var(--card-radius, 10px); padding: 16px; }
+  .get h2 { margin: 0 0 4px; font: 700 20px/1.2 Rajdhani, "DM Sans", sans-serif; letter-spacing: .04em; text-transform: uppercase; }
+  .get .sub { margin: 0 0 12px; color: var(--muted); font-size: 14px; }
+  .pf { display: grid; grid-template-columns: repeat(3, 1fr); gap: 4px; padding: 4px; margin: 0 0 10px; background: #11151C; border: 1px solid rgba(255,255,255,.14); border-radius: var(--card-radius-sm, 8px); }
+  .pf button { height: 36px; border: 1px solid transparent; border-radius: var(--card-radius-xs, 5px); background: transparent; color: #A9B0BB; cursor: pointer; font: 700 14px/1 Rajdhani, "DM Sans", sans-serif; letter-spacing: .1em; text-transform: uppercase; }
+  .pf button[aria-pressed="true"] { background: #1A1F27; color: var(--forge); border-color: rgba(212,175,55,.45); }
+  .get form { display: grid; gap: 10px; }
+  .get input { width: 100%; height: 50px; padding: 0 14px; background: #11151C; color: var(--fg); border: 1px solid rgba(255,255,255,.14); border-radius: var(--card-radius-sm, 8px); font: 500 16px/1 "DM Sans", sans-serif; }
+  .get input:focus { outline: none; border-color: var(--forge); box-shadow: 0 0 0 3px rgba(212,175,55,.12); }
+  .get .go { height: 50px; border: 0; border-radius: var(--card-radius-sm, 8px); background: var(--forge); color: #15110A; cursor: pointer; font: 700 16px/1 Rajdhani, "DM Sans", sans-serif; letter-spacing: .08em; text-transform: uppercase; }
+  .get .err { margin: 8px 0 0; color: var(--down); font-size: 14px; }
+  .get .fine { margin: 10px 0 0; color: var(--faint); font: 400 12px/1.5 ui-monospace, Menlo, monospace; }
+
+  /* The sample edition (looks like the War Room's Wire) */
+  .paper { background: var(--paper); border: 1px solid var(--line); border-radius: var(--card-radius-lg, 14px); overflow: hidden; }
+  .mast { display: flex; flex-wrap: wrap; align-items: baseline; gap: 6px 16px; padding: 18px 22px; border-bottom: 1px solid var(--line); }
+  .mast b { font: 800 34px/1 "DM Sans", sans-serif; letter-spacing: -.01em; }
+  .mast b i { color: var(--gold); font-style: normal; }
+  .mast span { color: var(--muted); font-size: 14px; padding-left: 16px; border-left: 1px solid var(--line); }
+  .mast .ed { margin-left: auto; font: 600 12px/1 ui-monospace, Menlo, monospace; letter-spacing: .1em; color: var(--forge); border: 1px solid var(--gold-line); padding: 6px 8px; border-radius: var(--card-radius-xs, 5px); }
+  .tabs { display: flex; gap: 4px; overflow-x: auto; padding: 0 14px; border-bottom: 1px solid var(--line); }
+  .tabs a { flex: none; padding: 13px 10px; color: var(--muted); text-decoration: none; font-weight: 700; font-size: 14px; border-bottom: 2px solid transparent; }
+  .tabs a.on { color: var(--gold); border-bottom-color: var(--gold); }
+  .tabs a:hover { color: var(--fg); }
+  .sec { padding: 22px; border-bottom: 1px solid var(--line); scroll-margin-top: 12px; }
+  .sec:last-child { border-bottom: 0; }
+  .eyebrow { font: 700 11px/1.3 "DM Sans", sans-serif; letter-spacing: .14em; text-transform: uppercase; color: var(--gold); margin: 0 0 6px; }
+  .sec > h2 { margin: 0 0 16px; font: 700 26px/1.15 "DM Sans", sans-serif; }
+  .front { display: grid; grid-template-columns: minmax(0, 1.4fr) minmax(0, 1fr); gap: 28px; }
+  .story h3 { margin: 4px 0 10px; font: 800 clamp(24px, 3.2vw, 34px)/1.12 "DM Sans", sans-serif; letter-spacing: -.01em; }
+  .story.side h3 { font-size: clamp(20px, 2.4vw, 24px); }
+  .story p { margin: 0 0 10px; color: #cfcbc2; }
+  .score { display: inline-flex; gap: 10px; align-items: center; margin: 2px 0 10px; padding: 8px 12px; background: var(--well); border: 1px solid var(--line); border-radius: var(--card-radius-sm, 8px); font: 600 14px/1.3 ui-monospace, Menlo, monospace; }
+  .score .w { color: var(--up); }
+  .commish { margin-top: 22px; padding: 16px; border: 1px dashed var(--gold-line); border-radius: var(--card-radius, 10px); background: rgba(212,175,55,.05); }
+  .commish .by { display: inline-flex; gap: 6px; align-items: center; font: 700 11px/1 ui-monospace, Menlo, monospace; letter-spacing: .12em; text-transform: uppercase; color: var(--forge); margin-bottom: 8px; }
+  .commish h3 { margin: 0 0 6px; font: 800 22px/1.2 "DM Sans", sans-serif; }
+  .commish p { margin: 0; color: #cfcbc2; }
+  .commish small { display: block; margin-top: 8px; color: var(--muted); }
+  .grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
+  .game { background: var(--well); border: 1px solid var(--line); border-radius: var(--card-radius, 10px); padding: 12px 14px; }
+  .game .row { display: flex; justify-content: space-between; gap: 10px; font-weight: 600; }
+  .game .row.lose { color: var(--muted); font-weight: 500; }
+  .game p { margin: 8px 0 0; font-size: 14px; color: var(--muted); }
+  .recs { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; }
+  .rec { background: var(--well); border: 1px solid var(--line); border-radius: var(--card-radius, 10px); padding: 14px; }
+  .rec b { display: block; font: 700 26px/1.1 Rajdhani, "DM Sans", sans-serif; color: var(--gold); }
+  .rec span { display: block; font-weight: 700; margin: 4px 0 2px; }
+  .rec small { color: var(--muted); }
+  .rival { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 16px; align-items: center; }
+  .rival .h2h { text-align: center; font: 700 30px/1 Rajdhani, sans-serif; color: var(--gold); }
+  .rival .h2h small { display: block; font: 600 11px/1.3 ui-monospace, Menlo, monospace; color: var(--muted); letter-spacing: .1em; text-transform: uppercase; margin-top: 4px; }
+  .note { margin: 14px 0 0; color: var(--faint); font: 400 12px/1.5 ui-monospace, Menlo, monospace; }
+  .again { margin: 22px 0 0; text-align: center; }
+  .again a { display: inline-block; padding: 14px 20px; background: var(--forge); color: #15110A; border-radius: var(--card-radius-sm, 8px); font: 700 16px/1 Rajdhani, "DM Sans", sans-serif; letter-spacing: .08em; text-transform: uppercase; text-decoration: none; }
+  @media (max-width: 860px) {
+    .intro, .front { grid-template-columns: minmax(0, 1fr); }
+    .recs { grid-template-columns: minmax(0, 1fr); }
+  }
+  @media (max-width: 600px) {
+    .grid { grid-template-columns: minmax(0, 1fr); }
+    .mast span { border-left: 0; padding-left: 0; }
+    .mast .ed { margin-left: 0; }
+    .sec { padding: 18px 16px; }
+    .intro { padding: 18px 16px; }
+  }
+  [hidden] { display: none !important; }
+/* Match the War Room's buttons (owner ask 2026-11-18): DM Sans, sentence case. */
+.pf button{font:600 14px/1 var(--body,'DM Sans',system-ui,sans-serif);letter-spacing:0;text-transform:none}
+.get .go{font:700 16px/1 var(--body,'DM Sans',system-ui,sans-serif);letter-spacing:0;text-transform:none}
+.again a{font:700 16px/1 var(--body,'DM Sans',system-ui,sans-serif);letter-spacing:0;text-transform:none}
+.mast .ed{font-family:'DM Sans',system-ui,sans-serif;font-weight:700}
+/* Match the War Room header (owner ask 2026-11-18): gold DM Sans wordmark, the app's logo size and
+   its "My Profile" pill shape for the back button (js/hub-v2.css .hv2-header). */
+.top{min-height:68px}
+.brand img{border-radius:var(--r,10px);box-shadow:0 2px 12px rgba(212,175,55,.3)}
+.brand span{font:700 1.1rem/1.1 var(--body,'DM Sans',system-ui,sans-serif);letter-spacing:.06em;background:linear-gradient(135deg,#D4AF37 0%,#F5F2EA 50%,#D4AF37 100%);background-size:200% auto;-webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent;color:#D4AF37;animation:dhq-shimmer 3s linear infinite}
+@keyframes dhq-shimmer{0%{background-position:0% center}100%{background-position:200% center}}
+@media (prefers-reduced-motion:reduce){.brand span{animation:none}}
+.back{display:inline-flex;align-items:center;min-height:44px;padding:0 16px;border:1px solid #ffffff18;border-radius:30px;background:#ffffff08;color:var(--white,#F5F2EA);font:500 13px var(--body,'DM Sans',system-ui,sans-serif)}
+.back:hover{border-color:rgba(212,175,55,.5);color:var(--white,#F5F2EA)}
+@media (max-width:600px){
+  .top{min-height:68px;padding-block:calc(10px + var(--sat,0px)) 10px}
+  .brand{gap:9px}.brand img{width:34px;height:34px;border-radius:var(--r,10px);box-shadow:0 2px 12px rgba(212,175,55,.3)}
+  .brand span{font-size:16px;letter-spacing:.025em;white-space:nowrap}
+  .back{min-height:44px;padding:0 14px;font-size:13px;border-radius:30px}
+}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header class="top">
+    <a class="brand" href="landing.html?home"><img src="img/dhq-crest.jpg" alt=""><span>DYNASTY HQ</span></a>
+    <a class="back" href="landing.html?home">&larr; Front page</a>
+  </header>
+
+  <!-- What it is, and how to get yours -->
+  <section class="intro" aria-labelledby="introTitle">
+    <div>
+      <span class="kick">Sample edition</span>
+      <h1 id="introTitle">The League Wire: <em>your league's weekly newspaper</em></h1>
+      <p>Every week the Wire writes itself from your league's games. No one has to do a thing.</p>
+      <ul>
+        <li>Recaps of every matchup, upsets and blowouts</li>
+        <li>Win streaks, losing skids and comebacks</li>
+        <li>Rivalries and all-time head-to-head records</li>
+        <li>League records as they fall</li>
+        <li><b style="color:var(--fg)">Commissioners can write each week's headline story</b> for the whole league to see</li>
+      </ul>
+    </div>
+    <div class="get" id="get">
+      <h2>Get your league's Wire</h2>
+      <p class="sub">Free. Your league's edition is ready in seconds.</p>
+      <div class="pf" role="group" aria-label="Where your league lives">
+        <button type="button" data-p="sleeper" aria-pressed="true">Sleeper</button><button type="button" data-p="mfl" aria-pressed="false">MFL</button><button type="button" data-p="espn" aria-pressed="false">ESPN</button>
+      </div>
+      <form id="getForm" novalidate>
+        <input id="getIn" type="text" autocapitalize="none" spellcheck="false" autocomplete="username" placeholder="Your Sleeper username" aria-label="Your Sleeper username">
+        <button class="go" type="submit">Get my league's Wire</button>
+      </form>
+      <p class="err" id="getErr" role="alert" hidden></p>
+      <p class="fine">Sleeper username, or your MFL / ESPN league ID. Dynasty, redraft, superflex and IDP.</p>
+    </div>
+  </section>
+
+  <!-- The sample edition -->
+  <article class="paper" aria-label="Sample edition of the League Wire">
+    <div class="mast"><b>The Wire<i>.</i></b><span>The Gridiron Syndicate · 12-team dynasty</span><em class="ed">WEEK 11 EDITION</em></div>
+    <nav class="tabs" aria-label="Sections"><a class="on" href="#front">Front page</a><a href="#recaps">Recaps</a><a href="#records">Records</a><a href="#rivalries">Rivalries</a></nav>
+
+    <section class="sec" id="front">
+      <div class="front">
+        <div class="story">
+          <p class="eyebrow">Week 11 · Upset of the week</p>
+          <h3>Taco Tuesday Titans take down the top seed</h3>
+          <div class="score"><span class="w">Taco Tuesday Titans 131.42</span><span>·</span><span>Gold Rush 118.06</span></div>
+          <p>The 3–7 Titans had lost four straight. Then their bench-turned-starter running back put up 31.6, and first-place Gold Rush lost for only the second time all season.</p>
+          <p>It tightens the race at the top: Gold Rush and Fourth &amp; Long are now both 8–3.</p>
+        </div>
+        <div>
+          <div class="story side">
+            <p class="eyebrow">Week 11 · Streak</p>
+            <h3>The Benchwarmers win their fifth straight</h3>
+            <p>From 1–5 to 6–5 in five weeks. A 142.88-point week, their best of the season, has them back in the playoff picture.</p>
+          </div>
+          <div class="story side" style="margin-top:18px">
+            <p class="eyebrow">Week 11 · Blowout</p>
+            <h3>Fourth &amp; Long wins by 61</h3>
+            <p>A 61.34-point win over Waiver Wire Warriors, the biggest margin of the season.</p>
+          </div>
+        </div>
+      </div>
+      <div class="commish">
+        <span class="by">&#9998; From the commissioner</span>
+        <h3>Trade deadline is Friday at noon. No exceptions this year.</h3>
+        <p>Last year's 12:04 PM "it was still Friday somewhere" trade is not happening again. Get your deals in early, and no, the commissioner will not be "reviewing" your 3-for-1 for the third time.</p>
+        <small>Commissioners write this headline story each week in the War Room. Everyone in the league sees it at the top of their Wire.</small>
+      </div>
+    </section>
+
+    <section class="sec" id="recaps">
+      <p class="eyebrow">Every game, every week</p>
+      <h2>Week 11 recaps</h2>
+      <div class="grid">
+        <div class="game"><div class="row"><span>Taco Tuesday Titans</span><span>131.42</span></div><div class="row lose"><span>Gold Rush</span><span>118.06</span></div><p>Upset: a 3–7 team beats the 8–2 leader.</p></div>
+        <div class="game"><div class="row"><span>Fourth &amp; Long</span><span>156.20</span></div><div class="row lose"><span>Waiver Wire Warriors</span><span>94.86</span></div><p>The season's biggest blowout: 61.34 points.</p></div>
+        <div class="game"><div class="row"><span>The Benchwarmers</span><span>142.88</span></div><div class="row lose"><span>Hail Mary Dynasty</span><span>127.15</span></div><p>Five straight wins. Back to .500 and climbing.</p></div>
+        <div class="game"><div class="row"><span>Blitz Brigade</span><span>119.74</span></div><div class="row lose"><span>Taxi Squad Kings</span><span>119.12</span></div><p>Won by 0.62 on a Monday night kicker.</p></div>
+        <div class="game"><div class="row"><span>Sunday Syndicate</span><span>124.31</span></div><div class="row lose"><span>Couch Coaches</span><span>101.47</span></div><p>Couch Coaches drop to 2–9.</p></div>
+        <div class="game"><div class="row"><span>Red Zone Raiders</span><span>133.09</span></div><div class="row lose"><span>Bye Week Blues</span><span>112.66</span></div><p>Three starters on bye. It went how you'd think.</p></div>
+      </div>
+    </section>
+
+    <section class="sec" id="records">
+      <p class="eyebrow">Records</p>
+      <h2>Season records so far</h2>
+      <div class="recs">
+        <div class="rec"><b>168.24</b><span>Highest score</span><small>Gold Rush, Week 4</small></div>
+        <div class="rec"><b>61.34</b><span>Biggest win</span><small>Fourth &amp; Long, Week 11 (new)</small></div>
+        <div class="rec"><b>0.62</b><span>Closest game</span><small>Blitz Brigade, Week 11 (new)</small></div>
+      </div>
+    </section>
+
+    <section class="sec" id="rivalries">
+      <p class="eyebrow">Rivalries</p>
+      <h2>The Brothers' War goes to Mike again</h2>
+      <div class="rival">
+        <p style="margin:0;color:#cfcbc2">Sunday Syndicate (Mike) and Couch Coaches (Dave) have played 13 times since 2021. Mike's 23-point win this week makes it 9–4 all-time, with the next meeting in Week 15.</p>
+        <div class="h2h">9–4<small>All-time</small></div>
+      </div>
+      <p class="note">Sample edition: the league, teams and people are invented. Your league's Wire uses your league's real games.</p>
+      <p class="again"><a href="#get" id="againBtn">Get my league's Wire</a></p>
+    </section>
+  </article>
+</div>
+<script>
+(function () {
+  'use strict';
+  var $ = function (id) { return document.getElementById(id); };
+  var COPY = { sleeper: 'Your Sleeper username', mfl: 'Your MFL league ID', espn: 'Your ESPN league ID' };
+  var plat = 'sleeper';
+  document.querySelectorAll('.pf button').forEach(function (b) {
+    b.addEventListener('click', function () {
+      plat = b.getAttribute('data-p');
+      document.querySelectorAll('.pf button').forEach(function (x) { x.setAttribute('aria-pressed', String(x === b)); });
+      var i = $('getIn'); i.placeholder = COPY[plat]; i.setAttribute('aria-label', COPY[plat]); i.inputMode = plat === 'sleeper' ? 'text' : 'numeric'; i.value = ''; i.focus();
+      $('getErr').hidden = true;
+    });
+  });
+  $('getIn').addEventListener('input', function () { $('getErr').hidden = true; });
+  // Tabs: jump to the section and mark it.
+  document.querySelectorAll('.tabs a').forEach(function (a) { a.addEventListener('click', function () { document.querySelectorAll('.tabs a').forEach(function (x) { x.classList.toggle('on', x === a); }); }); });
+  $('againBtn').addEventListener('click', function (e) { e.preventDefault(); $('get').scrollIntoView({ behavior: 'smooth', block: 'center' }); setTimeout(function () { try { $('getIn').focus({ preventScroll: true }); } catch (x) { /* fine */ } }, 400); });
+  $('getForm').addEventListener('submit', function (e) {
+    e.preventDefault();
+    var v = ($('getIn').value || '').trim(), err = $('getErr');
+    if (plat === 'sleeper') { v = v.replace(/^@/, ''); if (!v) { err.textContent = 'Type your Sleeper username. It is the name on your Sleeper profile, not your email.'; err.hidden = false; $('getIn').focus(); return; } }
+    else {
+      var m = plat === 'mfl' ? (v.match(/[?&]L=(\d+)/i) || v.match(/\/home\/(\d+)/i)) : v.match(/leagueId=(\d+)/i);
+      v = m ? m[1] : v.replace(/\D/g, '');
+      if (!/^\d{3,12}$/.test(v)) { err.textContent = plat === 'mfl' ? 'Type your MFL league ID. It is the number after L= in your MFL web address, like 41208.' : "Type your ESPN league ID. It is the number after leagueId= in your ESPN league's web address."; err.hidden = false; $('getIn').focus(); return; }
+    }
+    // The War Room opens the real Wire once the league is in.
+    try { sessionStorage.setItem('dhq_open_wire_v1', JSON.stringify({ ts: Date.now() })); } catch (x) { /* no auto-open */ }
+    // The front page's own War Room box does the rest (accounts, guests, the connect step).
+    location.href = 'landing.html?home&wirego=' + encodeURIComponent(plat) + '&v=' + encodeURIComponent(v);
+  });
+})();
+</script>
+</body>
+</html>

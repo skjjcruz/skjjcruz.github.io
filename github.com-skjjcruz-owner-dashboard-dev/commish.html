@@ -1,0 +1,2434 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Commissioner Calculator · Dynasty HQ</title>
+<meta name="description" content="Test any fantasy scoring change on a real NFL season: PPR, TE premium, 6-point passing TDs and more. See which positions and players gain. Free, no league or sign-up.">
+<link rel="icon" href="icon-192.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&family=Rajdhani:wght@600;700&display=swap" rel="stylesheet">
+<!--
+  DHQ Commissioner Calculator, Lab edition (owner rulings 2026-11-14 / 15).
+  League-free: pick your league's scoring (PPR / Half / Standard, passing TD,
+  TE premium, league size, superflex), try any rule change, and every NFL
+  player's real season is rescored under both and compared: positions,
+  rankings, biggest movers, a range sweep, a summary and a share link. No
+  league, no Sleeper username. Scoring is the method ported from C2 War
+  Room's Rule Lab (copied, the C2 repos untouched). Reads only Sleeper's
+  public stats and player list. Published to the Lab as commish.html by
+  scripts/publish-lab.cjs and gated like every page.
+-->
+<style>
+:root{
+  color-scheme:dark;
+  --page:#08080B; --off-black:#1B1B22; --panel:rgba(16,16,22,.96); --charcoal:#27262E;
+  --white:#F5F2EA; --silver:#BDB8AD; --soft:rgba(207,207,214,.88); --faint:rgba(189,184,173,.6);
+  --gold:#D4AF37; --good:#2ECC71; --warn:#F0A500; --bad:#E74C3C; --info:#5DADE2;
+  --send:#5dade2; --get:#e74c3c;
+  --line:rgba(212,175,55,.16); --line2:rgba(212,175,55,.25); --hair:rgba(255,255,255,.06);
+  --r-xs:5px; --r-sm:8px; --r:10px; --r-lg:14px;
+  --display:'Rajdhani','Arial Narrow',system-ui,sans-serif;
+  --body:'DM Sans',system-ui,-apple-system,'Segoe UI',sans-serif;
+  --mono:'IBM Plex Mono',ui-monospace,Menlo,monospace;
+  --sat:env(safe-area-inset-top,0px); --sab:env(safe-area-inset-bottom,0px);
+}
+*{box-sizing:border-box}
+html,body{background:var(--page)}
+body{margin:0;color:var(--white);font:14.5px/1.5 var(--body);-webkit-font-smoothing:antialiased;padding-inline:max(20px,env(safe-area-inset-left,0px)) max(20px,env(safe-area-inset-right,0px))}
+button,input,select{font:inherit;color:inherit}
+:focus-visible{outline:2px solid var(--gold);outline-offset:2px}
+.brandwash{position:fixed;inset:0;z-index:0;pointer-events:none;background:url("img/logo.png") no-repeat center 16%/min(720px,86vw) auto;opacity:.07;mix-blend-mode:screen;filter:blur(4px);-webkit-mask-image:radial-gradient(125% 105% at 50% 20%,#000 26%,transparent 74%);mask-image:radial-gradient(125% 105% at 50% 20%,#000 26%,transparent 74%)}
+.wrap{position:relative;z-index:1;max-width:1200px;margin:0 auto}
+
+.top{display:flex;align-items:center;justify-content:space-between;gap:16px;padding-block:calc(12px + var(--sat)) 12px;box-shadow:0 0 0 100vmax var(--page),0 1px 0 100vmax #ffffff18;clip-path:inset(0 -100vmax -1px)}
+.brand{display:flex;align-items:center;gap:12px;text-decoration:none;color:var(--white)}
+.brand img{width:44px;height:44px;border-radius:var(--r);box-shadow:0 2px 12px rgba(212,175,55,.3)}
+.brand span{font:700 20px/1 var(--display);letter-spacing:.06em}
+.back{color:#98A1AD;text-decoration:none;font-size:14px;padding:10px 14px;border:1px solid #232932;border-radius:var(--r-sm)}
+.back:hover{color:var(--white);border-color:#333A45}
+
+/* the panel */
+.panel{margin:28px 0 0;border:1px solid var(--line);background:var(--panel);border-radius:var(--r-sm);padding:18px 20px 20px}
+.panel-head{display:flex;align-items:baseline;justify-content:space-between;gap:12px;flex-wrap:wrap;padding-bottom:12px;border-bottom:1px solid rgba(212,175,55,.12)}
+.panel-head h1,.panel-head h2{margin:0;color:var(--gold);font:700 19px/1.1 var(--display);letter-spacing:.1em;text-transform:uppercase}
+.panel-head em{color:var(--faint);font-size:13.5px}
+.source{margin:14px 0;color:var(--soft);font-size:14px}
+.source b{color:var(--gold);font-weight:600}
+.source .est{color:var(--faint)}
+
+.sel{background:var(--charcoal);border:1px solid var(--line2);color:var(--white);font:500 13.5px var(--body);padding:9px 10px;border-radius:var(--r-xs);cursor:pointer;width:100%}
+.sel:focus{outline:none;border-color:var(--gold)}
+.league{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:10px;margin-bottom:16px}
+.fld{display:flex;flex-direction:column;gap:5px;min-width:0}
+.fld > span{font-size:10.5px;color:var(--faint);text-transform:uppercase;letter-spacing:.08em}
+.foot-note{margin:16px 0 40px;font-size:12px;line-height:1.6;color:var(--faint)}
+.loading{display:flex;align-items:center;gap:10px;color:var(--soft);font-size:13.5px;padding:12px}
+.loading::before{content:"";width:13px;height:13px;border-radius:50%;border:2px solid var(--gold);border-right-color:transparent;animation:spin .8s linear infinite}
+@keyframes spin{to{transform:rotate(360deg)}}
+.err{color:#F1948A;font-size:14px}
+.toast{position:fixed;left:50%;bottom:calc(24px + var(--sab));transform:translate(-50%,20px);opacity:0;pointer-events:none;z-index:50;background:var(--off-black);border:1px solid var(--line2);padding:10px 16px;border-radius:var(--r-sm);font-size:14px;transition:opacity .2s,transform .2s;max-width:calc(100vw - 32px)}
+.toast.on{opacity:1;transform:translate(-50%,0)}
+.wrap{max-width:1240px}
+.face{width:32px;height:32px;border-radius:50%;flex:none;overflow:hidden;background:#15151b;box-shadow:0 0 0 1.5px var(--pc,var(--silver));display:inline-block;position:relative}
+.face img{display:block;width:100%;height:100%;object-fit:cover;object-position:center 15%}
+.av{width:30px;height:30px;border-radius:50%;flex:none;overflow:hidden;background:#2a2932;display:inline-grid;place-items:center;font:700 12px var(--display);color:var(--silver);position:relative}
+.av img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover}
+.av.lg{width:52px;height:52px;font-size:20px;border-radius:var(--r)}
+.muted{color:var(--faint)}
+.gold{color:var(--gold)}
+.pos-up{color:#7DDCA3} .pos-dn{color:#F1948A}
+button{cursor:pointer}
+
+/* ── find your league ── */
+.setrow{display:grid;gap:10px}
+.allrules{margin-top:2px}
+.allrules summary{cursor:pointer;font-size:12.5px;color:var(--faint)}
+.allrules summary:hover{color:var(--white)}
+.rulegrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(230px,1fr));gap:4px 16px;margin-top:10px;font-size:12.5px;color:var(--soft)}
+.rulegrid span{display:flex;justify-content:space-between;gap:8px;padding:4px 0;border-bottom:1px solid var(--hair)}
+.rulegrid b{color:var(--white);font-weight:600;white-space:nowrap}
+.pos2{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}
+.lg-on{display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;padding:10px 12px;border:1px solid rgba(212,175,55,.45);border-radius:var(--r-sm);background:rgba(212,175,55,.08)}
+.lg-on b{display:block;color:var(--gold);font-weight:700}
+.lg-on small{display:block;color:var(--soft);font-size:12px;margin-top:2px}
+.lg-find{display:flex;align-items:center;gap:8px;flex:1 1 420px;max-width:560px;justify-content:flex-end}
+.lg-find>span{font-size:13px;color:var(--soft);white-space:nowrap}
+.lg-find input,.psearch input{background:var(--charcoal);border:1px solid var(--line2);color:var(--white);font:400 14px var(--body);padding:9px 12px;border-radius:var(--r-xs);min-width:220px;flex:1}
+.lg-find input:focus,.psearch input:focus{outline:none;border-color:var(--gold)}
+.psearch{position:relative;flex:1 1 220px;min-width:0;max-width:100%;display:flex;flex-direction:column}
+.psug{width:100%;max-width:100%;min-width:0;contain:inline-size;box-sizing:border-box;margin-top:6px;background:#1d1c23;border:1px solid rgba(212,175,55,.3);border-radius:var(--r-sm);padding:4px;max-height:300px;overflow:auto;overscroll-behavior:contain}
+.psug[hidden]{display:none}
+.psug .sug-cols{display:grid;gap:10px;align-items:end;padding:4px 8px 8px;font:600 10px var(--body);letter-spacing:.08em;text-transform:uppercase;color:var(--faint);border-bottom:1px solid var(--hair);margin-bottom:4px;min-width:max-content;width:100%;box-sizing:border-box}
+.psug .sug-cols span{text-align:right}
+.psug .sug-cols span:first-child{text-align:left}
+.psug .sug-cols .c{color:var(--soft);white-space:normal;line-height:1.2}
+.psug .sug-cols small{display:block;margin-top:2px;font:600 11px var(--body);letter-spacing:0;text-transform:none;color:var(--gold)}
+.psug .sug-cols .t{color:var(--gold)}
+.psug button.sug-row{display:grid;gap:10px;align-items:center;min-width:max-content;width:100%}
+.psug .sug-row .who{display:flex;align-items:center;gap:10px;min-width:0}
+.psug .sug-row .who > span:not(.face){min-width:0;overflow:hidden}
+.psug .sug-row .who b,.psug .sug-row .who small{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.psug .sug-row > *,.psug .sug-cols > *{min-width:0}
+.psug .sug-row .n{text-align:right;font-weight:600;font-variant-numeric:tabular-nums}
+.psug .sug-row .n.t{color:var(--gold);font-weight:700}
+@media (max-width:640px){.psug button.sug-row,.psug .sug-cols{gap:6px;padding-left:4px;padding-right:4px}.psug .sug-row .face{width:28px;height:28px}.psug .sug-row b{font-size:12.5px}.psug .sug-row .n{font-size:12.5px}.psug .sug-cols{font-size:9px;letter-spacing:.04em}.psug .sug-cols small{font-size:10px}}
+.psug .sug-head{position:sticky;top:-4px;z-index:1;display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;padding:6px 8px;margin:-4px -4px 4px;background:#1d1c23;border-bottom:1px solid var(--hair)}
+.psug .sug-head .cc-hint{margin:0}
+.psug button.sug-done{display:inline-flex;width:auto;padding:7px 12px;color:#16130a;background:var(--gold);border-color:var(--gold)}
+.psug button.sug-done:hover{background:var(--gold)}
+.pb-list.watched{align-items:center;margin-bottom:8px}
+.pb-list.watched .lbl{font:600 10.5px var(--body);letter-spacing:.1em;text-transform:uppercase;color:var(--faint);margin-right:2px}
+.psug button{display:flex;align-items:center;gap:10px;width:100%;padding:6px 8px;border:0;background:transparent;color:var(--white);text-align:left;border-radius:var(--r-xs)}
+.psug button:hover{background:rgba(212,175,55,.1)}
+.psug b{display:block;font-size:13.5px;font-weight:600}
+.psug button > span:not(.face){flex:1;min-width:0}
+.psug .face{width:34px;height:34px}
+.psug em{font-style:normal;font-weight:700;color:var(--gold);font-variant-numeric:tabular-nums}
+.psug button.on{opacity:.45}
+.wpos{flex-basis:100%}
+.psug small{display:block;font-size:11.5px;color:var(--faint)}
+.pb-item.wp{padding-left:6px}
+.pb-item.wp .face{width:24px;height:24px}
+#teamPick{background:var(--charcoal);border:1px solid var(--line2);color:var(--white);font:500 13.5px var(--body);padding:9px 10px;border-radius:var(--r-xs);max-width:100%}
+.movesgrid{display:grid;gap:8px;font-size:13px}
+.movesgrid b{display:inline-block;min-width:34px}
+.movesgrid span{margin-right:10px}
+.more{display:block;width:100%;padding:12px;border:0;background:transparent;color:var(--gold);font:600 13px var(--body);cursor:pointer;border-top:1px solid var(--hair)}
+.more:hover{background:rgba(212,175,55,.06)}
+.cc-find{display:grid;gap:14px;margin:6px 0 4px}
+.cc-find[hidden]{display:none}
+.cc-find form{display:flex;gap:10px;flex-wrap:wrap}
+.cc-find .in{position:relative;flex:1;min-width:240px}
+.cc-find input{width:100%;background:var(--charcoal);border:1px solid var(--line2);color:var(--white);font:400 15px var(--body);padding:13px 14px 13px 42px;border-radius:var(--r-sm)}
+.cc-find input:focus{outline:none;border-color:var(--gold);box-shadow:0 0 0 3px rgba(212,175,55,.12)}
+.cc-find input::placeholder{color:rgba(255,255,255,.3)}
+.cc-find .in svg{position:absolute;left:14px;top:50%;width:17px;height:17px;transform:translateY(-50%);stroke:var(--gold);fill:none;stroke-width:2;stroke-linecap:round;pointer-events:none}
+.btn{border:1px solid var(--line2);background:var(--charcoal);color:var(--white);font:600 14px var(--body);padding:12px 18px;border-radius:var(--r-sm);white-space:nowrap}
+.btn:hover{border-color:rgba(212,175,55,.5)}
+.btn.gold{background:var(--gold);border-color:var(--gold);color:#17140a}
+.btn.gold:hover{filter:brightness(1.07)}
+.btn:disabled{opacity:.45;cursor:not-allowed;filter:none}
+.btn.sm{padding:8px 12px;font-size:12.5px}
+.cc-hint{font-size:12.5px;color:var(--faint);margin:0}
+.cc-leagues{display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:10px}
+.cc-lg{display:flex;align-items:center;gap:12px;padding:12px 14px;border:1px solid var(--line);border-radius:var(--r);background:linear-gradient(180deg,rgba(39,38,46,.8),rgba(22,22,28,.9));text-align:left;color:var(--white)}
+.cc-lg:hover{border-color:rgba(212,175,55,.55);transform:translateY(-1px)}
+.cc-lg b{display:block;font-size:14.5px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.cc-lg small{display:block;font-size:12px;color:var(--faint);margin-top:2px}
+.cc-lg > span:nth-child(2){min-width:0;flex:1}
+.cc-msg{padding:12px 14px;border-radius:var(--r-sm);background:var(--charcoal);border:1px solid var(--line);font-size:13.5px;color:var(--soft)}
+.cc-msg.err{border-color:rgba(231,76,60,.4);color:#F1948A}
+
+/* ── the league banner ── */
+.cc-league{display:flex;align-items:center;gap:14px;flex-wrap:wrap;padding:14px 16px;margin:4px 0 14px;border:1px solid rgba(212,175,55,.3);border-radius:var(--r);background:linear-gradient(100deg,rgba(212,175,55,.12),rgba(212,175,55,.02) 65%)}
+.cc-league[hidden]{display:none}
+.cc-league .t{min-width:0;flex:1}
+.cc-league h2{margin:0;font:700 24px/1.05 var(--display);letter-spacing:.03em;color:var(--white)}
+.cc-league .tags{display:flex;flex-wrap:wrap;gap:6px;margin-top:6px}
+.tag{font:600 11px var(--body);letter-spacing:.06em;text-transform:uppercase;color:var(--silver);background:rgba(0,0,0,.28);border:1px solid var(--hair);border-radius:var(--r-xs);padding:3px 7px}
+.tag.gold{color:var(--gold);border-color:rgba(212,175,55,.35)}
+
+/* ── tabs and season chips ── */
+.cc-tabs{display:flex;gap:4px;border-bottom:1px solid rgba(212,175,55,.16);margin:2px 0 14px;overflow-x:auto}
+.cc-tabs button{flex:none;border:0;background:transparent;color:var(--faint);font:600 14px var(--body);padding:10px 14px;border-bottom:2px solid transparent;margin-bottom:-1px;display:flex;align-items:center;gap:8px}
+.cc-tabs button:hover{color:var(--white)}
+.cc-tabs button[aria-selected="true"]{color:var(--gold);border-bottom-color:var(--gold)}
+.cc-tabs svg{width:16px;height:16px;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
+.chips{display:flex;flex-wrap:wrap;gap:6px;align-items:center}
+.chips .lbl{font:600 10.5px var(--body);letter-spacing:.1em;text-transform:uppercase;color:var(--faint);margin-right:4px}
+.chip{border:1px solid var(--line2);background:var(--charcoal);color:var(--silver);font:600 12.5px var(--body);padding:7px 11px;border-radius:var(--r-xs)}
+.chip:hover{color:var(--white);border-color:rgba(212,175,55,.45)}
+.chip[aria-pressed="true"]{background:rgba(212,175,55,.16);color:var(--gold);border-color:rgba(212,175,55,.55)}
+.chip:disabled{opacity:.4;cursor:not-allowed}
+.chip small{font-weight:500;color:var(--faint);margin-left:4px}
+.sec{margin:0 0 16px}
+.sec-h{display:flex;align-items:baseline;justify-content:space-between;gap:10px;flex-wrap:wrap;margin:18px 0 10px}
+.sec-h h3{margin:0;font:700 16px var(--display);letter-spacing:.08em;text-transform:uppercase;color:var(--gold)}
+.sec-h p{margin:0;font-size:12.5px;color:var(--faint)}
+.card{border:1px solid var(--line);border-radius:var(--r);background:linear-gradient(180deg,rgba(39,38,46,.7),rgba(20,20,26,.9));padding:14px 16px}
+.loading-bar{height:4px;border-radius:2px;background:rgba(255,255,255,.06);overflow:hidden;margin-top:8px}
+.loading-bar i{display:block;height:100%;background:var(--gold);width:0;transition:width .25s}
+
+/* ── proposal builder ── */
+.pb{display:grid;gap:12px}
+.pb-row{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+.pb select,.pb input[type=number]{background:var(--charcoal);border:1px solid var(--line2);color:var(--white);font:500 13.5px var(--body);padding:9px 10px;border-radius:var(--r-xs)}
+.pb select{max-width:100%;min-width:220px;flex:1}
+.pb input[type=number]{width:110px}
+.pb select:focus,.pb input:focus{outline:none;border-color:var(--gold)}
+.pb .cur{font-size:12.5px;color:var(--faint)}
+.pb-list{display:flex;flex-wrap:wrap;gap:8px}
+.pb-item{display:inline-flex;align-items:center;gap:8px;padding:7px 8px 7px 12px;border-radius:var(--r-sm);background:rgba(212,175,55,.12);border:1px solid rgba(212,175,55,.45);font-size:13px}
+.pb-item b{font-weight:600}
+.pb-item .ar{color:var(--gold);font-weight:700}
+.pb-item button{width:30px;height:30px;flex:none;margin:-4px -2px -4px 0;font-size:16px!important;border-radius:50%;border:0;background:rgba(0,0,0,.35);color:var(--silver);font-size:13px;line-height:1;display:grid;place-items:center}
+.pb-item button:hover{color:var(--white);background:rgba(231,76,60,.5)}
+.pb-empty{font-size:13px;color:var(--faint)}
+.pb-listbox{display:grid;gap:8px;padding:12px;border:1px dashed var(--line2);border-radius:var(--r-sm);background:rgba(0,0,0,.18)}
+.pb-listbox > .lbl{font:600 10.5px var(--body);letter-spacing:.1em;text-transform:uppercase;color:var(--faint)}
+.pb-item.waiting{border-style:dashed;background:rgba(212,175,55,.05)}
+.pb-item small{font:600 9.5px var(--body);letter-spacing:.08em;text-transform:uppercase;color:var(--warn);margin-left:2px}
+.pb-go .btn.gold{padding:13px 22px;font-size:15px}
+.pb-go{display:flex;align-items:center;gap:12px;flex-wrap:wrap}
+
+/* ── verdict ── */
+.verdict{display:grid;gap:12px;padding:18px 20px;border:1px solid rgba(212,175,55,.5);border-radius:var(--r-lg);background:linear-gradient(110deg,rgba(212,175,55,.18),rgba(212,175,55,.03) 70%);box-shadow:0 14px 44px rgba(0,0,0,.35)}
+.verdict .k{font:700 11px var(--body);letter-spacing:.16em;text-transform:uppercase;color:var(--gold)}
+.verdict h2{margin:0;font:700 clamp(22px,3.2vw,32px)/1.08 var(--display);letter-spacing:.02em;color:var(--white)}
+.verdict h2 span{color:var(--gold)}
+.verdict .facts{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:10px}
+.fact{padding:10px 12px;border-radius:var(--r-sm);background:rgba(0,0,0,.28);border:1px solid var(--hair)}
+.fact span{display:block;font:600 10px var(--body);letter-spacing:.12em;text-transform:uppercase;color:var(--faint)}
+.fact b{display:block;margin-top:3px;font:700 19px/1.15 var(--display);color:var(--white)}
+.fact small{display:block;margin-top:2px;font-size:12px;color:var(--soft);line-height:1.35}
+.fact.hot{border-color:rgba(212,175,55,.5);background:rgba(212,175,55,.1)}
+.fact.hot b{color:var(--gold)}
+.verdict .vsub{margin:-4px 0 0;font-size:16px;color:var(--white)}
+.verdict .vlist{margin:2px 0 0;padding-left:18px;display:grid;gap:5px;font-size:14px;color:var(--soft)}
+.verdict .vlist b{color:var(--white);font-weight:600}
+.pchg{display:grid;gap:6px}
+.pc-row{display:grid;grid-template-columns:48px 190px minmax(0,1fr) 92px;align-items:center;gap:12px;padding:8px 6px;border-radius:var(--r-sm);font-size:14px}
+.pc-row+.pc-row{border-top:1px solid var(--hair)}
+.pc-pos{font:700 15px var(--display);letter-spacing:.04em}
+.pc-txt{color:var(--soft);font-variant-numeric:tabular-nums}
+.pc-txt b{color:var(--white)}
+.pc-bar{height:10px;border-radius:999px;background:rgba(255,255,255,.05);overflow:hidden}
+.pc-bar i{display:block;height:100%;border-radius:999px}
+.pc-row.up .pc-bar i{background:#7DDCA3} .pc-row.dn .pc-bar i{background:#F1948A}
+.pc-num{font-style:normal;font-weight:700;text-align:right;font-variant-numeric:tabular-nums}
+.pc-row.up .pc-num{color:#7DDCA3} .pc-row.dn .pc-num{color:#F1948A} .pc-row.eq .pc-num{color:var(--faint);font-weight:500}
+#lgMsg:empty{display:none}
+.site-pick{display:inline-flex;border:1px solid var(--line2);border-radius:var(--r-xs);overflow:hidden;flex:none}
+.site-pick button{appearance:none;border:0;background:transparent;color:var(--soft);font:600 12.5px var(--body);padding:9px 11px;cursor:pointer}
+.site-pick button+button{border-left:1px solid var(--line2)}
+.site-pick button[aria-pressed="true"]{background:rgba(212,175,55,.16);color:var(--gold)}
+.site-tag{font:700 10.5px var(--body);font-style:normal;letter-spacing:.08em;color:var(--soft);border:1px solid var(--line2);border-radius:var(--r-xs);padding:1px 6px;margin-left:6px;vertical-align:middle}
+.lg-skip{margin-top:8px;font-size:13px;color:var(--soft)}
+.lg-skip summary{cursor:pointer;color:var(--soft)}
+.lg-skip ul{margin:6px 0 0;padding-left:18px;display:grid;gap:3px}
+.lg-skip b{color:var(--white);font-weight:600}
+.lg-head{justify-content:flex-start;align-items:center;gap:10px 18px}
+.lg-head .lg-find{justify-content:flex-start;flex:0 1 640px}
+@media (max-width:640px){.lg-find{flex-basis:100%;max-width:none;flex-wrap:wrap;justify-content:flex-start}.lg-find>span{flex-basis:100%}.lg-find input{min-width:0;flex:1 1 0}.site-pick{flex-basis:100%}.site-pick button{flex:1}}
+.bychg th.chg{text-align:right;white-space:normal;min-width:92px;max-width:150px;vertical-align:bottom;line-height:1.25}
+.bychg th.chg span{display:block;color:var(--soft);letter-spacing:.06em}
+.bychg th.chg small{display:block;margin-top:2px;font:600 11px var(--body);letter-spacing:0;text-transform:none;color:var(--gold)}
+.bychg td.chg{font-weight:600;font-variant-numeric:tabular-nums}
+.bychg tr.grp td{padding:14px 8px 8px;text-align:left;border-bottom:1px solid rgba(212,175,55,.35);white-space:normal}
+.bychg tr.grp.flash td{background:rgba(212,175,55,.18);transition:background .6s}
+.bychg tr.grp .grp-name{font:700 15px var(--display);letter-spacing:.04em;color:var(--gold);margin-right:12px}
+.bychg tr.grp .grp-sum{font-size:13px;color:var(--soft)}
+.bychg tr.grp .grp-sum b{color:var(--white)} .bychg tr.grp .grp-sum em{font-style:normal;font-weight:700}
+.bychg tr.possep td{padding:8px 8px 2px;text-align:left;font:700 11px var(--body);letter-spacing:.12em;border-bottom:0}
+@media (max-width:640px){.bychg tr.grp td,.bychg tr.possep td{position:sticky;left:0}}
+.pb-item.wt{background:rgba(212,175,55,.1)}
+.pb-list.watched .rm-all{color:#F1948A;border-color:rgba(241,148,138,.45)}
+.pb-list.watched .rm-all:hover{background:rgba(231,76,60,.15)}
+.pb-item.wt .tm-ic{font-size:15px;line-height:1}
+.pb-item.wt small{font-size:11.5px;color:var(--soft);margin-left:2px}
+.bychg small.was{display:block;font-size:11px;color:var(--faint);font-weight:500}
+.bychg th.tot,.bychg td.tot{border-left:1px solid rgba(212,175,55,.25)}
+.bychg td.tot b{color:var(--gold)}
+.bychg tr.tap{cursor:pointer}
+.bychg .team[data-card]{cursor:pointer}
+.bychg .team[data-card] b{text-decoration:underline;text-decoration-color:rgba(212,175,55,.4);text-underline-offset:3px}
+.bychg .team[data-card]:hover b{color:var(--gold)}
+.bychg tr.tap:hover td,.bychg tr.tap.open td{background:rgba(212,175,55,.05)}
+.bychg tr.tap:focus-visible{outline:2px solid var(--gold);outline-offset:-2px}
+.bychg tr.whyrow td{padding:0 8px 12px;text-align:left;background:rgba(212,175,55,.05)}
+.bychg .why{display:grid;gap:5px;padding:10px 12px;border-left:2px solid var(--gold);border-radius:var(--r-xs);background:rgba(0,0,0,.25);font-size:13px;color:var(--soft);white-space:normal}
+.bychg .why b{color:var(--white);font-weight:600}
+.bychg .why b.pos-up{color:#7DDCA3} .bychg .why b.pos-dn{color:#F1948A}
+.bychg .why-sum{margin-top:3px;padding-top:6px;border-top:1px solid var(--hair);color:var(--faint)}
+@media (max-width:640px){.card.scroll:has(> .bychg){padding-left:0!important;padding-right:0!important}.bychg th.l,.bychg td.l{position:sticky;left:0;z-index:1;background:#1c1b22;box-shadow:6px 0 8px -6px rgba(0,0,0,.6)}.bychg tr.whyrow td{position:sticky;left:0;padding:0 0 12px}.bychg .why{box-sizing:border-box;width:calc(100vw - 92px);max-width:calc(100vw - 92px)}}
+.rtabs{display:flex;gap:4px;margin:18px 0 4px;padding:4px;border:1px solid var(--hair);border-radius:var(--r);background:rgba(0,0,0,.25);width:max-content;max-width:100%}
+.rtabs button{appearance:none;border:0;background:none;color:var(--soft);font:700 14px var(--display);letter-spacing:.06em;text-transform:uppercase;padding:9px 20px;border-radius:var(--r-sm);cursor:pointer}
+.rtabs button:hover{color:var(--white)}
+.rtabs button.on{background:var(--gold);color:#16130a}
+.movers.one{grid-template-columns:minmax(0,1fr)}
+.movers.one .mlist{display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:6px}
+@media (max-width:640px){.pc-row{grid-template-columns:40px minmax(0,1fr) 72px;row-gap:6px}.pc-bar{grid-column:1/-1;grid-row:2}}
+.fact b .ptag{font:700 11px var(--body);font-style:normal;letter-spacing:.08em;vertical-align:middle;margin-left:4px;padding:1px 6px;border:1px solid currentColor;border-radius:var(--r-xs)}
+
+/* ── tables ── */
+.tbl{width:100%;border-collapse:collapse;font-size:13.5px}
+.tbl th{font:600 10px var(--body);letter-spacing:.1em;text-transform:uppercase;color:var(--faint);text-align:right;padding:9px 8px;border-bottom:1px solid rgba(212,175,55,.2);white-space:nowrap}
+.tbl td{padding:9px 8px;border-bottom:1px solid var(--hair);text-align:right;font-variant-numeric:tabular-nums;white-space:nowrap}
+.tbl th.l,.tbl td.l{text-align:left}
+.tbl th.c,.tbl td.c{text-align:center}
+.tbl tr:hover td{background:rgba(212,175,55,.04)}
+.tbl .team{display:flex;align-items:center;gap:9px;min-width:0;max-width:280px}
+.tbl .team b{display:block;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.tbl .team small{display:block;font-size:11px;color:var(--faint);overflow:hidden;text-overflow:ellipsis}
+.tbl .team > span{min-width:0}
+.tbl tr.cut td{border-bottom:2px dashed rgba(212,175,55,.55)}
+.tbl tr.newin td{background:rgba(46,204,113,.07)}
+.tbl tr.newout td{background:rgba(231,76,60,.07)}
+.rk{font:700 16px var(--display);color:var(--white)}
+.mv{display:inline-block;min-width:34px;font:700 11.5px var(--body);padding:2px 6px;border-radius:var(--r-xs);text-align:center}
+.mv.up{background:rgba(46,204,113,.16);color:#7DDCA3} .mv.dn{background:rgba(231,76,60,.16);color:#F1948A} .mv.eq{color:var(--faint)}
+.pill{display:inline-block;font:700 10px var(--body);letter-spacing:.08em;text-transform:uppercase;padding:3px 7px;border-radius:var(--r-xs)}
+.pill.in{background:rgba(46,204,113,.16);color:#7DDCA3} .pill.out{background:rgba(231,76,60,.14);color:#F1948A} .pill.dim{color:var(--faint);background:rgba(255,255,255,.04)}
+.scroll{overflow-x:auto;-webkit-overflow-scrolling:touch}
+.arrow{color:var(--faint);margin:0 4px}
+.mv-m{display:none}
+
+/* ── bars ── */
+.bars{display:grid;gap:7px}
+.bar{display:grid;grid-template-columns:minmax(110px,190px) minmax(0,1fr) 64px;align-items:center;gap:10px;font-size:13px}
+.bar .n{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.bar .v{text-align:right;font-weight:700;font-variant-numeric:tabular-nums}
+.track{position:relative;height:10px;border-radius:999px;background:rgba(255,255,255,.05)}
+.track.div::after{content:"";position:absolute;left:50%;top:-3px;bottom:-3px;width:1px;background:rgba(255,255,255,.2)}
+.track i{position:absolute;top:0;height:100%;border-radius:999px}
+.track i.up{background:linear-gradient(90deg,rgba(125,220,163,.5),#7DDCA3)} .track i.dn{background:linear-gradient(270deg,rgba(241,148,138,.5),#F1948A)}
+.share{display:grid;grid-template-columns:52px minmax(0,1fr) 120px;align-items:center;gap:10px;font-size:13px}
+.share .tracks{display:grid;gap:3px}
+.share .t2{position:relative;height:8px;border-radius:999px;background:rgba(255,255,255,.05)}
+.share .t2 i{position:absolute;left:0;top:0;height:100%;border-radius:999px}
+.share .t2.a i{background:rgba(189,184,173,.55)} .share .t2.b i{background:var(--gold)}
+.legend{display:flex;gap:14px;font-size:12px;color:var(--faint)}
+.legend i{display:inline-block;width:10px;height:10px;border-radius:2px;margin-right:5px;vertical-align:-1px}
+
+/* ── player movers ── */
+.movers{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px}
+.mlist{display:grid;gap:4px}
+.mrow{display:grid;grid-template-columns:34px minmax(0,1fr) auto;align-items:center;gap:10px;padding:6px 8px;border-radius:var(--r-sm);background:rgba(255,255,255,.02)}
+.mrow b{display:block;font-size:13.5px;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.mrow small{display:block;font-size:11.5px;color:var(--faint)}
+.mrow em{font-style:normal;font-weight:700;font-variant-numeric:tabular-nums}
+
+/* ── luck ── */
+.heros{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:10px}
+.hero{display:flex;gap:12px;align-items:center;padding:14px;border-radius:var(--r);border:1px solid var(--line);background:linear-gradient(180deg,rgba(39,38,46,.8),rgba(20,20,26,.9))}
+.hero .k{font:600 10px var(--body);letter-spacing:.12em;text-transform:uppercase;color:var(--faint)}
+.hero b{display:block;font:700 18px/1.15 var(--display);color:var(--white);margin-top:2px}
+.hero small{display:block;font-size:12.5px;color:var(--soft);margin-top:2px}
+.hero.good{border-color:rgba(46,204,113,.35)} .hero.bad{border-color:rgba(231,76,60,.35)} .hero.gold{border-color:rgba(212,175,55,.45)}
+.lk{display:grid;grid-template-columns:44px 1fr;align-items:center;gap:6px}
+.lkh{min-width:120px}
+.lk .track{height:8px}
+.grid-wk{border-collapse:separate;border-spacing:3px;font-size:11.5px}
+.grid-wk th{font:600 10px var(--body);color:var(--faint);padding:2px 4px;text-align:center}
+.grid-wk th.l{text-align:left;max-width:170px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:12px;color:var(--soft);font-weight:600}
+.grid-wk td{width:34px;height:30px;text-align:center;border-radius:var(--r-xs);font-weight:700;font-variant-numeric:tabular-nums;position:relative;color:#121217}
+.grid-wk td.L::after,.grid-wk td.W::after{content:"";position:absolute;right:3px;top:3px;width:5px;height:5px;border-radius:50%}
+.grid-wk td.W::after{background:#0b3d22} .grid-wk td.L::after{background:#5a1610}
+
+/* ── recap ── */
+.rc{display:grid;gap:14px}
+.rc-head{padding:20px 22px;border-radius:var(--r-lg);border:1px solid rgba(212,175,55,.45);background:radial-gradient(120% 140% at 0% 0%,rgba(212,175,55,.2),rgba(212,175,55,.02) 60%),#15151b}
+.rc-head .k{font:700 11px var(--body);letter-spacing:.16em;text-transform:uppercase;color:var(--gold)}
+.rc-head h2{margin:6px 0 0;font:700 clamp(22px,3.4vw,34px)/1.08 var(--display);letter-spacing:.02em;color:var(--white)}
+.rc-games{display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:10px}
+.game{border:1px solid var(--line);border-radius:var(--r);padding:10px 12px;background:rgba(255,255,255,.02);display:grid;gap:6px}
+.game.hl{border-color:rgba(212,175,55,.55);background:rgba(212,175,55,.06)}
+.g-row{display:grid;grid-template-columns:30px minmax(0,1fr) auto;align-items:center;gap:9px}
+.g-row b{font-weight:600;font-size:13.5px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.g-row em{font-style:normal;font:700 17px var(--display);font-variant-numeric:tabular-nums}
+.g-row.w em{color:var(--gold)} .g-row.l b,.g-row.l em{color:var(--faint)}
+.g-foot{display:flex;justify-content:space-between;font-size:11.5px;color:var(--faint)}
+.g-foot .pill{font-size:9.5px}
+.rc-side{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:10px}
+
+.how{margin:18px 0 0;font-size:12px;line-height:1.6;color:var(--faint)}
+.how b{color:var(--soft);font-weight:600}
+.empty{padding:22px;text-align:center;color:var(--soft);font-size:14px;border:1px dashed var(--line2);border-radius:var(--r)}
+
+@media (max-width:900px){
+  .tbl .hide-m{display:none}
+  .tbl .mv-m{display:block;margin-top:3px}
+  .tbl .mv-m .mv{min-width:0;padding:1px 4px;font-size:10px}
+  .tbl .team .mv-m .pill{font-size:9px;padding:2px 5px}
+  .lk{grid-template-columns:auto}
+  .lk .track{display:none}
+  .lkh{min-width:0}
+}
+.cc-tabs .short{display:none}
+@media (max-width:560px){
+  .cc-tabs .full{display:none}
+  .cc-tabs .short{display:inline}
+  .cc-tabs button{padding:10px 10px}
+}
+@media (max-width:760px){
+  .movers{grid-template-columns:minmax(0,1fr)}
+  .pos2{grid-template-columns:minmax(0,1fr)}
+  .bar{grid-template-columns:minmax(80px,120px) minmax(0,1fr) 56px}
+  .share{grid-template-columns:42px minmax(0,1fr) 96px}
+  .tbl{font-size:12.5px}
+  .tbl th,.tbl td{padding:9px 5px}
+  .cc-league{gap:10px 12px}
+  .cc-league .t{flex:1 1 calc(100% - 64px)}
+  .cc-league .btn{flex:1 1 100%}
+  .tbl .team{max-width:112px;gap:7px}
+  .tbl .team .av{width:24px;height:24px;font-size:10px}
+  .cc-league h2{font-size:20px}
+}
+/* Phones (owner ask 2026-11-18): less boxy, one line per setting. Each rule row is a label and
+   its pills on ONE line that scrolls sideways; smaller headings; the league finder stays on top. */
+@media (max-width:600px){
+  body{padding-inline:max(12px,env(safe-area-inset-left,0px)) max(12px,env(safe-area-inset-right,0px))}
+  .top{padding-block:calc(8px + var(--sat)) 8px}
+  .brand{gap:8px}.brand img{width:30px;height:30px;box-shadow:none;border-radius:var(--r-sm)}.brand span{font-size:15px}
+  .back{padding:7px 12px;font-size:13px;border-radius:999px}
+  .panel{margin-top:4px;padding:10px 0 0;border:0;background:transparent}
+  .panel-head{display:block;padding-bottom:8px;border-bottom:0}
+  .panel-head h1{font-size:17px;white-space:nowrap}
+  .panel-head em{display:block;margin-top:3px;font-size:12.5px;font-style:normal;line-height:1.35}
+  .card{padding:12px;border-radius:var(--r)}
+  .sec-h{margin:14px 0 8px;gap:4px 10px}
+  .sec-h h3{font-size:14px}
+  .sec-h p{font-size:12.5px;line-height:1.4}
+  .lg-head{display:block}
+  .lg-head .lg-find{margin-top:8px;gap:6px}
+  .lg-find>span:first-child{font-size:12.5px}
+  .site-pick{border-radius:999px}
+  .site-pick button{padding:7px 10px;font-size:13px}
+  .lg-find input{font-size:16px;padding:7px 12px;border-radius:999px}
+  .lg-find .btn{padding:8px 14px;border-radius:999px}
+  .setrow{gap:4px}
+  .chips{flex-wrap:nowrap;overflow-x:auto;margin:0 -12px;padding:2px 12px;scrollbar-width:none;-webkit-overflow-scrolling:touch}
+  .chips::-webkit-scrollbar{display:none}
+  .chips .lbl{flex:none;min-width:82px;margin-right:0;font-size:10px;letter-spacing:.08em}
+  .chip{flex:none;white-space:nowrap;border-radius:999px;padding:6px 12px;font-size:13px}
+  .sec-h .chips{margin:0;padding:2px 0;max-width:100%}
+  .pb-row{gap:6px}
+  .pb-row select,.pb-row input{font-size:16px}
+  .pb-listbox{padding:10px}
+  .pb-item{font-size:12.5px;border-radius:999px}
+  .pb-go{gap:8px}
+  .pb-go .btn.gold{padding:11px 18px;font-size:14px}
+  .allrules summary{font-size:12.5px;padding:4px 0}
+}
+@media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
+/* Phones, round 2 (owner ask 2026-11-19: "big boxes, huge buttons"): one size smaller and lighter
+   everywhere: tighter cards, smaller headings, buttons and rows, the result card scaled down. */
+@media (max-width:600px){
+  .card{padding:10px 12px}
+  .sec-h{margin:10px 0 6px}
+  .sec-h h3{font-size:13px;letter-spacing:.07em}
+  .sec-h p{font-size:12px}
+  .pb-row{gap:6px}
+  .pb-row select,.pb-row input{height:36px;padding:0 10px;border-radius:var(--r-sm)}
+  #ruleVal{width:84px;flex:none}
+  .btn{padding:7px 12px;font-size:12.5px;border-radius:var(--r-sm)}
+  .btn.sm{padding:6px 11px;font-size:12.5px}
+  .pb-go .btn.gold{padding:8px 16px;font-size:13px}
+  .pb-listbox{padding:8px 10px;gap:6px}
+  .pb-item{padding:4px 4px 4px 10px;font-size:12px;gap:6px}
+  .pb-item button{width:24px;height:24px;margin:0;font-size:13px!important}
+  .chip{padding:5px 10px;font-size:12.5px}
+  .verdict{padding:12px 14px;gap:8px;border-radius:var(--r)}
+  .verdict .k{font-size:9.5px;letter-spacing:.12em}
+  .verdict h2{font-size:18px}
+  .verdict .vsub{font-size:14px}
+  .verdict .vlist{font-size:13px;gap:3px}
+  .rtabs{margin:12px 0 2px;padding:3px}
+  .rtabs button{padding:6px 14px;font-size:12.5px}
+  .pc-row{padding:6px 2px;font-size:13px}
+  .pc-pos{font-size:13px}
+  .pc-bar{height:6px}
+  .hero{padding:10px;gap:10px}.hero b{font-size:15px}
+  .how{font-size:11.5px}
+  .site-pick button{padding:6px 10px;font-size:12.5px}
+  .lg-find input{height:36px;padding:0 12px}
+  .lg-find .btn{padding:6px 14px}
+  /* nothing off the side (owner ask 2026-11-19: "still doesn't fit"): pills wrap beside their label */
+  .chips{flex-wrap:wrap;overflow:visible;margin:0;padding:3px 0 3px 74px;position:relative;gap:6px}
+  .chips .lbl{position:absolute;left:0;top:10px;width:70px;min-width:0;line-height:1.2;white-space:normal}
+  .sec-h .chips{padding-left:0}
+  .chip{padding:5px 9px}
+  .chips:has(> [data-preset]){padding-left:0;gap:5px}
+  .chips:has(> [data-preset]) .lbl{position:static;flex:0 0 100%;width:auto;margin-bottom:1px}
+  .chips [data-preset]{font-size:12px;padding:5px 9px}
+  .psug .sug-cols small{white-space:nowrap;font-size:10.5px}
+  .psug .sug-cols,.psug button.sug-row{min-width:0!important}
+  .psearch input{height:40px!important;padding:0 12px!important}
+  .psug .sug-row .who{min-width:0;overflow:hidden}
+  .psug .sug-row .who b,.psug .sug-row .who small{display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .psug .sug-cols .c{line-height:1.15}
+  .bychg th:nth-child(4),.bychg td:nth-child(4){display:none}
+  .card.scroll:has(> .bychg){padding-left:4px!important;padding-right:4px!important}
+  .bychg{font-size:12px}
+  .bychg th,.bychg td{padding:7px 4px}
+  .bychg thead th{white-space:normal;line-height:1.2;vertical-align:bottom}
+  .bychg th.chg{min-width:0;max-width:72px;font-size:9px;letter-spacing:.04em}
+  .bychg .who b,.bychg td.l b{display:inline-block;max-width:112px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;vertical-align:bottom}
+}
+@media (max-width:360px){
+  .bychg{font-size:11px}
+  .bychg th,.bychg td{padding:6px 3px}
+  .bychg .who b,.bychg td.l b{max-width:70px}
+  .bychg .face{width:22px;height:22px}
+}
+/* Match the War Room header (owner ask 2026-11-18): gold DM Sans wordmark, the app's logo size and
+   its "My Profile" pill shape for the back button (js/hub-v2.css .hv2-header). */
+.top{min-height:68px}
+.brand img{border-radius:var(--r,10px);box-shadow:0 2px 12px rgba(212,175,55,.3)}
+.brand span{font:700 1.1rem/1.1 var(--body,'DM Sans',system-ui,sans-serif);letter-spacing:.06em;background:linear-gradient(135deg,#D4AF37 0%,#F5F2EA 50%,#D4AF37 100%);background-size:200% auto;-webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent;color:#D4AF37;animation:dhq-shimmer 3s linear infinite}
+@keyframes dhq-shimmer{0%{background-position:0% center}100%{background-position:200% center}}
+@media (prefers-reduced-motion:reduce){.brand span{animation:none}}
+.back{display:inline-flex;align-items:center;min-height:44px;padding:0 16px;border:1px solid #ffffff18;border-radius:30px;background:#ffffff08;color:var(--white,#F5F2EA);font:500 13px var(--body,'DM Sans',system-ui,sans-serif)}
+.back:hover{border-color:rgba(212,175,55,.5);color:var(--white,#F5F2EA)}
+@media (max-width:600px){
+  .top{min-height:68px;padding-block:calc(10px + var(--sat,0px)) 10px}
+  .brand{gap:9px}.brand img{width:34px;height:34px;border-radius:var(--r,10px);box-shadow:0 2px 12px rgba(212,175,55,.3)}
+  .brand span{font-size:16px;letter-spacing:.025em;white-space:nowrap}
+  .back{min-height:44px;padding:0 14px;font-size:13px;border-radius:30px}
+}
+</style>
+<link rel="stylesheet" href="player-card/dhq-player-card.css?v=20261118card3">
+<script src="player-card/dhq-player-card.js?v=20261118card3" defer></script>
+</head>
+<body>
+<div class="brandwash" aria-hidden="true"></div>
+<div class="wrap">
+  <header class="top">
+    <a class="brand" href="landing.html?home" aria-label="Dynasty HQ front page"><img src="img/logo.png" alt="" width="44" height="44"><span>DYNASTY HQ</span></a>
+    <a class="back" href="landing.html?home">&larr; Front page</a>
+  </header>
+
+  <section class="panel" aria-labelledby="cc-title">
+    <div class="panel-head"><h1 id="cc-title">Commissioner Calculator</h1><em>Test any scoring change on a real NFL season. No league or sign-up needed.</em></div>
+
+    <div id="setup"><div class="loading">Loading…</div></div>
+    <div id="result"></div>
+    <p class="how" id="how"></p>
+  </section>
+  <p class="foot-note" id="footNote"><b>Where the numbers come from.</b> Every NFL player's official season stats and the player list, read live from Sleeper's public data. Nothing is saved to an account.</p>
+</div>
+<div class="toast" id="toast" role="status"></div>
+
+<script>
+(function () {
+  // ══════════════════════════════════════════════════════════════════════
+  // CC: the Commissioner Calculator engine, league-free (owner ruling
+  // 2026-11-15: no league, no Sleeper username). Test a scoring change on a
+  // real NFL season: every player's season is scored under the starting
+  // rules and again with the change, and only the two runs are compared.
+  //  - Scoring is Sleeper's rule set on the raw stat line, key by key
+  //    (points = sum of stat x rule), the method that reproduced every
+  //    starter's recorded points in five real Sleeper leagues.
+  //  - Season totals come from Sleeper's public season stats (one request);
+  //    per-game bonuses arrive as counts, so they score the same as weekly.
+  //  - Starting rules: Sleeper's PPR / Half-PPR / Standard. Checked against
+  //    Sleeper's own season totals for 2025: every QB, RB, WR and TE matches
+  //    exactly but one (565 of 566), kickers 40 of 42. Team defense uses the classic league
+  //    defaults (Sleeper's built-in defense totals use a formula no league
+  //    setting reproduces), and every rule is listed on the page.
+  //  - Starters for positional value: a league of N teams fields QB, 2 RB,
+  //    2 WR, TE, FLEX (RB/WR/TE), K, DEF (+ a QB in the superflex slot);
+  //    replacement = the best player who isn't a starter at his position.
+  // ══════════════════════════════════════════════════════════════════════
+  var CC = (function () {
+    'use strict';
+    function num(x) { var n = Number(x); return isFinite(n) ? n : 0; }
+    function r1(x) { return Math.round(num(x) * 10) / 10; }
+
+    var OFF = { pass_yd: 0.04, pass_td: 4, pass_int: -1, pass_2pt: 2, rush_yd: 0.1, rush_td: 6, rush_2pt: 2, rec: 1, rec_yd: 0.1, rec_td: 6, rec_2pt: 2, fum_lost: -2, fum_rec_td: 6, st_td: 6, st_ff: 1, st_fum_rec: 1 };
+    var KICK = { fgm_0_19: 3, fgm_20_29: 3, fgm_30_39: 3, fgm_40_49: 4, fgm_50p: 5, xpm: 1, xpmiss: -1, fgmiss: -1 };
+    var DEF = { sack: 1, int: 2, fum_rec: 2, def_td: 6, safe: 2, blk_kick: 2, ff: 1, def_st_td: 6, def_st_ff: 1, def_st_fum_rec: 1,
+      pts_allow_0: 10, pts_allow_1_6: 7, pts_allow_7_13: 4, pts_allow_14_20: 1, pts_allow_21_27: 0, pts_allow_28_34: -1, pts_allow_35p: -4 };
+    // base: 'ppr' | 'half' | 'std'; passTd: 4 | 6; tep: 0 | 0.5 | 1
+    function startingRules(base, passTd, tep) {
+      var r = {}, k;
+      for (k in OFF) r[k] = OFF[k];
+      for (k in KICK) r[k] = KICK[k];
+      for (k in DEF) r[k] = DEF[k];
+      r.rec = base === 'std' ? 0 : base === 'half' ? 0.5 : 1;
+      r.pass_td = num(passTd) || 4;
+      if (num(tep)) r.bonus_rec_te = num(tep);
+      return r;
+    }
+    function scoreLine(line, rules) {
+      if (!line) return 0;
+      var t = 0;
+      for (var k in rules) { var v = line[k]; if (typeof v === 'number' && v) t += v * num(rules[k]); }
+      return t;
+    }
+    var POS = ['QB', 'RB', 'WR', 'TE', 'K', 'DEF'], IDP = ['DL', 'LB', 'DB'];
+    // IDP positions join only when the league starts them (league.idp = per-team DL/LB/DB/FLEX counts).
+    function posList(league) { return league && league.idp ? POS.concat(IDP) : POS; }
+
+    // Every player who played: season points and points per game under a rule set.
+    // players: { pid: [name, pos, team] }
+    function scoreSeason(stats, rules, players, PL) {
+      PL = PL || POS;
+      var out = [];
+      Object.keys(stats || {}).forEach(function (pid) {
+        var line = stats[pid]; if (!line || !(num(line.gp) > 0)) return;
+        var p = players[pid], pos = p ? p[1] : /^[A-Z]{2,3}$/.test(pid) ? 'DEF' : '';
+        if (PL.indexOf(pos) < 0) return;
+        var pts = scoreLine(line, rules);
+        out.push({ pid: pid, name: p ? p[0] : pid, pos: pos, team: p ? p[2] : pid, gp: num(line.gp), pts: pts, ppg: pts / num(line.gp) });
+      });
+      return out;
+    }
+    // Starters by position for an N-team league (see the header).
+    function starters(list, teams, superflex, PL, idp) {
+      PL = PL || POS;
+      var by = {};
+      PL.forEach(function (p) { by[p] = list.filter(function (x) { return x.pos === p; }).sort(function (a, b) { return b.pts - a.pts; }); });
+      var n = { QB: teams * (superflex ? 2 : 1), RB: teams * 2, WR: teams * 2, TE: teams, K: teams, DEF: teams }, s = {};
+      if (idp) { n.DL = teams * (idp.DL || 0); n.LB = teams * (idp.LB || 0); n.DB = teams * (idp.DB || 0); }
+      PL.forEach(function (p) { s[p] = by[p].slice(0, n[p]); });
+      var flexPool = by.RB.slice(n.RB).concat(by.WR.slice(n.WR), by.TE.slice(n.TE)).sort(function (a, b) { return b.pts - a.pts; }).slice(0, teams);
+      flexPool.forEach(function (x) { s[x.pos].push(x); });
+      if (idp && idp.FLEX) {
+        var idpPool = by.DL.slice(n.DL).concat(by.LB.slice(n.LB), by.DB.slice(n.DB)).sort(function (a, b) { return b.pts - a.pts; }).slice(0, teams * idp.FLEX);
+        idpPool.forEach(function (x) { s[x.pos].push(x); });
+      }
+      var repl = {};
+      PL.forEach(function (p) { repl[p] = by[p][s[p].length] ? by[p][s[p].length].pts : 0; });
+      return { byPos: by, starters: s, replacement: repl };
+    }
+
+    // The comparison: starting rules vs starting rules plus the proposal.
+    function compare(stats, players, base, proposal, league) {
+      var prop = {}, k;
+      for (k in base) prop[k] = base[k];
+      for (k in proposal) prop[k] = proposal[k];
+      var PL = posList(league), A = scoreSeason(stats, base, players, PL), B = scoreSeason(stats, prop, players, PL);
+      var bIdx = {}; B.forEach(function (x) { bIdx[x.pid] = x; });
+      var SA = starters(A, league.teams, league.superflex, PL, league.idp), SB = starters(B, league.teams, league.superflex, PL, league.idp);
+      function ranks(S) { var o = {}; PL.forEach(function (p) { S.byPos[p].forEach(function (x, i) { o[x.pid] = i + 1; }); }); return o; }
+      var posRankA = ranks(SA), posRankB = ranks(SB);
+      var overallA = {}, overallB = {};
+      A.slice().sort(function (a, b) { return b.pts - a.pts; }).forEach(function (x, i) { overallA[x.pid] = i + 1; });
+      B.slice().sort(function (a, b) { return b.pts - a.pts; }).forEach(function (x, i) { overallB[x.pid] = i + 1; });
+      var rows = A.map(function (a) {
+        var b = bIdx[a.pid];
+        return { pid: a.pid, name: a.name, pos: a.pos, team: a.team, gp: a.gp, before: r1(a.pts), after: r1(b.pts), delta: r1(b.pts - a.pts),
+          pctDelta: a.pts > 0 ? (b.pts - a.pts) / a.pts * 100 : 0, posRankBefore: posRankA[a.pid], posRankAfter: posRankB[a.pid],
+          rankBefore: overallA[a.pid], rankAfter: overallB[a.pid], valueBefore: r1(a.pts - SA.replacement[a.pos]), valueAfter: r1(b.pts - SB.replacement[a.pos]) };
+      });
+      // Positions: share of all starter points, average starter, and what a top player is worth over a replacement.
+      function posStats(S) {
+        var total = 0, out = {};
+        PL.forEach(function (p) { S.starters[p].forEach(function (x) { total += Math.max(0, x.pts); }); });
+        PL.forEach(function (p) {
+          var st = S.starters[p], sum = st.reduce(function (t, x) { return t + Math.max(0, x.pts); }, 0);
+          var top = S.byPos[p].slice(0, league.teams), topAvg = top.length ? top.reduce(function (t, x) { return t + x.pts; }, 0) / top.length : 0;
+          out[p] = { share: total ? sum / total * 100 : 0, avgStarter: st.length ? sum / st.length : 0, starters: st.length, topValue: topAvg - S.replacement[p], replacement: S.replacement[p],
+            top: S.byPos[p].slice(0, Math.max(1, league.teams)).map(function (x) { return x.pid; }) };
+        });
+        return out;
+      }
+      var PA = posStats(SA), PB = posStats(SB);
+      var positions = PL.map(function (p) {
+        var a = PA[p], b = PB[p], topSetA = {}, inTop = [], outTop = [];
+        a.top.forEach(function (id) { topSetA[id] = 1; });
+        b.top.forEach(function (id) { if (!topSetA[id]) inTop.push(id); });
+        var topSetB = {}; b.top.forEach(function (id) { topSetB[id] = 1; });
+        a.top.forEach(function (id) { if (!topSetB[id]) outTop.push(id); });
+        return { pos: p, shareBefore: r1(a.share), shareAfter: r1(b.share), avgBefore: r1(a.avgStarter), avgAfter: r1(b.avgStarter),
+          avgPct: a.avgStarter ? r1((b.avgStarter - a.avgStarter) / a.avgStarter * 100) : 0, valueBefore: r1(a.topValue), valueAfter: r1(b.topValue),
+          enters: inTop, leaves: outTop };
+      });
+      var totalA = A.reduce(function (t, x) { return t + x.pts; }, 0), totalB = B.reduce(function (t, x) { return t + x.pts; }, 0);
+      return { rows: rows, positions: positions, rules: prop, totalPct: totalA ? (totalB - totalA) / totalA * 100 : 0, league: league };
+    }
+
+    // Clean steps from 0 out past both today's value and the proposal (whole
+    // points for TD-sized rules, else the nicest step near half the rule's size).
+    function sweepValues(current, proposed) {
+      var c = num(current), p = num(proposed), sign = (p || c) < 0 ? -1 : 1, top = Math.max(Math.abs(c), Math.abs(p)), step;
+      if (Math.round(c) === c && Math.abs(c) >= 2) step = 1;
+      else {
+        var want = (Math.abs(c) || Math.abs(p) || 1) / 2, nice = [0.01, 0.02, 0.05, 0.1, 0.25, 0.5, 1, 2];
+        step = nice.reduce(function (b, x) { return Math.abs(x - want) < Math.abs(b - want) ? x : b; }, nice[0]);
+      }
+      var hi = Math.max(top * 1.5, top + 2 * step), v = [];
+      for (var x = 0; x <= hi + 1e-9 && v.length < 13; x += step) v.push(Math.round(x * 1000) / 1000 * sign);
+      [c, p].forEach(function (y) { if (v.indexOf(y) < 0) v.push(y); });
+      return v.sort(function (a, b) { return a - b; });
+    }
+    // One rule through a range: starter share by position and the #1 player at each value.
+    function sweep(stats, players, base, key, values, league) {
+      return values.map(function (v) {
+        var o = {}; o[key] = v;
+        var r = compare(stats, players, base, o, league), best = r.rows.slice().sort(function (a, b) { return b.after - a.after; })[0];
+        var sh = {}; r.positions.forEach(function (p) { sh[p.pos] = p.shareAfter; });
+        return { value: v, share: sh, top: best ? { name: best.name, pos: best.pos, pts: best.after } : null };
+      });
+    }
+    return { startingRules: startingRules, scoreLine: scoreLine, compare: compare, sweepValues: sweepValues, sweep: sweep, POS: POS, IDP: IDP, posList: posList };
+  })();
+// ══════════════════════════════════════════════════════════════════════
+// ESPN_RULES: translate an ESPN Fantasy Football league's scoring settings
+// (GET .../seasons/{year}/segments/0/leagues/{id}?view=mSettings) into a
+// Sleeper-style rule set (sleeper stat key -> points per unit), for the
+// Commissioner Calculator engine (points = sum of stat[k] * rule[k]).
+//
+// Stat ids were matched against Sleeper's 2025 season stats player by
+// player (ESPN kona_player_info actuals vs api.sleeper.app season totals),
+// not taken from community lists. Notable findings baked in below:
+//  - Sleeper's yardage-game bonus counts are RANGES, same as ESPN's:
+//    bonus_pass_yd_300 = 300-399 yd games, bonus_pass_yd_400 = 400+;
+//    bonus_rush/rec_yd_100 = 100-199, *_200 = 200+. So they map 1:1.
+//  - ESPN first downs include touchdowns; Sleeper's *_fd do not.
+//  - Sleeper def_st_td = kick + punt + blocked-kick return TDs;
+//    def_td = interception + fumble return TDs.
+//  - fgm_50p is never used (fgm_50_59 + fgm_60p carry 50+), so 50+ yard
+//    field goals are not counted twice.
+// Rules that cannot be expressed exactly are listed in `skipped`
+// (approx: true when a close equivalent was still applied).
+// ══════════════════════════════════════════════════════════════════════
+var ESPN_RULES = (function () {
+  'use strict';
+
+  // ESPN lineup slot id per position (pointsOverrides are keyed by slot).
+  var SLOT = { QB: 0, RB: 2, WR: 4, TE: 6, DEF: 16, K: 17 };
+  var OFF_POS = ['QB', 'RB', 'WR', 'TE'];
+  var SLOT_NAME = { 0: 'QB', 1: 'TQB', 2: 'RB', 3: 'RB/WR', 4: 'WR', 5: 'WR/TE', 6: 'TE', 7: 'OP', 8: 'DT', 9: 'DE', 10: 'LB',
+    11: 'DL', 12: 'CB', 13: 'S', 14: 'DB', 15: 'DP', 16: 'D/ST', 17: 'K', 18: 'P', 19: 'HC', 20: 'Bench', 21: 'IR', 23: 'FLEX', 24: 'ER' };
+
+  // Points-allowed tiers: ESPN splits 14-17 / 18-21 / 22-27 and 35-45 / 46+,
+  // Sleeper keeps 14-20 / 21-27 and 35+. When the ESPN tiers that share a
+  // Sleeper bucket score differently, the bucket gets the share-weighted
+  // value, using how often each score happened in 2025 (544 team games):
+  // 14-20: 48.5% were 14-17; 21-27: 14.8% were exactly 21; 35+: 94.9% were 35-45.
+  var W_14_17 = 0.485, W_21 = 0.148, W_35_45 = 0.949;
+  // Sleeper keeps one stat for several ESPN TD types. Equal ESPN values map
+  // exactly; unequal ones are blended by each type's 2025 share.
+  var GROUPS = {
+    def_st_td: { l: 'D/ST kick, punt and blocked-kick return TDs', ids: { 93: 0.19, 101: 0.23, 102: 0.58 } },
+    def_td: { l: 'D/ST interception and fumble return TDs', ids: { 103: 0.61, 104: 0.39 } },
+    st_td: { l: 'Player kick and punt return TDs', ids: { 101: 0.28, 102: 0.72 } }
+  };
+
+  // stat id -> { l: label, o: offense keys, k: kicker keys, d: D/ST keys,
+  //   p: primary position for offense when positions disagree,
+  //   n: step size (ESPN floors per game: "every N"), ax: approximation note,
+  //   skip: why it cannot be scored }
+  function m(keys, mult) { var o = {}; keys.split(' ').forEach(function (k) { o[k] = mult == null ? 1 : mult; }); return o; }
+  var FG_U40 = 'fgm_0_19 fgm_20_29 fgm_30_39', FGX_U40 = 'fgmiss_0_19 fgmiss_20_29 fgmiss_30_39';
+  var NOT_SCORED_AVG = 'an average/rate, not a count; nothing to multiply';
+  var S = {
+    0: { l: 'Passing attempts', o: m('pass_att'), p: 'QB' },
+    1: { l: 'Completions', o: m('pass_cmp'), p: 'QB' },
+    2: { l: 'Incomplete passes', o: m('pass_inc'), p: 'QB' },
+    3: { l: 'Passing yards', o: m('pass_yd'), p: 'QB' },
+    4: { l: 'Passing TDs', o: m('pass_td'), p: 'QB' },
+    5: { l: 'Every 5 passing yards', o: m('pass_yd', 1 / 5), n: 5, p: 'QB' },
+    6: { l: 'Every 10 passing yards', o: m('pass_yd', 1 / 10), n: 10, p: 'QB' },
+    7: { l: 'Every 20 passing yards', o: m('pass_yd', 1 / 20), n: 20, p: 'QB' },
+    8: { l: 'Every 25 passing yards', o: m('pass_yd', 1 / 25), n: 25, p: 'QB' },
+    9: { l: 'Every 50 passing yards', o: m('pass_yd', 1 / 50), n: 50, p: 'QB' },
+    10: { l: 'Every 100 passing yards', o: m('pass_yd', 1 / 100), n: 100, p: 'QB' },
+    11: { l: 'Every 5 completions', o: m('pass_cmp', 1 / 5), n: 5, p: 'QB' },
+    12: { l: 'Every 10 completions', o: m('pass_cmp', 1 / 10), n: 10, p: 'QB' },
+    13: { l: 'Every 5 incomplete passes', o: m('pass_inc', 1 / 5), n: 5, p: 'QB' },
+    14: { l: 'Every 10 incomplete passes', o: m('pass_inc', 1 / 10), n: 10, p: 'QB' },
+    15: { l: '40+ yd TD pass bonus', o: m('pass_td_40p'), p: 'QB' },
+    16: { l: '50+ yd TD pass bonus', o: m('pass_td_50p'), p: 'QB' },
+    17: { l: '300-399 yd passing game', o: m('bonus_pass_yd_300'), p: 'QB' },
+    18: { l: '400+ yd passing game', o: m('bonus_pass_yd_400'), p: 'QB' },
+    19: { l: '2-pt conversion pass', o: m('pass_2pt'), p: 'QB' },
+    20: { l: 'Interceptions thrown', o: m('pass_int'), p: 'QB' },
+    21: { l: 'Completion percentage', skip: NOT_SCORED_AVG },
+    22: { l: 'Passing yards per game', skip: NOT_SCORED_AVG },
+    23: { l: 'Rushing attempts', o: m('rush_att'), p: 'RB' },
+    24: { l: 'Rushing yards', o: m('rush_yd'), p: 'RB' },
+    25: { l: 'Rushing TDs', o: m('rush_td'), p: 'RB' },
+    26: { l: '2-pt conversion run', o: m('rush_2pt'), p: 'RB' },
+    27: { l: 'Every 5 rushing yards', o: m('rush_yd', 1 / 5), n: 5, p: 'RB' },
+    28: { l: 'Every 10 rushing yards', o: m('rush_yd', 1 / 10), n: 10, p: 'RB' },
+    29: { l: 'Every 20 rushing yards', o: m('rush_yd', 1 / 20), n: 20, p: 'RB' },
+    30: { l: 'Every 25 rushing yards', o: m('rush_yd', 1 / 25), n: 25, p: 'RB' },
+    31: { l: 'Every 50 rushing yards', o: m('rush_yd', 1 / 50), n: 50, p: 'RB' },
+    32: { l: 'Every 100 rushing yards', o: m('rush_yd', 1 / 100), n: 100, p: 'RB' },
+    33: { l: 'Every 5 rushing attempts', o: m('rush_att', 1 / 5), n: 5, p: 'RB' },
+    34: { l: 'Every 10 rushing attempts', o: m('rush_att', 1 / 10), n: 10, p: 'RB' },
+    35: { l: '40+ yd TD rush bonus', o: m('rush_td_40p'), p: 'RB' },
+    36: { l: '50+ yd TD rush bonus', o: m('rush_td_50p'), p: 'RB' },
+    37: { l: '100-199 yd rushing game', o: m('bonus_rush_yd_100'), p: 'RB' },
+    38: { l: '200+ yd rushing game', o: m('bonus_rush_yd_200'), p: 'RB' },
+    39: { l: 'Rushing yards per attempt', skip: NOT_SCORED_AVG },
+    40: { l: 'Rushing yards per game', skip: NOT_SCORED_AVG },
+    41: { l: 'Receptions', o: m('rec'), rec: true, p: 'WR' },
+    42: { l: 'Receiving yards', o: m('rec_yd'), p: 'WR' },
+    43: { l: 'Receiving TDs', o: m('rec_td'), p: 'WR' },
+    44: { l: '2-pt conversion catch', o: m('rec_2pt'), p: 'WR' },
+    45: { l: '40+ yd TD reception bonus', o: m('rec_td_40p'), p: 'WR' },
+    46: { l: '50+ yd TD reception bonus', o: m('rec_td_50p'), p: 'WR' },
+    47: { l: 'Every 5 receiving yards', o: m('rec_yd', 1 / 5), n: 5, p: 'WR' },
+    48: { l: 'Every 10 receiving yards', o: m('rec_yd', 1 / 10), n: 10, p: 'WR' },
+    49: { l: 'Every 20 receiving yards', o: m('rec_yd', 1 / 20), n: 20, p: 'WR' },
+    50: { l: 'Every 25 receiving yards', o: m('rec_yd', 1 / 25), n: 25, p: 'WR' },
+    51: { l: 'Every 50 receiving yards', o: m('rec_yd', 1 / 50), n: 50, p: 'WR' },
+    52: { l: 'Every 100 receiving yards', o: m('rec_yd', 1 / 100), n: 100, p: 'WR' },
+    53: { l: 'Receptions', o: m('rec'), rec: true, p: 'WR' },
+    54: { l: 'Every 5 receptions', o: m('rec', 1 / 5), n: 5, p: 'WR' },
+    55: { l: 'Every 10 receptions', o: m('rec', 1 / 10), n: 10, p: 'WR' },
+    56: { l: '100-199 yd receiving game', o: m('bonus_rec_yd_100'), p: 'WR' },
+    57: { l: '200+ yd receiving game', o: m('bonus_rec_yd_200'), p: 'WR' },
+    58: { l: 'Targets', o: m('rec_tgt'), p: 'WR' },
+    59: { l: 'Yards after catch', o: m('rec_yar'), p: 'WR', ax: "Sleeper's yards-after-catch (rec_yar) differs from ESPN's by a few yards for some players" },
+    60: { l: 'Receiving yards per catch', skip: NOT_SCORED_AVG },
+    61: { l: 'Receiving yards per game', skip: NOT_SCORED_AVG },
+    62: { l: '2-pt conversions', o: m('pass_2pt rush_2pt rec_2pt'), p: 'RB' },
+    63: { l: 'Fumble recovered for TD', o: m('fum_rec_td'), p: 'WR' },
+    64: { l: 'Times sacked', o: m('pass_sack'), p: 'QB' },
+    65: { l: 'Fumbles (one play type)', skip: 'Sleeper does not split fumbles by play type' },
+    66: { l: 'Fumbles (one play type)', skip: 'Sleeper does not split fumbles by play type' },
+    67: { l: 'Fumbles (one play type)', skip: 'Sleeper does not split fumbles by play type' },
+    68: { l: 'Fumbles', o: m('fum'), p: 'RB' },
+    69: { l: 'Fumbles lost (one play type)', skip: 'Sleeper does not split fumbles by play type' },
+    70: { l: 'Fumbles lost (one play type)', skip: 'Sleeper does not split fumbles by play type' },
+    71: { l: 'Fumbles lost (one play type)', skip: 'Sleeper does not split fumbles by play type' },
+    72: { l: 'Fumbles lost', o: m('fum_lost'), p: 'RB' },
+    73: { l: 'Turnovers', o: m('pass_int fum_lost'), p: 'QB' }, // = INTs + fumbles lost (167/167 players)
+    // Kicking. 50+ goes to fgm_50_59 + fgm_60p (never fgm_50p: no double count).
+    74: { l: 'FG made 50+ yds', k: m('fgm_50_59 fgm_60p') },
+    75: { l: 'FG attempted 50+ yds', k: m('fgm_50_59 fgm_60p fgmiss_50_59 fgmiss_60p') },
+    76: { l: 'FG missed 50+ yds', k: m('fgmiss_50_59 fgmiss_60p') },
+    77: { l: 'FG made 40-49 yds', k: m('fgm_40_49') },
+    78: { l: 'FG attempted 40-49 yds', k: m('fgm_40_49 fgmiss_40_49') },
+    79: { l: 'FG missed 40-49 yds', k: m('fgmiss_40_49') },
+    80: { l: 'FG made 0-39 yds', k: m(FG_U40) },
+    81: { l: 'FG attempted 0-39 yds', k: m(FG_U40 + ' ' + FGX_U40) },
+    82: { l: 'FG missed 0-39 yds', k: m(FGX_U40) },
+    83: { l: 'FG made', k: m('fgm') },
+    84: { l: 'FG attempted', k: m('fga') },
+    85: { l: 'FG missed', k: m('fgmiss') },
+    86: { l: 'PAT made', k: m('xpm') },
+    87: { l: 'PAT attempted', k: m('xpa') },
+    88: { l: 'PAT missed', k: m('xpmiss') },
+    198: { l: 'FG made 50-59 yds', k: m('fgm_50_59') },
+    199: { l: 'FG attempted 50-59 yds', k: m('fgm_50_59 fgmiss_50_59') },
+    200: { l: 'FG missed 50-59 yds', k: m('fgmiss_50_59') },
+    201: { l: 'FG made 60+ yds', k: m('fgm_60p') },
+    202: { l: 'FG attempted 60+ yds', k: m('fgm_60p fgmiss_60p') },
+    203: { l: 'FG missed 60+ yds', k: m('fgmiss_60p') },
+    214: { l: 'FG yards made', k: m('fgm_yds') },
+    215: { l: 'FG yards missed', skip: 'Sleeper has no missed-field-goal-yards stat' },
+    216: { l: 'FG yards attempted', skip: 'Sleeper has no missed-field-goal-yards stat' },
+    217: { l: 'Every 5 FG yards made', k: m('fgm_yds', 1 / 5), n: 5 },
+    218: { l: 'Every 10 FG yards made', k: m('fgm_yds', 1 / 10), n: 10 },
+    219: { l: 'Every 20 FG yards made', k: m('fgm_yds', 1 / 20), n: 20 },
+    220: { l: 'Every 25 FG yards made', k: m('fgm_yds', 1 / 25), n: 25 },
+    221: { l: 'Every 50 FG yards made', k: m('fgm_yds', 1 / 50), n: 50 },
+    222: { l: 'Every 100 FG yards made', k: m('fgm_yds', 1 / 100), n: 100 },
+    // Team defense / special teams
+    89: { l: '0 points allowed', d: m('pts_allow_0') },
+    90: { l: '1-6 points allowed', d: m('pts_allow_1_6') },
+    91: { l: '7-13 points allowed', d: m('pts_allow_7_13') },
+    92: { l: '14-17 points allowed', tier: '14_17' },
+    121: { l: '18-21 points allowed', tier: '18_21' },
+    122: { l: '22-27 points allowed', tier: '22_27' },
+    123: { l: '28-34 points allowed', d: m('pts_allow_28_34') },
+    124: { l: '35-45 points allowed', tier: '35_45' },
+    125: { l: '46+ points allowed', tier: '46p' },
+    120: { l: 'Points allowed', d: m('pts_allow'), ax: "ESPN and Sleeper totals differ by a few points for a couple of teams" },
+    93: { l: 'Blocked punt/FG return TD', g: 'def_st_td' },
+    94: { l: 'Defensive TDs', d: m('def_td') },
+    95: { l: 'Interceptions', d: m('int') },
+    96: { l: 'Fumbles recovered', d: m('fum_rec def_st_fum_rec'), ax: "team fumble recoveries differ by one for a few teams between ESPN and Sleeper" },
+    97: { l: 'Blocked kicks', d: m('blk_kick') },
+    98: { l: 'Safeties', d: m('safe') },
+    99: { l: 'Sacks', d: m('sack') },
+    100: { l: 'Half sacks', d: m('sack', 2) },
+    101: { l: 'Kickoff return TD', go: 'st_td', g: 'def_st_td', p: 'WR' },
+    102: { l: 'Punt return TD', go: 'st_td', g: 'def_st_td', p: 'WR' },
+    103: { l: 'Interception return TD', g: 'def_td' },
+    104: { l: 'Fumble return TD', g: 'def_td' },
+    105: { l: 'D/ST touchdowns', d: m('def_td def_st_td') },
+    106: { l: 'Forced fumbles', d: m('ff def_st_ff'), ax: 'team forced fumbles differ by one or two for several teams between ESPN and Sleeper' },
+    107: { l: 'Assisted tackles', skip: 'ESPN and Sleeper count team tackles very differently (about 25% apart); IDP is not supported' },
+    108: { l: 'Solo tackles', skip: 'ESPN and Sleeper count team tackles very differently (about 25% apart); IDP is not supported' },
+    109: { l: 'Total tackles', skip: 'ESPN and Sleeper count team tackles very differently (about 25% apart); IDP is not supported' },
+    113: { l: 'Passes defensed', d: m('def_pass_def'), ax: 'team passes defensed differ by one for some teams between ESPN and Sleeper' },
+    114: { l: 'Kickoff return yards', o: m('kr_yd'), d: m('def_kr_yd'), p: 'WR' },
+    115: { l: 'Punt return yards', o: m('pr_yd'), d: m('def_pr_yd'), p: 'WR' },
+    127: { l: 'Yards allowed', d: m('yds_allow') },
+    128: { l: 'Less than 100 yards allowed', d: m('yds_allow_0_100') },
+    129: { l: '100-199 yards allowed', d: m('yds_allow_100_199') },
+    130: { l: '200-299 yards allowed', d: m('yds_allow_200_299') },
+    131: { l: '300-349 yards allowed', d: m('yds_allow_300_349') },
+    132: { l: '350-399 yards allowed', d: m('yds_allow_350_399') },
+    133: { l: '400-449 yards allowed', d: m('yds_allow_400_449') },
+    134: { l: '450-499 yards allowed', d: m('yds_allow_450_499') },
+    135: { l: '500-549 yards allowed', d: m('yds_allow_500_549') },
+    136: { l: '550+ yards allowed', d: m('yds_allow_550p') },
+    205: { l: '2-pt return', d: m('def_2pt') },
+    206: { l: '2-pt return', d: m('def_2pt') },
+    209: { l: '1-pt safety', skip: 'Sleeper has no one-point-safety stat (it is extremely rare)' },
+    210: { l: 'Games played', o: m('gp'), k: m('gp'), d: m('gp'), p: 'RB' },
+    // ESPN counts a touchdown as a first down; Sleeper's *_fd leave TDs out.
+    211: { l: 'Passing first downs', o: m('pass_fd pass_td'), p: 'QB', ax: 'ESPN and Sleeper first-down counts differ by one or two for some players' },
+    212: { l: 'Rushing first downs', o: m('rush_fd rush_td'), p: 'RB', ax: 'ESPN and Sleeper first-down counts differ by one or two for some players' },
+    213: { l: 'Receiving first downs', o: m('rec_fd rec_td'), p: 'WR', ax: 'ESPN and Sleeper first-down counts differ by one or two for some players' }
+  };
+  // Duplicate points-allowed ids ESPN also exposes (same counts as 120, 89-92, 121-125).
+  S[187] = S[120];
+  [[188, 89], [189, 90], [190, 91], [191, 92], [192, 121], [193, 122], [194, 123], [195, 124], [196, 125]].forEach(function (p) { S[p[0]] = S[p[1]]; });
+  var TD_DIST = 'Sleeper only tracks 40+ and 50+ yard TDs, not other TD lengths';
+  [[175, 'TD pass 0-9 yds'], [176, 'TD pass 10-19 yds'], [177, 'TD pass 20-29 yds'], [178, 'TD pass 30-39 yds'],
+   [179, 'TD rush 0-9 yds'], [180, 'TD rush 10-19 yds'], [181, 'TD rush 20-29 yds'], [182, 'TD rush 30-39 yds'],
+   [183, 'TD reception 0-9 yds'], [184, 'TD reception 10-19 yds'], [185, 'TD reception 20-29 yds'], [186, 'TD reception 30-39 yds']]
+    .forEach(function (p) { S[p[0]] = { l: p[1], skip: TD_DIST }; });
+  function range(a, b, f) { for (var i = a; i <= b; i++) if (!S[i]) S[i] = f(i); }
+  range(138, 154, function () { return { l: 'Punting stat', skip: 'punters are not scored by the calculator' }; });
+  range(155, 174, function () { return { l: 'Team result (head coach)', skip: 'head-coach / team-result scoring is not supported' }; });
+  range(223, 234, function () { return { l: 'Missed/attempted FG yards (step)', skip: 'Sleeper has no missed-field-goal-yards stat' }; });
+
+  function num(x) { var n = Number(x); return isFinite(n) ? n : 0; }
+  function round(x) { return Math.round(x * 10000) / 10000; }
+  function fmt(x) { return String(round(x)); }
+  // "2 pts", "0 pts (D/ST 2)", "1 pt (TE 1.5)"
+  function ptsText(base, ov) {
+    var t = fmt(base) + (Math.abs(base) === 1 ? ' pt' : ' pts'), o = [];
+    Object.keys(ov || {}).forEach(function (s) { if (num(ov[s]) !== base) o.push((SLOT_NAME[s] || 'slot ' + s) + ' ' + fmt(num(ov[s]))); });
+    return o.length ? t + '; ' + o.join(', ') : t;
+  }
+
+  function fromSettings(json) {
+    var st = (json && json.settings) || json || {};
+    var ss = st.scoringSettings || {}, items = ss.scoringItems || [];
+    var rs = st.rosterSettings || {}, slots = rs.lineupSlotCounts || {};
+    var rules = {}, skipped = [];
+    function add(k, v) { if (!v) return; rules[k] = (rules[k] || 0) + v; }
+    function skip(label, why, approx) { skipped.push(approx ? { label: label, why: why, approx: true } : { label: label, why: why }); }
+    function eff(it, pos) { var o = it.pointsOverrides || {}, s = SLOT[pos]; return o[s] != null ? num(o[s]) : num(it.points); }
+    var tiers = {}, gv = { def_st_td: {}, def_td: {}, st_td: {} };
+
+    items.forEach(function (it) {
+      var id = num(it.statId), d = S[id], base = num(it.points);
+      var ov = it.pointsOverrides || {}, ovKeys = Object.keys(ov);
+      var label = d ? d.l : 'ESPN stat #' + id, pts = ptsText(base, ov);
+      if (!base && !ovKeys.some(function (s) { return num(ov[s]); })) return; // scores nothing
+      if (it.isReverseItem) skip(label, 'ESPN marks this as a reverse (fewer-is-better) item; scored as a plain count');
+      if (!d) { skip(label + ' (' + pts + ')', 'unrecognized ESPN stat id; not scored'); return; }
+      if (d.skip) { skip(label + ' (' + pts + ')', d.skip); return; }
+      // Overrides on slots we cannot place (flex, IDP, TQB ...): not expressible.
+      ovKeys.forEach(function (s) {
+        var known = false; for (var p in SLOT) if (String(SLOT[p]) === s) known = true;
+        if (!known && num(ov[s]) !== base) skip(label + ' for ' + (SLOT_NAME[s] || 'slot ' + s), 'slot-specific override (' + fmt(num(ov[s])) + ' pts) has no Sleeper equivalent; base ' + fmt(base) + ' used');
+      });
+      var note = d.ax || '';
+      if (d.n) note = 'ESPN awards whole points per ' + d.n + ' per game (rounded down); applied as ' + fmt(base / d.n) + ' per unit, which runs high by about half a step, ~' +
+        (Math.round(Math.abs(base) * (d.n - 1) / (2 * d.n) * 100) / 100) + ' pts, per game with that stat';
+      if (note) skip(label + ' (' + pts + ')', note, true);
+
+      if (d.tier) { tiers[d.tier] = eff(it, 'DEF'); return; }
+      if (d.g) gv[d.g][id] = (gv[d.g][id] || 0) + eff(it, 'DEF');
+      var k;
+      if (d.d) { var vd = eff(it, 'DEF'); for (k in d.d) add(k, vd * d.d[k]); }
+      if (d.k) { var vk = eff(it, 'K'); for (k in d.k) add(k, vk * d.k[k]); }
+      if (d.o || d.go) {
+        var v = {}, same = true;
+        OFF_POS.forEach(function (p) { v[p] = eff(it, p); if (v[p] !== v.QB) same = false; });
+        if (d.rec && !same) {
+          // Receptions: rec carries one value and RB/WR/TE get Sleeper's
+          // bonus_rec_* deltas. rec takes the QB value (QBs have no bonus key),
+          // so every position comes out exact.
+          var r0 = v.QB;
+          for (k in d.o) add(k, r0 * d.o[k]);
+          ['RB', 'WR', 'TE'].forEach(function (p) { add('bonus_rec_' + p.toLowerCase(), (v[p] - r0) * d.o.rec); });
+          return;
+        }
+        var use = same ? v.QB : v[d.p || 'RB'];
+        if (!same) {
+          var diff = OFF_POS.filter(function (p) { return v[p] !== use; }).map(function (p) { return p + ' ' + fmt(v[p]); }).join(', ');
+          skip(label + ' by position', 'Sleeper has no position-specific key for this; ' + fmt(use) + ' (the ' + (d.p || 'RB') + ' value) is used for everyone, ESPN gives ' + diff, true);
+        }
+        if (d.go) gv[d.go][id] = (gv[d.go][id] || 0) + use;
+        else for (k in d.o) add(k, use * d.o[k]);
+      }
+    });
+    Object.keys(GROUPS).forEach(function (key) {
+      var g = GROUPS[key], vals = gv[key], ids = Object.keys(g.ids);
+      if (!ids.some(function (id) { return vals[id]; })) return;
+      var first = vals[ids[0]] || 0, equal = ids.every(function (id) { return (vals[id] || 0) === first; });
+      if (equal) { add(key, first); return; }
+      var blend = 0; ids.forEach(function (id) { blend += (vals[id] || 0) * g.ids[id]; });
+      add(key, blend);
+      skip(g.l + ' (' + ids.map(function (id) { return S[id].l + ' ' + fmt(vals[id] || 0); }).join(', ') + ')',
+        'Sleeper counts these as one stat (' + key + '); blended to ' + fmt(blend) + ' by how often each happened in 2025', true);
+    });
+
+    // Points-allowed tiers (see W_* above).
+    if (Object.keys(tiers).length) {
+      var t = function (k) { return tiers[k] || 0; };
+      add('pts_allow_14_20', W_14_17 * t('14_17') + (1 - W_14_17) * t('18_21'));
+      add('pts_allow_21_27', W_21 * t('18_21') + (1 - W_21) * t('22_27'));
+      add('pts_allow_35p', W_35_45 * t('35_45') + (1 - W_35_45) * t('46p'));
+      if (t('14_17') !== t('18_21')) skip('14-17 / 18-21 points allowed (' + fmt(t('14_17')) + ' / ' + fmt(t('18_21')) + ')', "Sleeper's tier is 14-20; blended to " + fmt(rules.pts_allow_14_20 || 0) + ' by how often each score happened in 2025', true);
+      if (t('18_21') !== t('22_27')) skip('21 points allowed (' + fmt(t('18_21')) + ' on ESPN vs ' + fmt(t('22_27')) + ' for 22-27)', "Sleeper's tier is 21-27; blended to " + fmt(rules.pts_allow_21_27 || 0) + ' (a 21-point game scores as 22-27 on Sleeper)', true);
+      if (t('35_45') !== t('46p')) skip('35-45 / 46+ points allowed (' + fmt(t('35_45')) + ' / ' + fmt(t('46p')) + ')', "Sleeper's tier is 35+; blended to " + fmt(rules.pts_allow_35p || 0), true);
+    }
+
+    for (var key in rules) { rules[key] = round(rules[key]); if (!rules[key]) delete rules[key]; }
+    if (rules.rec == null) rules.rec = 0;
+
+    // League shape.
+    var sc = function (id) { return num(slots[id]); };
+    var idp = [8, 9, 10, 11, 12, 13, 14, 15].some(function (id) { return sc(id) > 0; });
+    if (idp) skip('IDP lineup slots', 'individual defensive players are not scored by the calculator');
+    if (sc(18) > 0) skip('Punter slot', 'punters are not scored by the calculator');
+    if (sc(19) > 0) skip('Head coach slot', 'head coaches are not scored by the calculator');
+    if (sc(1) > 0) skip('Team QB slot', 'a team-QB slot is treated as one QB');
+    var type = ss.scoringType;
+    if (type && !/POINTS/.test(type)) skip('Scoring type ' + type, 'category/roto leagues have no point total; rules shown as if points');
+
+    var teams = num(st.size) || num(json && json.teams && json.teams.length) || 0;
+    return {
+      name: st.name || '',
+      teams: teams,
+      superflex: sc(7) > 0 || sc(0) + sc(1) >= 2,
+      rules: rules,
+      skipped: skipped
+    };
+  }
+
+  return { fromSettings: fromSettings };
+})();
+if (typeof module !== 'undefined' && module.exports) module.exports = ESPN_RULES;
+  // ══════════════════════════════════════════════════════════════════════
+  // MFL_RULES: MyFantasyLeague league scoring -> Sleeper-style rule set
+  // (points = sum over keys of seasonStat[key] * rule[key]), for the
+  // Commissioner Calculator engine (CC.scoreLine).
+  //
+  //   MFL_RULES.fromExports(leagueJson, rulesJson)
+  //     leagueJson = TYPE=league&JSON=1 response, rulesJson = TYPE=rules&JSON=1
+  //     -> { name, teams, superflex, positions, idp, rules: {sleeperKey: pts},
+  //          skipped: [{ label, why, approx }] }
+  //
+  // How MFL scores (checked against TYPE=playerScores):
+  //  - Every rule in every group that lists a player's position applies, and
+  //    they ADD (a TE in "QB|RB|WR|TE" CC *1 and "TE" CC *1 gets 2 a catch).
+  //  - A rule fires per game when the game total sits inside its range
+  //    (length rules such as FG, PS, RS fire per play on the play's yards).
+  //  - Points: "*x" = x per unit, "x" = flat x when in range, "a/b" = a per
+  //    full b units (rounded down each game).
+  // Sleeper has one value per stat for everybody, plus per-position bonus
+  // stats for receptions (bonus_rec_te/rb/wr) and first downs (bonus_fd_*).
+  // Anything that cannot be carried exactly is listed in `skipped`: approx
+  // true = a close equivalent is scored, false = not scored at all.
+  // ══════════════════════════════════════════════════════════════════════
+var MFL_RULES = (function () {
+  'use strict';
+
+  // MFL's own names for every event code (TYPE=allRules), for rules with no Sleeper stat.
+  var NAMES = {
+    '#P': 'number of passing TDs', 'PS': 'length of passing TD', 'PY': 'passing yards', 'APY': 'average yards per completion', 'PA': 'pass attempts',
+    'PC': 'pass completions', 'PCP': 'completion percentage', 'INC': 'pass incompletions', 'IN': 'pass interceptions thrown',
+    '#IT': 'number of interceptions thrown returned for a TD', 'IT': 'length of interception thrown returned for a TD', 'TSK': 'QB sacked',
+    'TSY': 'QB sacked yardage', 'RATE': 'passer rating', 'P20': '20+ yard completions', 'P30': '30+ yard completions',
+    'P40': 'long passing plays of 40+ yards', 'P50': '50+ yard completions', 'P2': 'passing 2 pointers', '#R': 'number of rushing TDs',
+    'RS': 'length of rushing TD', 'RY': 'rushing yards', 'ARY': 'yards per rush', 'RA': 'rush attempts', 'R20': '20+ yard runs',
+    'R40': 'long rushing plays of 40+ yards', 'R2': 'rushing 2 pointers', '#C': 'number of receiving TDs', 'RC': 'length of receiving TD',
+    'CY': 'receiving yards', 'ACY': 'yards per catch', 'CC': 'receptions', 'TGT': 'targets', 'C20': 'long receptions of 20+ yards',
+    'C40': 'long receptions of 40+ yards', 'C2': 'receiving 2 pointers', 'RCY': 'rushing + receiving yards', 'PRY': 'passing + rushing yards',
+    'TYS': 'total yards from scrimmage', 'TY': 'total yards', '#TD': 'total touchdowns', '#F': 'number of field goals made',
+    'FG': 'length of field goal made', '#M': 'number of field goals missed', 'MG': 'length of missed field goal',
+    '#A': 'number of field goals attempted', 'FGP': 'field goal percentage', 'HBF': 'field goals had blocked', 'EP': 'extra points',
+    'EM': 'extra points missed', 'EA': 'extra points attempted', 'EPP': 'extra point percentage', 'HBE': 'extra points had blocked', '#N': 'punts',
+    'PNY': 'punt yards', 'ANY': 'yards per punt', 'PI': 'punts inside the 20', 'HBP': 'punts had blocked', '#UT': 'number of punt return TDs',
+    'PR': 'length of punt return TD', '#U': 'punt returns', 'UY': 'punt return yards', 'AUY': 'yards per punt return', 'U40': '40+ yard punt returns',
+    '#KT': 'number of kickoff return TDs', 'KO': 'length of kickoff return TD', '#K': 'kickoff returns', 'KY': 'kickoff return yards',
+    'AKY': 'yards per kickoff return', 'K40': '40+ yard kickoff returns', 'FU': 'fumbles', 'FUO': 'fumbles on offense',
+    'FUS': 'fumbles on special teams', 'FUD': 'fumbles on defense', 'FL': 'fumbles lost (to opponent)', 'FLO': 'fumbles lost on offense',
+    'FLS': 'fumbles lost on special teams', 'FLD': 'fumbles lost on defense', '#DR': 'number of defensive fumble recovery TDs',
+    'DR': 'length of defensive fumble recovery TD', 'FC': 'fumble recoveries (from opponent)', 'FCD': 'fumble recoveries on defense',
+    'FCS': 'fumble recoveries on special teams', 'FCY': 'opponent fumble recovery yards', '#FT': 'own fumbles returned for a TD',
+    'FT': 'length of lost fumble returned for a TD', '#FR': 'number of offensive fumble recovery TDs', 'FR': 'length of offensive fumble recovery TD',
+    'OFC': 'own fumble recoveries', 'OFCY': 'own fumble recovery yards', 'FF': 'forced fumbles', '#IR': 'number of interception return TDs',
+    'IR': 'length of interception return TD', 'IC': 'interceptions caught', 'ICY': 'interception return yards', 'PD': 'passes defended',
+    '#BF': 'number of blocked field goal TDs', 'BF': 'length of blocked field goal TD', 'BLF': 'blocked field goals',
+    '#MF': 'number of missed field goal return TDs', 'MF': 'length of missed field goal return TD', '#BP': 'number of blocked punt TDs',
+    'BP': 'length of blocked punt TD', 'BLP': 'blocked punts', 'BLE': 'blocked extra points', 'TKD': 'defensive tackles', 'ASD': 'defensive assists',
+    'TK': 'tackles', 'AS': 'assists', 'AS2': 'assists divided by 2', 'SK': 'sacked a QB', 'SKY': 'sacked a QB yardage', 'QH': 'quarterback hits',
+    'TKL': 'tackles for a loss', 'SF': 'safeties', 'TPA': 'total points allowed', 'STPA': 'special teams points allowed',
+    'OPA': 'offensive points against', 'TYA': 'total net yards allowed', 'TYP': 'passing yards allowed', 'TYR': 'rushing yards allowed',
+    'STTA': 'special teams TDs allowed', 'OTA': 'offensive TDs allowed', '#D': 'number of defensive TDs', 'DD': 'length of defensive TD',
+    'D2': 'defensive conversion returns', 'SF1': 'one-point safeties', 'M2': 'successful 2-point conversions', 'F2': 'failed 2-point conversions',
+    '#T': 'number of defensive & special teams TDs', 'TT': 'length of defensive/special teams TDs', 'F': 'penalties', 'FY': 'penalty yards',
+    'TIME': 'time of possession', 'TPS': 'team points scored', 'DIF': 'point differential', 'OPS': 'offensive points scored', 'FD': 'first downs',
+    '1P': 'passing first downs', '1R': 'rushing first downs', '1C': 'receiving first downs', '1F': 'penalty first downs',
+    '3D': 'third-down conversions', '3F': 'failed third downs', '4D': 'fourth-down conversions', '4F': 'failed fourth downs', 'W': 'wins (coach)',
+    'L': 'losses (coach)', 'T': 'ties (coach)', 'APYAG': 'passing yards allowed per game', 'APYAR': 'pass defense rank',
+    'ARYAG': 'rushing yards allowed per game', 'ARYAR': 'run defense rank' };
+
+  function txt(v) { return v && typeof v === 'object' && Object.prototype.hasOwnProperty.call(v, '$t') ? v.$t : v; }
+  function arr(x) { return x == null ? [] : Object.prototype.toString.call(x) === '[object Array]' ? x : [x]; }
+  function rnd(x) { return Math.round(x * 1e6) / 1e6; }
+  function fmt(x) { var r = Math.round(x * 1000) / 1000; return String(r); }
+  function has(o, k) { return Object.prototype.hasOwnProperty.call(o, k); }
+
+  // ── Grammar ─────────────────────────────────────────────────────────────
+  // Range "lo-hi", either side may be negative: "-50-999", "-50--1", "0.0-50.0".
+  function parseRange(s) {
+    var m = /^\s*(-?\d*\.?\d+)\s*-\s*(-?\d*\.?\d+)\s*$/.exec(String(s == null ? '' : s));
+    if (m) return { lo: +m[1], hi: +m[2] };
+    var one = parseFloat(s);
+    return isFinite(one) ? { lo: one, hi: one } : null;
+  }
+  // Points: "*x" per unit | "a/b" a per full b units | "x" flat.
+  function parsePoints(s) {
+    var f = String(s == null ? '' : s).replace(/\s+/g, ''), m;
+    if ((m = /^\*(-?\d*\.?\d+)$/.exec(f))) return { kind: 'mult', x: +m[1] };
+    if ((m = /^(-?\d*\.?\d+)\/(-?\d*\.?\d+)$/.exec(f))) return +m[2] ? { kind: 'step', x: +m[1], per: +m[2] } : null;
+    if ((m = /^=?(-?\d*\.?\d+)$/.exec(f))) return { kind: 'flat', x: +m[1] };
+    return null;
+  }
+  function ruleValue(r, v) {
+    if (v < r.lo - 1e-9 || v > r.hi + 1e-9) return 0;
+    if (r.kind === 'mult') return r.x * v;
+    if (r.kind === 'flat') return r.x;
+    var q = v / r.per;
+    q = q >= 0 ? Math.floor(q + 1e-9) : Math.ceil(q - 1e-9);
+    return r.x * q;
+  }
+
+  // ── Sleeper segment helpers ─────────────────────────────────────────────
+  // A segment [a, b) of the per-game total (or per-play length) and the mix
+  // of Sleeper stats that counts exactly the games/plays inside it.
+  // combo null = no Sleeper stat (must score 0 there to be exact).
+  function thr(list, base) { // cumulative "N+ games" counts, optional base count
+    var segs = [], i, c, INF = Infinity;
+    c = null;
+    if (base) { c = {}; c[base] = 1; if (list.length) c[list[0][1]] = -1; }
+    segs.push({ a: -INF, b: list.length ? list[0][0] : INF, combo: c });
+    for (i = 0; i < list.length; i++) {
+      c = {}; c[list[i][1]] = 1;
+      if (i + 1 < list.length) c[list[i + 1][1]] = -1;
+      segs.push({ a: list[i][0], b: i + 1 < list.length ? list[i + 1][0] : INF, combo: c, tail: true });
+    }
+    return segs;
+  }
+  // Sleeper's yardage-game bonuses are bands, not cumulative: bonus_pass_yd_300
+  // counts 300-399 games and bonus_pass_yd_400 counts 400+ (same for 100/200).
+  function band(list) {
+    var segs = [{ a: -Infinity, b: list[0][0], combo: null }], i, c;
+    for (i = 0; i < list.length; i++) {
+      c = {}; c[list[i][1]] = 1;
+      segs.push({ a: list[i][0], b: i + 1 < list.length ? list[i + 1][0] : Infinity, combo: c, tail: true });
+    }
+    return segs;
+  }
+  function bkt(list) { // disjoint buckets [a, b, key]
+    return list.map(function (x, i) {
+      var c = {}; c[x[2]] = 1;
+      return { a: i === 0 ? -Infinity : x[0], b: i === list.length - 1 ? Infinity : x[1], combo: c };
+    });
+  }
+  var PA_SEGS = bkt([[0, 1, 'pts_allow_0'], [1, 7, 'pts_allow_1_6'], [7, 14, 'pts_allow_7_13'], [14, 21, 'pts_allow_14_20'],
+    [21, 28, 'pts_allow_21_27'], [28, 35, 'pts_allow_28_34'], [35, 0, 'pts_allow_35p']]);
+  var YA_SEGS = bkt([[0, 100, 'yds_allow_0_100'], [100, 200, 'yds_allow_100_199'], [200, 300, 'yds_allow_200_299'], [300, 350, 'yds_allow_300_349'],
+    [350, 400, 'yds_allow_350_399'], [400, 450, 'yds_allow_400_449'], [450, 500, 'yds_allow_450_499'], [500, 550, 'yds_allow_500_549'], [550, 0, 'yds_allow_550p']]);
+  var FG_SEGS = bkt([[0, 20, 'fgm_0_19'], [20, 30, 'fgm_20_29'], [30, 40, 'fgm_30_39'], [40, 50, 'fgm_40_49'], [50, 60, 'fgm_50_59'], [60, 0, 'fgm_60p']]);
+  var MG_SEGS = (function () { // Sleeper has no fgmiss_0_19: it is fgmiss minus the other buckets
+    var ks = ['fgmiss_20_29', 'fgmiss_30_39', 'fgmiss_40_49', 'fgmiss_50_59', 'fgmiss_60p'], s = bkt([[0, 20, 'x'], [20, 30, ks[0]], [30, 40, ks[1]], [40, 50, ks[2]], [50, 60, ks[3]], [60, 0, ks[4]]]);
+    s[0].combo = { fgmiss: 1 }; ks.forEach(function (k) { s[0].combo[k] = -1; });
+    return s;
+  })();
+
+  // How TD lengths spread (2025 NFL: 9% of passing and rushing TDs were 40+ yds;
+  // most rushing TDs are from the 1-5): used to average a tier Sleeper can't split.
+  function TDLEN(d) { return Math.exp(-d / 16.6); }
+  function RUSHLEN(d) { return 0.15 * Math.exp(-d / 4) + 0.015 * Math.exp(-d / 26.8); }
+
+  // How often each points-allowed total (0-60) and yards-allowed band (per 10 yds)
+  // happened in 2025 NFL games: used to average an MFL tier that splits a Sleeper tier.
+  var PA_HIST = [7,0,0,8,1,0,10,9,4,11,26,0,6,23,15,5,17,27,10,15,43,23,16,22,33,10,16,35,15,9,15,20,7,8,18,10,1,9,10,1,7,5,6,0,6,2,0,1,1,0,0,0,1,0,0,0,0,0,0,0,0];
+  var YA_HIST = [0,0,0,0,0,0,0,1,1,1,0,0,2,5,3,3,6,4,4,6,11,10,14,11,14,14,21,23,17,31,18,25,20,36,26,27,29,17,26,15,18,18,11,13,6,6,2,8,5,5,2,5,0,1,1,0,0,1,1,0,0,0,0,0,0,0,0,0,0,0,0];
+  function PAW(v) { return PA_HIST[Math.max(0, Math.min(60, Math.round(v)))] + 0.5; }
+  function YAW(v) { return YA_HIST[Math.max(0, Math.min(70, Math.floor(v / 10)))] + 0.5; }
+
+  // ── Event table ─────────────────────────────────────────────────────────
+  // P = individual players (offense, kickers, IDP), T = team defense "Def".
+  // n: plain name, u: unit, k: Sleeper stat(s) the per-unit value goes on,
+  // lo/hi: realistic per-game range, ref: a typical game (picks the per-unit
+  // rate), g: granularity, segs: Sleeper game/play counts, segText: what they
+  // are, ev: per-play length rule, grp: several MFL events share one Sleeper
+  // stat (weights = rough share of that stat), note: mapping is approximate.
+  function D(n, u, k, lo, hi, ref, more) {
+    var d = { n: n, u: u, k: k ? arr(k) : [], lo: lo, hi: hi, ref: ref, g: 1 }, x;
+    for (x in more || {}) d[x] = more[x];
+    return d;
+  }
+  var P = {
+    '#P': D('passing TDs', 'TD', 'pass_td', 0, 7, 1),
+    'PY': D('passing yards', 'yd', 'pass_yd', 0, 550, 220, { segs: band([[300, 'bonus_pass_yd_300'], [400, 'bonus_pass_yd_400']]), segText: '300-399 and 400+ yard passing games' }),
+    'PA': D('pass attempts', 'attempt', 'pass_att', 0, 70, 30),
+    // completion % tiers: no per-game % in season totals; scored as completions and
+    // attempts at a 33-attempt game (exact for a typical starter's game, off for cameos)
+    'PCP': D('completion percentage', '%', null, 0, 100, 64, { ratio: { num: 'pass_cmp', den: 'pass_att', att: 33, mean: 64, sd: 7 } }),
+    'PC': D('completions', 'completion', 'pass_cmp', 0, 50, 20, { segs: thr([[25, 'bonus_pass_cmp_25']]), segText: '25+ completion games' }),
+    'INC': D('incompletions', 'incompletion', 'pass_inc', 0, 40, 10),
+    'IN': D('interceptions thrown', 'INT', 'pass_int', 0, 6, 1),
+    '#IT': D('pick-sixes thrown', 'TD', 'pass_int_td', 0, 3, 1),
+    'TSK': D('times sacked', 'sack', 'pass_sack', 0, 10, 2),
+    'TSY': D('sack yards lost', 'yd', 'pass_sack_yds', 0, 80, 14),
+    'P2': D('passing 2-pt conversions', 'conversion', 'pass_2pt', 0, 3, 1),
+    'P40': D('40+ yard completions', 'play', 'pass_cmp_40p', 0, 5, 1),
+    '#R': D('rushing TDs', 'TD', 'rush_td', 0, 6, 1),
+    'RY': D('rushing yards', 'yd', 'rush_yd', 0, 300, 40, { segs: band([[100, 'bonus_rush_yd_100'], [200, 'bonus_rush_yd_200']]), segText: '100-199 and 200+ yard rushing games' }),
+    'RA': D('rush attempts', 'carry', 'rush_att', 0, 45, 12, { segs: thr([[20, 'bonus_rush_att_20']]), segText: '20+ carry games' }),
+    'R2': D('rushing 2-pt conversions', 'conversion', 'rush_2pt', 0, 3, 1),
+    'R40': D('40+ yard runs', 'play', 'rush_40p', 0, 4, 1),
+    '#C': D('receiving TDs', 'TD', 'rec_td', 0, 5, 1),
+    'CY': D('receiving yards', 'yd', 'rec_yd', 0, 300, 40, { segs: band([[100, 'bonus_rec_yd_100'], [200, 'bonus_rec_yd_200']]), segText: '100-199 and 200+ yard receiving games' }),
+    'CC': D('receptions', 'catch', 'rec', 0, 20, 4),
+    'TGT': D('targets', 'target', 'rec_tgt', 0, 25, 5),
+    'C2': D('receiving 2-pt conversions', 'conversion', 'rec_2pt', 0, 3, 1),
+    'C40': D('40+ yard catches', 'play', 'rec_40p', 0, 4, 1),
+    'C20': D('20+ yard catches', 'play', ['rec_20_29', 'rec_30_39', 'rec_40p'], 0, 6, 1),
+    'RCY': D('rushing + receiving yards', 'yd', 'rush_rec_yd', 0, 350, 60, { segs: band([[100, 'bonus_rush_rec_yd_100'], [200, 'bonus_rush_rec_yd_200']]), segText: '100-199 and 200+ scrimmage-yard games' }),
+    'PRY': D('passing + rushing yards', 'yd', 'pass_rush_yd', 0, 600, 230),
+    'TYS': D('yards from scrimmage', 'yd', ['pass_yd', 'rush_yd', 'rec_yd'], 0, 600, 60),
+    'TY': D('total yards', 'yd', ['pass_yd', 'rush_yd', 'rec_yd', 'kr_yd', 'pr_yd'], 0, 600, 60),
+    '#TD': D('total TDs', 'TD', 'anytime_tds', 0, 5, 1, { note: "Sleeper's TD count covers rushing, receiving, return and defensive TDs; MFL's total TDs may also count passing TDs" }),
+    // MFL counts a TD as a first down; Sleeper's first-down stats leave TDs out
+    // (the "~" keys are that TD credit, merged into pass_td/rush_td/rec_td at the end)
+    'FD': D('first downs', 'first down', ['pass_fd', 'rush_fd', 'rec_fd', '~pass_td', '~rush_td', '~rec_td'], 0, 25, 3),
+    '1P': D('passing first downs', 'first down', ['pass_fd', '~pass_td'], 0, 25, 8),
+    '1R': D('rushing first downs', 'first down', ['rush_fd', '~rush_td'], 0, 15, 2),
+    '1C': D('receiving first downs', 'first down', ['rec_fd', '~rec_td'], 0, 12, 2),
+    'FU': D('fumbles', 'fumble', 'fum', 0, 4, 1),
+    'FUO': D('fumbles on offense', 'fumble', 'fum', 0, 4, 1, { note: 'Sleeper counts every fumble, not only those on offense' }),
+    'FL': D('fumbles lost', 'fumble', 'fum_lost', 0, 4, 1),
+    'FLO': D('fumbles lost on offense', 'fumble', 'fum_lost', 0, 4, 1, { note: "Sleeper's fumbles lost also include fumbles on kick and punt returns, which MFL leaves out here" }),
+    '#FR': D('offensive fumble-recovery TDs', 'TD', 'fum_rec_td', 0, 2, 1),
+    '#UT': D('punt return TDs', 'TD', 'st_td', 0, 2, 1, { grp: 'st', w: 0.5 }),
+    '#KT': D('kickoff return TDs', 'TD', 'st_td', 0, 2, 1, { grp: 'st', w: 0.5 }),
+    'UY': D('punt return yards', 'yd', 'pr_yd', 0, 150, 10),
+    'KY': D('kickoff return yards', 'yd', 'kr_yd', 0, 250, 25),
+    '#U': D('punt returns', 'return', 'pr', 0, 8, 2),
+    '#K': D('kickoff returns', 'return', 'kr', 0, 8, 2),
+    // individual defenders (IDP); Sleeper puts the same idp_* stats on offensive players
+    // MFL's "Tackles" include special-teams tackles; Sleeper keeps those in st_tkl_solo
+    'TK': D('solo tackles', 'tackle', ['idp_tkl_solo', 'st_tkl_solo'], 0, 20, 4),
+    'TKD': D('defensive solo tackles', 'tackle', 'idp_tkl_solo', 0, 20, 4),
+    'AS': D('assisted tackles', 'assist', 'idp_tkl_ast', 0, 15, 2, { note: "MFL's assists include special-teams assists; Sleeper only has defensive assists (special-teams solo tackles are covered)" }),
+    'ASD': D('defensive assisted tackles', 'assist', 'idp_tkl_ast', 0, 15, 2),
+    'AS2': D('assisted tackles / 2', 'assist', 'idp_tkl_ast', 0, 15, 2, { scale: 0.5 }),
+    'TOTTKL': D('total tackles', 'tackle', 'idp_tkl', 0, 25, 5, { segs: thr([[10, 'bonus_tkl_10p']]), segText: '10+ tackle games' }),
+    'SK': D('sacks', 'sack', 'idp_sack', 0, 6, 1, { g: 0.5, segs: thr([[2, 'bonus_sack_2p']]), segText: '2+ sack games' }),
+    'SKY': D('sack yards', 'yd', 'idp_sack_yd', 0, 60, 7),
+    'QH': D('QB hits', 'hit', 'idp_qb_hit', 0, 8, 1),
+    'TKL': D('tackles for loss', 'TFL', 'idp_tkl_loss', 0, 6, 1),
+    'IC': D('interceptions', 'INT', 'idp_int', 0, 3, 1),
+    'ICY': D('interception return yards', 'yd', 'idp_int_ret_yd', 0, 120, 20),
+    'FC': D('fumble recoveries', 'recovery', 'idp_fum_rec', 0, 3, 1),
+    'FCD': D('fumble recoveries on defense', 'recovery', 'idp_fum_rec', 0, 3, 1, { note: 'Sleeper counts all fumble recoveries' }),
+    'FCY': D('fumble return yards', 'yd', 'idp_fum_ret_yd', 0, 100, 10),
+    'FF': D('forced fumbles', 'forced fumble', 'idp_ff', 0, 3, 1),
+    'PD': D('passes defended', 'pass defended', 'idp_pass_def', 0, 6, 1, { segs: thr([[3, 'idp_pass_def_3p']]), segText: '3+ pass-defended games' }),
+    'TOTPD': D('passes defended', 'pass defended', 'idp_pass_def', 0, 6, 1, { note: 'mapped to passes defended' }),
+    'SF': D('safeties', 'safety', 'idp_safe', 0, 2, 1),
+    'BLF': D('blocked field goals', 'block', 'idp_blk_kick', 0, 2, 1, { grp: 'blk', w: 0.4 }),
+    'BLP': D('blocked punts', 'block', 'idp_blk_kick', 0, 2, 1, { grp: 'blk', w: 0.25 }),
+    'BLE': D('blocked extra points', 'block', 'idp_blk_kick', 0, 2, 1, { grp: 'blk', w: 0.35 }),
+    '#IR': D('interception return TDs', 'TD', 'idp_def_td', 0, 2, 1, { grp: 'dtd', w: 0.65 }),
+    '#DR': D('fumble return TDs', 'TD', 'idp_def_td', 0, 2, 1, { grp: 'dtd', w: 0.35 }),
+    '#D': D('defensive TDs', 'TD', 'idp_def_td', 0, 2, 1),
+    '#T': D('defensive + special teams TDs', 'TD', ['idp_def_td', 'st_td'], 0, 2, 1),
+    // kickers
+    '#F': D('field goals made', 'FG', 'fgm', 0, 7, 1),
+    '#M': D('field goals missed', 'miss', 'fgmiss', 0, 4, 1),
+    '#A': D('field goal attempts', 'attempt', 'fga', 0, 8, 1),
+    'EP': D('extra points made', 'XP', 'xpm', 0, 8, 1),
+    'EM': D('extra points missed', 'miss', 'xpmiss', 0, 3, 1),
+    'EA': D('extra point attempts', 'attempt', 'xpa', 0, 8, 1),
+    'HBF': D('field goals had blocked', 'block', 'fg_blkd', 0, 2, 1),
+    'HBE': D('extra points had blocked', 'block', 'xp_blkd', 0, 2, 1),
+    // per-play length rules
+    'FG': D('field goals by distance', 'yd', null, 18, 66, 0, { ev: true, segs: FG_SEGS, lin: [['fgm_yds', function (d) { return d; }], ['fgm_yds_over_30', function (d) { return Math.max(d - 30, 0); }]],
+      segText: "Sleeper's 0-19 / 20-29 / 30-39 / 40-49 / 50-59 / 60+ made-FG counts and total FG yards" }),
+    'MG': D('missed field goals by distance', 'yd', null, 18, 66, 0, { ev: true, segs: MG_SEGS, segText: "Sleeper's missed-FG counts by 10-yard band (20-29 ... 60+)" }),
+    'PS': D('passing TDs by length', 'yd', null, 1, 99, 0, { ev: true, wt: TDLEN, segs: thr([[40, 'pass_td_40p'], [50, 'pass_td_50p']], 'pass_td'), segText: "Sleeper's 40+ and 50+ yard passing TD counts" }),
+    'RS': D('rushing TDs by length', 'yd', null, 1, 99, 0, { ev: true, wt: RUSHLEN, segs: thr([[40, 'rush_td_40p'], [50, 'rush_td_50p']], 'rush_td'), segText: "Sleeper's 40+ and 50+ yard rushing TD counts" }),
+    'RC': D('receiving TDs by length', 'yd', null, 1, 99, 0, { ev: true, wt: TDLEN, segs: thr([[40, 'rec_td_40p'], [50, 'rec_td_50p']], 'rec_td'), segText: "Sleeper's 40+ and 50+ yard receiving TD counts" })
+  };
+  // Length rules with no Sleeper length split: scored per TD at a typical length.
+  var LEN_AS_COUNT = { 'PR': '#UT', 'KO': '#KT', 'IR': '#IR', 'DR': '#DR', 'FR': '#FR', 'BF': '#BF', 'BP': '#BP', 'MF': '#MF', 'TT': '#T', 'DD': '#D', 'IT': '#IT' };
+
+  var T = {
+    'SK': D('sacks', 'sack', 'sack', 0, 10, 2),
+    'SKY': D('sack yards', 'yd', 'sack_yd', 0, 80, 14),
+    'IC': D('interceptions', 'INT', 'int', 0, 5, 1),
+    'ICY': D('interception return yards', 'yd', 'int_ret_yd', 0, 200, 20),
+    'FC': D('fumble recoveries', 'recovery', 'fum_rec', 0, 4, 1),
+    'FCD': D('fumble recoveries on defense', 'recovery', 'fum_rec', 0, 4, 1, { note: 'Sleeper counts all fumble recoveries' }),
+    'FCY': D('fumble return yards', 'yd', 'fum_ret_yd', 0, 100, 10),
+    'FF': D('forced fumbles', 'forced fumble', 'ff', 0, 4, 1),
+    'SF': D('safeties', 'safety', 'safe', 0, 2, 1),
+    'PD': D('passes defended', 'pass defended', 'def_pass_def', 0, 15, 5),
+    'TK': D('solo tackles', 'tackle', 'tkl_solo', 0, 80, 35),
+    'TKD': D('solo tackles', 'tackle', 'tkl_solo', 0, 80, 35),
+    'AS': D('assisted tackles', 'assist', 'tkl_ast', 0, 50, 20),
+    'ASD': D('assisted tackles', 'assist', 'tkl_ast', 0, 50, 20),
+    'TKL': D('tackles for loss', 'TFL', 'tkl_loss', 0, 15, 5),
+    'QH': D('QB hits', 'hit', 'qb_hit', 0, 15, 5),
+    'BLF': D('blocked field goals', 'block', 'blk_kick', 0, 2, 1, { grp: 'blk', w: 0.4 }),
+    'BLP': D('blocked punts', 'block', 'blk_kick', 0, 2, 1, { grp: 'blk', w: 0.25 }),
+    'BLE': D('blocked extra points', 'block', 'blk_kick', 0, 2, 1, { grp: 'blk', w: 0.35 }),
+    '#IR': D('interception return TDs', 'TD', 'def_td', 0, 2, 1, { grp: 'dtd', w: 0.65 }),
+    '#DR': D('fumble return TDs', 'TD', 'def_td', 0, 2, 1, { grp: 'dtd', w: 0.35 }),
+    '#D': D('defensive TDs', 'TD', 'def_td', 0, 2, 1),
+    '#T': D('defensive + special teams TDs', 'TD', ['def_td', 'def_st_td'], 0, 2, 1),
+    '#UT': D('punt return TDs', 'TD', 'def_st_td', 0, 2, 1, { grp: 'st', w: 0.35 }),
+    '#KT': D('kickoff return TDs', 'TD', 'def_st_td', 0, 2, 1, { grp: 'st', w: 0.3 }),
+    '#BP': D('blocked punt TDs', 'TD', 'def_st_td', 0, 2, 1, { grp: 'st', w: 0.15 }),
+    '#BF': D('blocked field goal TDs', 'TD', 'def_st_td', 0, 2, 1, { grp: 'st', w: 0.1 }),
+    '#MF': D('missed field goal return TDs', 'TD', 'def_st_td', 0, 2, 1, { grp: 'st', w: 0.1 }),
+    'D2': D('defensive 2-pt returns', 'return', 'def_2pt', 0, 2, 1),
+    'TOTTKL': D('total tackles', 'tackle', 'tkl', 0, 120, 55),
+    'UY': D('punt return yards', 'yd', 'def_pr_yd', 0, 150, 20),
+    'KY': D('kickoff return yards', 'yd', 'def_kr_yd', 0, 250, 60),
+    'TPA': D('points allowed', 'pt', 'pts_allow', 0, 70, 17, { segs: PA_SEGS, bucket: true, wt: PAW, segText: "Sleeper's points-allowed tiers 0 / 1-6 / 7-13 / 14-20 / 21-27 / 28-34 / 35+",
+      note: "MFL uses the scoreboard; Sleeper's points allowed leaves out some points the defense did not give up (e.g. return TDs), so about 1 game in 10 lands in a different tier" }),
+    'TYA': D('yards allowed', 'yd', 'yds_allow', 0, 700, 320, { g: 5, segs: YA_SEGS, bucket: true, wt: YAW, segText: "Sleeper's yards-allowed tiers <100 / 100-199 / 200-299 / 300-349 / 350-399 / 400-449 / 450-499 / 500-549 / 550+" })
+  };
+  T.OPA = D('points allowed (offense only)', 'pt', 'pts_allow', 0, 70, 17, { segs: PA_SEGS, bucket: true, wt: PAW, segText: T.TPA.segText,
+    note: "MFL counts only points the opposing offense scored; Sleeper's points-allowed figure is defined differently, so some games land in a different tier" });
+  T['STPA+OPA'] = D('points allowed (offense + special teams)', 'pt', 'pts_allow', 0, 70, 17, { segs: PA_SEGS, bucket: true, wt: PAW, segText: T.TPA.segText,
+    note: "MFL leaves out points scored by the opposing defense; Sleeper's points-allowed figure is defined differently, so about 1 game in 10 lands in a different tier" });
+  T['OPA+STPA'] = T['STPA+OPA'];
+  // Combined per-game codes that match a Sleeper stat.
+  var COMBO_P = { 'RY+CY': 'RCY', 'CY+RY': 'RCY', 'PY+RY': 'PRY', 'RY+PY': 'PRY' };
+
+  var OFFP = ['QB', 'RB', 'WR', 'TE'], IDPP = ['LB', 'DE', 'DT', 'CB', 'S', 'DL', 'DB', 'EDGE', 'ILB', 'OLB', 'NT', 'SS', 'FS'];
+  function posClass(p) {
+    if (OFFP.indexOf(p) >= 0) return 'off';
+    if (p === 'PK' || p === 'K') return 'kick';
+    if (p === 'Def' || p === 'DEF') return 'team';
+    if (IDPP.indexOf(p) >= 0) return 'idp';
+    return 'other';
+  }
+  var OTHER_NAMES = { 'Off': 'team offense', 'ST': 'team special teams', 'PN': 'punters', 'Coach': 'head coaches', 'XX': 'unlisted players',
+    'TMQB': 'team QB', 'TMRB': 'team RB', 'TMWR': 'team WR', 'TMTE': 'team TE', 'TMPK': 'team kicker', 'TMPN': 'team punter', 'TMDL': 'team DL', 'TMLB': 'team LB', 'TMDB': 'team DB' };
+
+  // ── One code for one position: f(v) -> Sleeper stats ────────────────────
+  // Returns { add: {key: pts}, exact: bool, why: [reasons], any: bool }
+  function rngText(r, d) {
+    var u = d.u === 'yd' ? ' yds' : '';
+    if (r.hi >= d.hi) return (r.lo <= d.lo ? 'any' : fmt(r.lo) + '+') + u;
+    if (r.lo <= d.lo) return 'up to ' + fmt(r.hi) + u;
+    return r.lo === r.hi ? fmt(r.lo) + u : fmt(r.lo) + '-' + fmt(r.hi) + u;
+  }
+  function ptsText(r, d) {
+    if (r.kind === 'mult') return fmt(r.x) + ' per ' + d.u;
+    if (r.kind === 'flat') return fmt(r.x) + ' pts';
+    return fmt(r.x) + ' per ' + fmt(r.per) + ' ' + d.u + (Math.abs(r.per) > 1 ? 's' : '');
+  }
+  function grid(d) {
+    var out = [], g = d.g || 1, v;
+    for (v = d.lo; v <= d.hi + 1e-9; v += g) out.push(Math.round(v * 1000) / 1000);
+    return out;
+  }
+  function solve(d, rules) {
+    var scale = d.scale || 1, V = grid(d), res = { add: {}, exact: true, why: [], any: false }, rounded = [];
+    // "a per full b units" rounds down each game; Sleeper totals can only carry a/b per unit.
+    var raw = rules;
+    // A big step ("5 per full 100 yds") is really a bonus at 100, 200...: keep it as
+    // tiers when it lands on Sleeper's game counts or is coarser than a typical game;
+    // a small step ("1 per 25 yds") is scored per unit and flagged as rounded.
+    var bounds = (d.segs || []).map(function (sg) { return sg.a; });
+    rules = raw.map(function (r) {
+      if (r.kind !== 'step' || d.ev || Math.abs(r.per) <= (d.g || 1) + 1e-9) return r;
+      var per = Math.abs(r.per), m, aligned = r.per > 0 && bounds.length > 1;
+      for (m = per; aligned && m <= d.hi; m += per) if (m >= r.lo && bounds.indexOf(m) < 0) aligned = false;
+      if (aligned || (r.per > 0 && per >= d.ref)) return { kind: 'step', x: r.x, per: r.per, lo: r.lo, hi: r.hi, tier: true };
+      rounded.push(r);
+      return { kind: 'mult', x: r.x / r.per, lo: r.lo, hi: r.hi };
+    });
+    function f(v) { var t = 0; rules.forEach(function (r) { t += ruleValue(r, v * scale); }); return t; }
+    function put(k, x) { if (Math.abs(x) > 1e-12) { res.add[k] = (res.add[k] || 0) + x; res.any = true; } }
+    var lin = [], fits, best = null;
+    if (d.ratio) {
+      // least-squares line through the tier points over realistic percentages
+      var q = d.ratio, sw = 0, sx = 0, sy = 0, sxx = 0, sxy = 0, x;
+      for (x = q.mean - 3 * q.sd; x <= q.mean + 3 * q.sd; x += 0.5) {
+        var w = Math.exp(-0.5 * Math.pow((x - q.mean) / q.sd, 2)), y = f(x);
+        sw += w; sx += w * x; sy += w * y; sxx += w * x * x; sxy += w * x * y;
+      }
+      var b = (sw * sxy - sx * sy) / (sw * sxx - sx * sx), a = (sy - b * sx) / sw;
+      put(q.num, b * 100 / q.att); put(q.den, a / q.att);
+      res.exact = false;
+      res.why.push('MFL per game: ' + raw.map(function (r) { return rngText(r, d) + ': ' + ptsText(r, d); }).join(', ') +
+        '; Sleeper season totals have no per-game percentage, so it is scored as ' + fmt(b * 100 / q.att) + ' per completion and ' + fmt(a / q.att) +
+        ' per attempt (right for a typical ' + q.att + '-attempt game)');
+      return res;
+    }
+    if (d.ev) {
+      // per-play rules: try the available linear stats (FG yards) with each rule's per-yard rate
+      var slopes = [0];
+      rules.forEach(function (r) { var s = r.kind === 'mult' ? r.x : r.kind === 'step' ? r.x / r.per : 0; if (s && slopes.indexOf(s) < 0) slopes.push(s); });
+      var cands = [[]];
+      if (d.lin) slopes.forEach(function (s) { if (s) d.lin.forEach(function (L) { cands.push([[L[0], L[1], s]]); }); });
+      cands.forEach(function (c) {
+        var fit = segFit(V, function (v) { var t = f(v); c.forEach(function (L) { t -= L[2] * L[1](v); }); return t; }, d.segs, false, d.wt);
+        if (!best || (fit.exact && !best.fit.exact) || (fit.exact === best.fit.exact && fit.err < best.fit.err - 1e-9)) best = { lin: c, fit: fit };
+      });
+      lin = best.lin; fits = best.fit;
+      lin.forEach(function (L) { put(L[0], L[2]); });
+    } else {
+      var s = 0;
+      rules.forEach(function (r) {
+        if (r.kind === 'flat' || r.tier || d.ref * scale < r.lo - 1e-9 || d.ref * scale > r.hi + 1e-9) return;
+        s += r.kind === 'mult' ? r.x : r.x / r.per;
+      });
+      d.k.forEach(function (k) { put(k, s * scale); });
+      fits = segFit(V, function (v) { return f(v) - s * scale * v; }, d.segs || [{ a: -Infinity, b: Infinity, combo: null }], !d.bucket, d.wt);
+      res.floorLost = fits.floorLost;
+    }
+    fits.vals.forEach(function (sv) { if (sv.combo) for (var k in sv.combo) put(k, sv.combo[k] * sv.val); });
+    res.exact = fits.exact && !rounded.length;
+    rounded.forEach(function (r) {
+      res.why.push(fmt(r.x) + ' per full ' + fmt(Math.abs(r.per)) + ' ' + d.u + 's is rounded down each game in MFL; scored here as ' + fmt(r.x / r.per) +
+        ' per ' + d.u + ' (about ' + fmt(Math.abs(r.x) / 2) + ' pt a game more than MFL)');
+    });
+    if (!fits.exact) {
+      var tiers = raw.filter(function (r) {
+        if (rounded.indexOf(r) >= 0) return false;
+        if (d.ev) return true;
+        return r.kind === 'flat' || (r.kind === 'step' && Math.abs(r.per) > (d.g || 1) + 1e-9) || r.lo > d.lo + 1e-9 || r.hi < d.hi - 1e-9;
+      });
+      if (tiers.length) {
+        var sp = tiers.map(function (r) { return rngText(r, d) + ': ' + ptsText(r, d); }).join(', ');
+        res.why.push((d.ev ? 'MFL scores each play by length (' : 'MFL per game: ') + sp + (d.ev ? ')' : '') +
+          (d.segText ? '; Sleeper only has ' + d.segText : '; Sleeper has no per-game count for that'));
+      }
+      if (!res.why.length) res.why.push('rule ranges do not line up with Sleeper stats');
+    }
+    if (d.note) { res.exact = false; res.why.push(d.note); }
+    return res;
+  }
+  function suffix(sol) {
+    if (!sol.any) return '. Not scored';
+    if (sol.floorLost) return '. The per-unit points are scored; the per-game points Sleeper cannot count are not';
+    return '. Scored approximately';
+  }
+  // Fit residual r(v) to per-segment constants. Weighted mean where not constant.
+  function segFit(V, r, segs, floorMustBeZero, wt) {
+    var out = { vals: [], exact: true, err: 0 };
+    segs.forEach(function (sg) {
+      var pts = V.filter(function (v) { return v >= sg.a - 1e-9 && v < sg.b - 1e-9; });
+      if (!pts.length) { out.vals.push({ combo: sg.combo, val: 0 }); return; }
+      var ys = pts.map(r), mn = Math.min.apply(null, ys), mx = Math.max.apply(null, ys);
+      if (!sg.combo) {
+        if (mx - mn > 1e-6 || Math.abs(mx) > 1e-6) { out.exact = false; out.floorLost = true; out.err += ys.reduce(function (t, y) { return t + Math.abs(y); }, 0); }
+        out.vals.push({ combo: null, val: 0 });
+        return;
+      }
+      if (mx - mn <= 1e-6) { out.vals.push({ combo: sg.combo, val: ys[0] }); return; }
+      // tails (N+ games) cluster near the threshold: weight falls off across the segment
+      var n = ys.length, wsum = 0, t = 0;
+      ys.forEach(function (y, i) { var w = wt ? wt(pts[i]) : sg.tail ? (n - i) : 1; wsum += w; t += w * y; });
+      var m = t / wsum;
+      out.exact = false;
+      out.err += ys.reduce(function (a, y) { return a + Math.abs(y - m); }, 0);
+      out.vals.push({ combo: sg.combo, val: m });
+    });
+    return out;
+  }
+
+  // ── League ──────────────────────────────────────────────────────────────
+  function leagueInfo(leagueJson) {
+    var lg = (leagueJson && (leagueJson.league || leagueJson)) || {};
+    var fr = lg.franchises || {}, list = arr(fr.franchise);
+    var teams = parseInt(fr.count, 10) || list.length || 0;
+    var st = lg.starters || {}, pos = {}, superflex = false, idp = false;
+    arr(st.position).forEach(function (p) {
+      var lim = String(p.limit || '1'), m = /^(\d+)(?:-(\d+))?$/.exec(lim), mx = m ? +(m[2] || m[1]) : 1, mn = m ? +m[1] : 1;
+      String(p.name || '').split(/[+|,]/).forEach(function (n) {
+        n = n.trim(); if (!n) return;
+        pos[n] = { min: mn, max: mx };
+        if (n === 'QB' && mx >= 2) superflex = true;
+        if (posClass(n) === 'idp') idp = true;
+      });
+    });
+    return { name: txt(lg.name) || '', teams: teams, superflex: superflex, idp: idp, starters: pos, startersCount: parseInt(st.count, 10) || 0,
+      idpStarters: parseInt(st.idp_starters, 10) || 0 };
+  }
+
+  // ── Main ────────────────────────────────────────────────────────────────
+  function fromExports(leagueJson, rulesJson) {
+    var info = leagueInfo(leagueJson);
+    var root = (rulesJson && (rulesJson.rules || rulesJson)) || {};
+    var groups = arr(root.positionRules), byPos = {}, notes = [], noteIdx = {};
+    function note(label, why, approx) {
+      var k = label + '|' + why;
+      if (noteIdx[k]) return;
+      noteIdx[k] = 1; notes.push({ label: label, why: why, approx: !!approx });
+    }
+    // 1. Every rule that applies to each position (groups add up).
+    groups.forEach(function (g) {
+      var ps = String(txt(g.positions) || '').split('|');
+      arr(g.rule).forEach(function (r) {
+        var code = String(txt(r.event) || '').trim(), rg = parseRange(txt(r.range)), pt = parsePoints(txt(r.points));
+        if (!code) return;
+        if (!rg || !pt) { note((P[code] || T[code] || {}).n || NAMES[code] || code, 'could not read the rule (range "' + txt(r.range) + '", points "' + txt(r.points) + '"); not scored', false); return; }
+        var rule = { kind: pt.kind, x: pt.x, per: pt.per, lo: rg.lo, hi: rg.hi };
+        ps.forEach(function (p) {
+          p = p.trim(); if (!p) return;
+          var m = byPos[p] = byPos[p] || {};
+          (m[code] = m[code] || []).push(rule);
+        });
+      });
+    });
+    var startersKnown = Object.keys(info.starters).length > 0;
+    Object.keys(info.starters).forEach(function (p) {
+      if (posClass(p) !== 'other') return;
+      if (p === 'TMPK') note('Team kicker (TMPK) slot', 'MFL scores the whole team\'s kicking as one player; Sleeper scores kickers one by one, so each kicker is scored here with the kicker rules', true);
+      else if (!byPos[p]) note('Starting slot ' + (OTHER_NAMES[p] || p), 'Sleeper scoring has no ' + (OTHER_NAMES[p] || p) + ' position; not scored', false);
+    });
+    function inLeague(p) { return !startersKnown || has(info.starters, p); }
+
+    // 2. Translate per position.
+    var per = {}; // pos -> key -> value
+    var posNotes = {}; // label|why -> {positions, approx}
+    function pnote(pos, label, why, approx) {
+      var k = label + '|' + why;
+      var e = posNotes[k] || (posNotes[k] = { label: label, why: why, approx: approx, pos: [] });
+      if (e.pos.indexOf(pos) < 0) e.pos.push(pos);
+      e.approx = e.approx || approx;
+    }
+    Object.keys(byPos).forEach(function (pos) {
+      var cls = posClass(pos), codes = byPos[pos], add = per[pos] = {};
+      if (cls === 'other') {
+        if (inLeague(pos)) note('Rules for ' + (OTHER_NAMES[pos] || pos), 'Sleeper scoring has no ' + (OTHER_NAMES[pos] || pos) + ' position; not scored', false);
+        return;
+      }
+      var table = cls === 'team' ? T : P, grpVals = {};
+      // Expand combined codes and per-play length codes that have no Sleeper split.
+      var work = {};
+      Object.keys(codes).forEach(function (code) {
+        var rules = codes[code], parts = code.split('+');
+        if (table[code]) { (work[code] = work[code] || []).push.apply(work[code], rules); return; }
+        if (cls !== 'team' && COMBO_P[code]) { var c2 = COMBO_P[code]; (work[c2] = work[c2] || []).push.apply(work[c2], rules); return; }
+        if (parts.length > 1 && parts.every(function (x) { return table[x] && table[x].ev || LEN_AS_COUNT[x]; })) {
+          parts.forEach(function (x) { (work[x] = work[x] || []).push.apply(work[x], rules); });
+          return;
+        }
+        (work[code] = work[code] || []).push.apply(work[code], rules);
+      });
+      Object.keys(work).forEach(function (code) {
+        var rules = work[code], d = table[code];
+        if (!d && LEN_AS_COUNT[code] && table[LEN_AS_COUNT[code]]) {
+          // e.g. "length of interception return TD": one value per TD at typical lengths 1-99
+          var cd = table[LEN_AS_COUNT[code]], vals = [], dd;
+          for (dd = 1; dd <= 99; dd++) vals.push(rules.reduce(function (t, r) { return t + ruleValue(r, dd); }, 0));
+          var mean = vals.reduce(function (t, y) { return t + y; }, 0) / vals.length, flat = Math.max.apply(null, vals) - Math.min.apply(null, vals) < 1e-6;
+          if (!flat) pnote(pos, cd.n + ' by length', 'MFL scores each TD by its length (' + rules.map(function (r) { return rngText(r, { lo: 0, hi: 99, u: 'yd' }) + ': ' + ptsText(r, { u: 'yd' }); }).join(', ') +
+            '); Sleeper has no length for these TDs, so each counts ' + fmt(mean) + ' (the average over 1-99 yds)', true);
+          work[LEN_AS_COUNT[code]] = (work[LEN_AS_COUNT[code]] || []).concat([{ kind: 'mult', x: mean, lo: -1e9, hi: 1e9, synthetic: true }]);
+          return;
+        }
+      });
+      Object.keys(work).forEach(function (code) {
+        var rules = work[code], d = table[code];
+        if (!d) {
+          if (LEN_AS_COUNT[code] && table[LEN_AS_COUNT[code]]) return; // folded above
+          var nm = (P[code] || T[code] || {}).n || NAMES[code] || code;
+          var why = cls === 'team' && P[code] ? 'an individual-player stat listed under team defense; Sleeper defenses have no such stat; not scored'
+            : 'Sleeper has no ' + (cls === 'team' ? 'team-defense ' : '') + 'stat for ' + nm + '; not scored';
+          if (rules.some(function (r) { return r.x; })) pnote(pos, nm, why, false);
+          return;
+        }
+        // Weekly averages/percentages never reach here (not in the table).
+        var sol = solve(d, rules);
+        if (d.grp) {
+          var gv = grpVals[d.grp] = grpVals[d.grp] || { key: d.k[0], members: {} };
+          gv.members[code] = sol.add[d.k[0]] || 0;
+          if (!sol.exact) pnote(pos, d.n, sol.why.join('; ') + suffix(sol), sol.any);
+          return;
+        }
+        for (var k in sol.add) add[k] = (add[k] || 0) + sol.add[k];
+        if (!sol.exact) pnote(pos, d.n, sol.why.join('; ') + suffix(sol), sol.any);
+      });
+      // Several MFL events on one Sleeper stat: exact if all scored the same, else a weighted mix.
+      Object.keys(grpVals).forEach(function (gname) {
+        var gv = grpVals[gname], members = Object.keys(table).filter(function (c) { return table[c].grp === gname; });
+        var vals = members.map(function (c) { return has(gv.members, c) ? gv.members[c] : 0; });
+        var same = vals.every(function (v) { return Math.abs(v - vals[0]) < 1e-9; }), val;
+        if (same) val = vals[0];
+        else {
+          var tw = 0, tv = 0;
+          members.forEach(function (c, i) { tw += table[c].w; tv += table[c].w * vals[i]; });
+          val = tv / tw;
+          pnote(pos, members.map(function (c) { return table[c].n; }).join(' / '),
+            'MFL scores them ' + members.map(function (c, i) { return table[c].n + ' ' + fmt(vals[i]); }).join(', ') + "; Sleeper's " + gv.key +
+            ' lumps them together, so each counts ' + fmt(val) + ' (weighted by how often each happens). Scored approximately', true);
+        }
+        if (val) add[gv.key] = (add[gv.key] || 0) + val;
+      });
+    });
+
+    // 3. One value per Sleeper stat: the position that owns the stat sets it;
+    //    position bonuses where Sleeper has them; other differences listed.
+    var rules = {};
+    var present = Object.keys(per).filter(function (p) { return posClass(p) !== 'other'; });
+    function presentOf(cls) { return present.filter(function (p) { return posClass(p) === cls && inLeague(p); }); }
+    var offPos = presentOf('off'), idpPos = presentOf('idp'), kickPos = presentOf('kick'), teamPos = presentOf('team');
+    if (!offPos.length) offPos = present.filter(function (p) { return posClass(p) === 'off'; });
+    var keys = {};
+    present.forEach(function (p) { for (var k in per[p]) keys[k] = 1; });
+    function val(p, k) { return per[p] && per[p][k] ? per[p][k] : 0; }
+    function ownerOf(k) {
+      if (/^(pass_|bonus_pass_)/.test(k)) return 'QB';
+      if (/^(rush_rec|bonus_rush_rec|rush_|bonus_rush_|fum|anytime)/.test(k)) return 'RB';
+      return 'WR';
+    }
+    var LBL = { pass_td: 'passing TDs', pass_yd: 'passing yards', pass_int: 'interceptions thrown', pass_2pt: 'passing 2-pt', rush_td: 'rushing TDs', rush_yd: 'rushing yards',
+      rec: 'receptions', rec_yd: 'receiving yards', rec_td: 'receiving TDs', fum_lost: 'fumbles lost', fum: 'fumbles', pass_att: 'pass attempts', pass_cmp: 'completions',
+      rush_att: 'rush attempts', rec_tgt: 'targets', bonus_rec_yd_100: '100-yd receiving bonus', bonus_rec_yd_200: '200-yd receiving bonus', bonus_rush_yd_100: '100-yd rushing bonus',
+      bonus_rush_yd_200: '200-yd rushing bonus', bonus_pass_yd_300: '300-yd passing bonus', bonus_pass_yd_400: '400-yd passing bonus', bonus_rush_rec_yd_100: '100-yd scrimmage bonus',
+      bonus_rush_rec_yd_200: '200-yd scrimmage bonus', pass_td_40p: '40+ yd passing TD bonus', pass_td_50p: '50+ yd passing TD bonus', rush_td_40p: '40+ yd rushing TD bonus',
+      rush_td_50p: '50+ yd rushing TD bonus', rec_td_40p: '40+ yd receiving TD bonus', rec_td_50p: '50+ yd receiving TD bonus', st_td: 'return TDs', kr_yd: 'kick return yards', pr_yd: 'punt return yards',
+      idp_tkl_solo: 'IDP solo tackles', idp_tkl_ast: 'IDP assisted tackles', idp_tkl: 'IDP total tackles', idp_sack: 'IDP sacks', idp_sack_yd: 'IDP sack yards',
+      idp_qb_hit: 'IDP QB hits', idp_tkl_loss: 'IDP tackles for loss', idp_int: 'IDP interceptions', idp_int_ret_yd: 'IDP interception return yards',
+      idp_fum_rec: 'IDP fumble recoveries', idp_fum_ret_yd: 'IDP fumble return yards', idp_ff: 'IDP forced fumbles', idp_pass_def: 'IDP passes defended',
+      idp_safe: 'IDP safeties', idp_blk_kick: 'IDP blocked kicks', idp_def_td: 'IDP defensive TDs', st_tkl_solo: 'special-teams tackles',
+      rec_40p: '40+ yd catches', rush_40p: '40+ yd runs', pass_cmp_40p: '40+ yd completions', pass_sack: 'times sacked', pass_inc: 'incompletions' };
+    function lbl(k) { return LBL[k] || k.replace(/^idp_/, 'IDP ').replace(/_/g, ' '); }
+    // Differences for stats a position essentially never records (a WR's passing,
+    // a QB's catches or returns) are gathered into one line instead of one each.
+    var rareDiffs = [];
+    function rare(p, k) {
+      if (/^(pass_|bonus_pass_)/.test(k)) return p !== 'QB';
+      if (/^(rec|bonus_rec|st_td|kr_|pr_)/.test(k)) return p === 'QB';
+      return false;
+    }
+    var FD = ['pass_fd', 'rush_fd', 'rec_fd'], FDMAIN = { QB: ['pass_fd', 'rush_fd'], RB: ['rush_fd', 'rec_fd'], WR: ['rec_fd'], TE: ['rec_fd'] };
+    Object.keys(keys).forEach(function (k) {
+      if (k === 'rec' || FD.indexOf(k) >= 0 || k.charAt(0) === '~') return; // below
+      var cls = /^(idp_|bonus_sack_2p|bonus_tkl_10p)/.test(k) ? 'idp' : /^(fg|xp)/.test(k) ? 'kick' : T_KEYS[k] ? 'team' : 'off';
+      var pool = cls === 'idp' ? idpPos : cls === 'kick' ? kickPos : cls === 'team' ? teamPos : offPos;
+      if (!pool.length) {
+        // nobody who accrues it is in the league (e.g. IDP rules in an offense-only league): take any value
+        var any = present.filter(function (p) { return val(p, k); })[0];
+        if (any && cls !== 'idp' && cls !== 'off') rules[k] = val(any, k);
+        return;
+      }
+      var base;
+      if (cls === 'off' && pool.indexOf(ownerOf(k)) >= 0) base = val(ownerOf(k), k);
+      else {
+        var cnt = {}, order = cls === 'idp' ? ['LB', 'DE', 'DT', 'DL', 'CB', 'S', 'DB'] : pool, bestV = null, bestN = -1;
+        pool.forEach(function (p) { var v = rnd(val(p, k)); cnt[v] = (cnt[v] || 0) + 1; });
+        order.concat(pool).forEach(function (p) { if (pool.indexOf(p) < 0) return; var v = rnd(val(p, k)); if (cnt[v] > bestN) { bestN = cnt[v]; bestV = v; } });
+        base = bestV;
+      }
+      base = rnd(base);
+      if (base) rules[k] = base;
+      pool.forEach(function (p) {
+        var v = rnd(val(p, k));
+        if (Math.abs(v - base) > 1e-9 && rare(p, k)) { rareDiffs.push(p + ' ' + lbl(k) + ' ' + fmt(v) + ' (scored ' + fmt(base) + ')'); return; }
+        if (Math.abs(v - base) > 1e-9) pnote(p, lbl(k), 'MFL gives ' + p + ' ' + fmt(v) + ', everyone else here gets ' + fmt(base) + '; Sleeper has no ' + p + '-only stat for this. ' + p + ' scored at ' + fmt(base), true);
+      });
+    });
+    // receptions: WR rate for everyone + bonus_rec_te / bonus_rec_rb
+    if (keys.rec) {
+      var rb = offPos.indexOf('WR') >= 0 ? val('WR', 'rec') : val(offPos[0], 'rec');
+      if (rb) rules.rec = rb;
+      offPos.forEach(function (p) {
+        var dlt = val(p, 'rec') - rb;
+        if (Math.abs(dlt) < 1e-9) return;
+        if (p === 'TE' || p === 'RB' || p === 'WR') rules['bonus_rec_' + p.toLowerCase()] = dlt;
+        else pnote(p, 'receptions', 'MFL gives ' + p + ' ' + fmt(val(p, 'rec')) + ' per catch, everyone else here ' + fmt(rb) + '; Sleeper has no ' + p + ' reception bonus. ' + p + ' scored at ' + fmt(rb), true);
+      });
+    }
+    // first downs: each type at its owner's rate + bonus_fd_<pos> when a position's difference is uniform
+    if (FD.some(function (k) { return keys[k]; })) {
+      var fdBase = {}, own = { pass_fd: 'QB', rush_fd: 'RB', rec_fd: 'WR' };
+      FD.forEach(function (k) { fdBase[k] = offPos.indexOf(own[k]) >= 0 ? val(own[k], k) : 0; if (fdBase[k]) rules[k] = fdBase[k]; });
+      offPos.forEach(function (p) {
+        var main = FDMAIN[p] || ['rec_fd'], ds = main.map(function (k) { return val(p, k) - fdBase[k]; });
+        if (ds.every(function (x) { return Math.abs(x) < 1e-9; })) return;
+        if (ds.every(function (x) { return Math.abs(x - ds[0]) < 1e-9; })) { rules['bonus_fd_' + p.toLowerCase()] = ds[0]; return; }
+        main.forEach(function (k, i) {
+          if (Math.abs(ds[i]) > 1e-9) pnote(p, lbl(k).replace('_', ' '), 'MFL gives ' + p + ' ' + fmt(val(p, k)) + ' vs ' + fmt(fdBase[k]) + ' for everyone else; scored at ' + fmt(fdBase[k]), true);
+        });
+      });
+    }
+    // first-down credit on TDs: owner's rate added to the TD stat, differences listed
+    ['pass_td', 'rush_td', 'rec_td'].forEach(function (k) {
+      var vk = '~' + k, own = { pass_td: 'QB', rush_td: 'RB', rec_td: 'WR' }[k];
+      if (!keys[vk] || offPos.indexOf(own) < 0) return;
+      var b = rnd(val(own, vk));
+      if (b) rules[k] = rnd((rules[k] || 0) + b);
+      offPos.forEach(function (p) {
+        var v = rnd(val(p, vk));
+        if (Math.abs(v - b) > 1e-9 && !rare(p, k)) pnote(p, 'first-down credit on ' + lbl(k), 'MFL counts a TD as a first down and gives ' + p + ' ' + fmt(v) + ' for it vs ' + fmt(b) + ' for everyone else; scored at ' + fmt(b), true);
+      });
+    });
+    // Sleeper also puts idp_* on offensive players; say so when MFL does not score them.
+    var idpKeys = Object.keys(rules).filter(function (k) { return /^idp_/.test(k); });
+    if (idpKeys.length && offPos.some(function (p) { return idpKeys.some(function (k) { return !val(p, k); }); }))
+      note('Defensive stats by offensive players', 'MFL scores some defensive stats (' + idpKeys.filter(function (k) { return offPos.some(function (p) { return !val(p, k); }); }).map(lbl).join(', ') +
+        ') only for defenders, but one Sleeper rule covers everyone, so the odd one by a QB/RB/WR/TE scores here too', true);
+
+    if (rareDiffs.length) note('Rarely used position differences', 'MFL scores these differently by position, but the players almost never record them: ' + rareDiffs.join('; '), true);
+    Object.keys(posNotes).forEach(function (k) {
+      var e = posNotes[k], ps = e.pos.filter(inLeague);
+      if (!ps.length) return;
+      note(e.label + ' (' + ps.join('/') + ')', e.why, e.approx);
+    });
+    var out = {};
+    Object.keys(rules).sort().forEach(function (k) { var v = rnd(rules[k]); if (v) out[k] = v; });
+    return { name: info.name, teams: info.teams, superflex: info.superflex, idp: info.idp, positions: Object.keys(info.starters),
+      rules: out, skipped: notes };
+  }
+  var T_KEYS = {};
+  Object.keys(T).forEach(function (c) { T[c].k.forEach(function (k) { T_KEYS[k] = 1; }); (T[c].segs || []).forEach(function (s) { for (var k in s.combo || {}) T_KEYS[k] = 1; }); });
+
+  return { fromExports: fromExports, _internals: { solve: solve, posClass: posClass, parseRange: parseRange, parsePoints: parsePoints, ruleValue: ruleValue, P: P, T: T, leagueInfo: leagueInfo } };
+})();
+  // ══════════════════════════════════════════════════════════════════════
+  // The page: pick your rules, try a change, see the whole NFL move.
+  // No league and no Sleeper username (owner ruling 2026-11-15).
+  // ══════════════════════════════════════════════════════════════════════
+  var SL = 'https://api.sleeper.app/v1';
+  // ESPN answers the browser directly (public leagues). MFL blocks browsers, so it
+  // goes through the app's existing relay; its key is the public (anon) key the
+  // website already ships.
+  var ESPN_BASE = 'https://lm-api-reads.fantasy.espn.com/apis/v3/games/ffl';
+  var MFL_RELAY = 'https://sxshiqyxhhifvtfqawbq.supabase.co/functions/v1/mfl-proxy';
+  var RELAY_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InN4c2hpcXl4aGhpZnZ0ZnFhd2JxIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzI3MTExMzAsImV4cCI6MjA4ODI4NzEzMH0.zJi9W986ZLaANiZN6pt6ReFwaQU6yPeidsERIWo2ibI';
+  var SITE_NAME = { sleeper: 'Sleeper', espn: 'ESPN', mfl: 'MFL' };
+  var PLAYERS_KEY = 'dhq_cc_players_v3', PLAYERS_TTL = 3 * 86400e3;
+  var $ = function (id) { return document.getElementById(id); };
+  var esc = function (s) { return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]; }); };
+  var fmt1 = function (n) { return (Math.round(Number(n) * 10) / 10).toFixed(1); };
+  var sgn = function (n, dp) { n = Number(n) || 0; return (n > 0 ? '+' : n < 0 ? '−' : '') + Math.abs(n).toFixed(dp == null ? 1 : dp); };
+  function store(k, v) { try { localStorage.setItem(k, JSON.stringify(v)); } catch (e) { /* full or blocked */ } }
+  function load(k) { try { return JSON.parse(localStorage.getItem(k) || 'null'); } catch (e) { return null; } }
+  var tt; function toast(m) { var t = $('toast'); t.textContent = m; t.classList.add('on'); clearTimeout(tt); tt = setTimeout(function () { t.classList.remove('on'); }, 2600); }
+  var CACHE = {};
+  function getJSON(url) {
+    if (!CACHE[url]) CACHE[url] = fetch(url).then(function (r) { if (!r.ok) throw new Error('HTTP ' + r.status); return r.json(); }).catch(function (e) { delete CACHE[url]; throw e; });
+    return CACHE[url];
+  }
+  var POS_COLOR = { QB: '#ff6b6b', RB: '#4ecdc4', WR: '#45b7d1', TE: '#f7dc6f', K: '#bb8fce', DEF: '#95a5a6', DL: '#f0a35e', LB: '#e58fb8', DB: '#8fb3ff' };
+  function headshot(pid, pos) {
+    var isDef = /^[A-Z]{2,3}$/.test(String(pid));
+    var src = isDef ? 'https://sleepercdn.com/images/team_logos/nfl/' + String(pid).toLowerCase() + '.png' : 'https://sleepercdn.com/content/nfl/players/thumb/' + encodeURIComponent(pid) + '.jpg';
+    return '<span class="face" style="--pc:' + (POS_COLOR[pos] || 'var(--silver)') + '"><img src="' + src + '" alt="" loading="lazy" onerror="this.remove()"></span>';
+  }
+
+  // ── Rule names (Sleeper keys in plain words) ─────────────────────────
+  var RULE = {
+    rec: 'Points per catch', bonus_rec_te: 'TE premium (extra per TE catch)', bonus_rec_rb: 'RB bonus per catch', bonus_rec_wr: 'WR bonus per catch',
+    pass_td: 'Passing TD', pass_yd: 'Passing yards', pass_int: 'Interception thrown', pass_2pt: 'Passing 2-pt', pass_sack: 'Sacked', pass_att: 'Pass attempt', pass_cmp: 'Completion', pass_inc: 'Incompletion', pass_fd: 'Passing first down', pass_int_td: 'Pick-six thrown',
+    rush_td: 'Rushing TD', rush_yd: 'Rushing yards', rush_att: 'Rush attempt', rush_2pt: 'Rushing 2-pt', rush_fd: 'Rushing first down',
+    rec_td: 'Receiving TD', rec_yd: 'Receiving yards', rec_2pt: 'Receiving 2-pt', rec_fd: 'Receiving first down', rec_tgt: 'Target',
+    fum_lost: 'Fumble lost', fum: 'Fumble', fum_rec_td: 'Fumble recovery TD', st_td: 'Special teams TD', st_ff: 'Special teams forced fumble', st_fum_rec: 'Special teams fumble recovery',
+    bonus_pass_yd_300: '300+ passing yard game', bonus_pass_yd_400: '400+ passing yard game', bonus_rush_yd_100: '100+ rushing yard game', bonus_rush_yd_200: '200+ rushing yard game',
+    bonus_rec_yd_100: '100+ receiving yard game', bonus_rec_yd_200: '200+ receiving yard game', bonus_rush_rec_yd_100: '100+ scrimmage yard game', bonus_rush_rec_yd_200: '200+ scrimmage yard game',
+    pass_td_40p: '40+ yard passing TD bonus', pass_td_50p: '50+ yard passing TD bonus', rush_td_40p: '40+ yard rushing TD bonus', rush_td_50p: '50+ yard rushing TD bonus', rec_td_40p: '40+ yard receiving TD bonus', rec_td_50p: '50+ yard receiving TD bonus',
+    bonus_fd_qb: 'QB first-down bonus', bonus_fd_rb: 'RB first-down bonus', bonus_fd_wr: 'WR first-down bonus', bonus_fd_te: 'TE first-down bonus', bonus_rush_td_qb: 'QB rushing TD bonus', bonus_pass_cmp_25: '25+ completion game', bonus_rush_att_20: '20+ carry game',
+    xpm: 'Extra point made', xpmiss: 'Extra point missed', fgm: 'Field goal made (any)', fgmiss: 'Field goal missed', fgm_yds: 'FG points per yard', fgm_0_19: 'FG made 0-19', fgm_20_29: 'FG made 20-29', fgm_30_39: 'FG made 30-39', fgm_40_49: 'FG made 40-49', fgm_50p: 'FG made 50+',
+    sack: 'Team D: sack', int: 'Team D: interception', fum_rec: 'Team D: fumble recovery', def_td: 'Team D: touchdown', safe: 'Team D: safety', blk_kick: 'Team D: blocked kick', ff: 'Team D: forced fumble', def_st_td: 'Team D/ST: return TD',
+    def_st_ff: 'Team D/ST: forced fumble', def_st_fum_rec: 'Team D/ST: fumble recovery',
+    pts_allow_0: 'Team D: 0 points allowed', pts_allow_1_6: 'Team D: 1-6 allowed', pts_allow_7_13: 'Team D: 7-13 allowed', pts_allow_14_20: 'Team D: 14-20 allowed', pts_allow_21_27: 'Team D: 21-27 allowed', pts_allow_28_34: 'Team D: 28-34 allowed', pts_allow_35p: 'Team D: 35+ allowed'
+  };
+  // Names for rules that only come in from a linked league (ESPN / MFL / Sleeper).
+  var EXTRA_NAME = { fgm_50_59: 'FG made 50-59', fgm_60p: 'FG made 60+', fgmiss_0_19: 'FG missed 0-19', fgmiss_20_29: 'FG missed 20-29', fgmiss_30_39: 'FG missed 30-39', fgmiss_40_49: 'FG missed 40-49', fgmiss_50_59: 'FG missed 50-59', fgmiss_50p: 'FG missed 50+', fgmiss_60p: 'FG missed 60+',
+    def_2pt: 'Team D: 2-pt return', yds_allow_0_100: 'Team D: under 100 yds allowed', yds_allow_100_199: 'Team D: 100-199 yds allowed', yds_allow_200_299: 'Team D: 200-299 yds allowed', yds_allow_300_349: 'Team D: 300-349 yds allowed', yds_allow_350_399: 'Team D: 350-399 yds allowed',
+    yds_allow_400_449: 'Team D: 400-449 yds allowed', yds_allow_450_499: 'Team D: 450-499 yds allowed', yds_allow_500_549: 'Team D: 500-549 yds allowed', yds_allow_550p: 'Team D: 550+ yds allowed', yds_allow: 'Team D: per yard allowed', pts_allow: 'Team D: per point allowed',
+    kr_yd: 'Kick return yards', pr_yd: 'Punt return yards', fd: 'First down', rush_rec_yd: 'Rush + receiving yards', int_ret_yd: 'Team D: INT return yards', fum_ret_yd: 'Team D: fumble return yards', qb_hit: 'Team D: QB hit', tkl_loss: 'Team D: tackle for loss', def_pass_def: 'Team D: pass defended', def_3_and_out: 'Team D: 3-and-out', def_4_and_stop: 'Team D: 4th-down stop',
+    idp_sack: 'IDP sack', idp_tkl_solo: 'IDP solo tackle', idp_tkl_ast: 'IDP assisted tackle', idp_tkl_loss: 'IDP tackle for loss', idp_tkl: 'IDP tackle', idp_int: 'IDP interception', idp_ff: 'IDP forced fumble', idp_fum_rec: 'IDP fumble recovery',
+    idp_pass_def: 'IDP pass defended', idp_pass_def_3p: 'IDP 3+ passes defended bonus', idp_qb_hit: 'IDP QB hit', idp_def_td: 'IDP defensive TD', idp_safe: 'IDP safety', idp_blk_kick: 'IDP blocked kick', idp_sack_yd: 'IDP sack yards', idp_int_ret_yd: 'IDP INT return yards', idp_fum_ret_yd: 'IDP fumble return yards' };
+  function ruleName(k) { return RULE[k] || EXTRA_NAME[k] || k.replace(/_/g, ' ').replace(/^./, function (c) { return c.toUpperCase(); }); }
+  function ruleVal(k, v) {
+    v = Number(v) || 0;
+    if (/_yd$/.test(k) && v > 0 && v < 1) { var per = 1 / v; return '1 pt / ' + (Math.abs(per - Math.round(per)) < 0.02 ? Math.round(per) : per.toFixed(1)) + ' yds'; }
+    var r = Math.round(v * 100) / 100;
+    return (r > 0 && !/_yd$/.test(k) ? '+' : '') + r + ' pt' + (Math.abs(r) === 1 ? '' : 's');
+  }
+  var PRESETS = [
+    { label: 'Full PPR', o: { rec: 1 } }, { label: 'Half PPR', o: { rec: 0.5 } }, { label: 'Standard (no PPR)', o: { rec: 0 } },
+    { label: 'TE premium +0.5', o: { bonus_rec_te: 0.5 } }, { label: 'TE premium +1', o: { bonus_rec_te: 1 } },
+    { label: '6-pt passing TDs', o: { pass_td: 6 } }, { label: '4-pt passing TDs', o: { pass_td: 4 } },
+    { label: 'Interceptions −2', o: { pass_int: -2 } }, { label: '1 pt / 20 passing yds', o: { pass_yd: 0.05 } },
+    { label: 'First downs +0.5 (rush & rec)', o: { rush_fd: 0.5, rec_fd: 0.5 } }, { label: '100-yard game bonus +3', o: { bonus_rush_yd_100: 3, bonus_rec_yd_100: 3 } },
+    { label: 'Fumbles lost −1', o: { fum_lost: -1 } }
+  ];
+
+  // ── State (and the shareable URL) ────────────────────────────────────
+  var ST = { draft: {}, wpos: null, lg: null, lgList: null, site: 'sleeper', watch: [], wteams: [], state: null, year: null, years: [], base: 'half', passTd: 4, tep: 0, teams: 12, sf: false, proposal: {}, pos: 'ALL', shown: 40, stats: {}, players: null, sweep: null, ruleSel: null };
+  // A linked league (optional): its exact scoring, size and superflex become the starting point.
+  function rules() {
+    if (ST.lg) { var o = {}, s = ST.lg.league.scoring_settings || {}; Object.keys(s).forEach(function (k) { o[k] = Number(s[k]) || 0; }); return o; }
+    return CC.startingRules(ST.base, ST.passTd, ST.tep);
+  }
+  function league() { return ST.lg ? { teams: ST.lg.teams, superflex: ST.lg.sf, idp: ST.lg.idp || null } : { teams: ST.teams, superflex: ST.sf, idp: null }; }
+  function posNow() { return CC.posList(league()); }
+  function cleanProposal() {
+    var r = rules();
+    [ST.proposal, ST.draft].forEach(function (o) { Object.keys(o).forEach(function (k) { if (Math.abs((Number(r[k]) || 0) - o[k]) < 1e-9) delete o[k]; }); });
+  }
+  function same(a, b) { var ka = Object.keys(a), kb = Object.keys(b); return ka.length === kb.length && ka.every(function (k) { return b[k] === a[k]; }); }
+  function copyOf(o) { var c = {}; Object.keys(o).forEach(function (k) { c[k] = o[k]; }); return c; }
+  function setHash() {
+    var parts = ['y=' + ST.year, 'b=' + ST.base, 'td=' + ST.passTd, 'te=' + ST.tep, 'n=' + ST.teams, 'sf=' + (ST.sf ? 1 : 0)];
+    var p = Object.keys(ST.proposal); if (p.length) parts.push('p=' + p.map(function (k) { return k + ':' + ST.proposal[k]; }).join(','));
+    if (ST.pos !== 'ALL') parts.push('pos=' + ST.pos);
+    if (ST.lg) parts.push('lg=' + lgKey());
+    if (ST.watch.length) parts.push('w=' + ST.watch.join(','));
+    if (ST.lg && wTeams().length) parts.push('wt=' + wTeams().map(function (t) { return t.roster_id; }).join(','));
+    try { history.replaceState(null, '', location.pathname + location.search + '#' + parts.join('&')); } catch (e) { /* file:// */ }
+  }
+  function hashParams() {
+    var o = {};
+    location.hash.replace(/^#/, '').split('&').forEach(function (kv) { var i = kv.indexOf('='); if (i <= 0) return; try { o[kv.slice(0, i)] = decodeURIComponent(kv.slice(i + 1)); } catch (e) { /* cut-off link */ } });
+    return o;
+  }
+  function applyLink(h) {
+    if (h.y && ST.years.indexOf(Number(h.y)) >= 0) ST.year = Number(h.y);
+    if (/^(ppr|half|std)$/.test(h.b || '')) ST.base = h.b;
+    if (h.td === '4' || h.td === '6') ST.passTd = Number(h.td);
+    if (/^(0|0\.5|1)$/.test(h.te || '')) ST.tep = Number(h.te);
+    if (/^(8|10|12|14|16)$/.test(h.n || '')) ST.teams = Number(h.n);
+    if (h.sf === '1' || h.sf === '0') ST.sf = h.sf === '1';
+    if (/^(ALL|QB|RB|WR|TE|K|DEF|DL|LB|DB)$/.test(h.pos || '')) ST.pos = h.pos;
+    ST.proposal = {};
+    if (h.p) h.p.split(',').forEach(function (kv) {
+      var a = kv.split(':');
+      if (a.length === 2 && /^[a-z0-9_]+$/.test(a[0]) && (RULE[a[0]] || (ST.lg && a[0] in rules())) && a[1] !== '' && isFinite(Number(a[1]))) ST.proposal[a[0]] = Number(a[1]);
+    });
+    ST.wteams = (h.wt || '').split(',').filter(function (id, i, a) { return /^\d{1,3}$/.test(id) && a.indexOf(id) === i; });
+    ST.watch = (h.w || '').split(',').filter(function (id, i, a) { return /^[A-Za-z0-9]{1,8}$/.test(id) && a.indexOf(id) === i; }).slice(0, 40);
+    cleanProposal();
+    ST.draft = copyOf(ST.proposal);
+  }
+
+  // ── A league (optional): its rules, size, rosters and team names ─────
+  function openLeague(id) {
+    return Promise.all([getJSON(SL + '/league/' + id), getJSON(SL + '/league/' + id + '/rosters'), getJSON(SL + '/league/' + id + '/users')]).then(function (x) {
+      var lg = x[0]; if (!lg || !lg.league_id) throw new Error('noleague');
+      var pos = lg.roster_positions || [];
+      ST.lg = { site: 'sleeper', skipped: [], league: lg, rosters: x[1] || [], users: x[2] || [], teams: Number(lg.total_rosters) || (x[1] || []).length || 12,
+        sf: pos.indexOf('SUPER_FLEX') >= 0 || pos.filter(function (p) { return p === 'QB'; }).length > 1, idp: idpCounts(pos) };
+      ST.lgList = null; ST.sweep = null; ST.lgMsg = '';
+    });
+  }
+  // Open whatever a link describes: its league (or none), then its settings and changes.
+  function lgKey() { return ST.lg ? (ST.lg.site && ST.lg.site !== 'sleeper' ? ST.lg.site + '-' : '') + ST.lg.league.league_id : ''; }
+  function fromLink(h) {
+    var go = function () { applyLink(h); update(); }, want = h.lg || '';
+    if (want === lgKey()) return go();
+    var m = /^(espn|mfl)-(\d{3,12})$/.exec(want);
+    if (m) { ST.site = m[1]; openSite(m[1], m[2]).then(go, go); }
+    else if (/^\d{10,}$/.test(want)) { ST.site = 'sleeper'; openLeague(want).then(go, go); }
+    else { ST.lg = null; go(); }
+  }
+  // IDP starters per team from a Sleeper lineup, or null when the league starts none.
+  function idpCounts(slots) {
+    var c = { DL: 0, LB: 0, DB: 0, FLEX: 0 };
+    (slots || []).forEach(function (p) { if (/^(DL|DE|DT)$/.test(p)) c.DL++; else if (p === 'LB') c.LB++; else if (/^(DB|CB|S)$/.test(p)) c.DB++; else if (p === 'IDP_FLEX') c.FLEX++; });
+    return c.DL + c.LB + c.DB + c.FLEX ? c : null;
+  }
+  // MFL: minimum starters at each IDP group, the rest of the IDP starters as flex.
+  function mflIdp(lj) {
+    var st = lj && lj.league && lj.league.starters, list = st && st.position; if (!list) return null;
+    if (!Array.isArray(list)) list = [list];
+    var c = { DL: 0, LB: 0, DB: 0, FLEX: 0 }, min = 0;
+    list.forEach(function (x) {
+      var n = String(x.name || ''), lo = parseInt(String(x.limit || '0').split('-')[0], 10) || 0;
+      if (/^(DT|DE|DT\+DE|DE\+DT|DL)$/.test(n)) c.DL += lo; else if (n === 'LB') c.LB += lo; else if (/^(CB|S|CB\+S|S\+CB|DB)$/.test(n)) c.DB += lo; else return;
+      min += lo;
+    });
+    var total = Number(st.idp_starters) || 0; if (total > min) c.FLEX = total - min;
+    return c.DL + c.LB + c.DB + c.FLEX ? c : null;
+  }
+  // ESPN / MFL: rules, size and superflex only (no rosters). Tries this season, then last.
+  function getESPN(id, yr) {
+    return fetch(ESPN_BASE + '/seasons/' + yr + '/segments/0/leagues/' + id + '?view=mSettings', { credentials: 'include' }).then(function (r) {
+      if (r.status === 401 || r.status === 403) throw new Error('private');
+      if (r.status === 404) throw new Error('noleague');
+      if (!r.ok) throw new Error('HTTP ' + r.status);
+      return r.json();
+    });
+  }
+  function getMFL(type, id, yr) {
+    var url = 'https://api.myfantasyleague.com/' + yr + '/export?TYPE=' + type + '&L=' + id + '&JSON=1';
+    return fetch(MFL_RELAY, { method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + RELAY_KEY, apikey: RELAY_KEY }, body: JSON.stringify({ url: url }) }).then(function (r) {
+      if (!r.ok) throw new Error('HTTP ' + r.status);
+      return r.json();
+    }).then(function (j) {
+      if (!j || j.error) throw new Error(/private|password|login|cookie|api ?key/i.test(JSON.stringify(j && j.error || '')) ? 'private' : 'noleague');
+      return j;
+    });
+  }
+  function openSite(site, id) {
+    var cur = Number(ST.state && (ST.state.league_season || ST.state.season)) || new Date().getFullYear();
+    var load = function (yr) {
+      return site === 'espn'
+        ? getESPN(id, yr).then(function (j) { return ESPN_RULES.fromSettings(j); })
+        : Promise.all([getMFL('league', id, yr), getMFL('rules', id, yr)]).then(function (x) { var o = MFL_RULES.fromExports(x[0], x[1]); if (o) o.idpCounts = mflIdp(x[0]); return o; });
+    };
+    return load(cur).catch(function (e) { if (e && e.message === 'private') throw e; return load(cur - 1); }).then(function (o) {
+      if (!o || !o.rules || !Object.keys(o.rules).length) throw new Error('norules');
+      var sk = (o.skipped || []).slice();
+      if (o.idp && !o.idpCounts) sk.unshift({ label: 'Individual defensive players (IDP)', why: 'this league\u2019s IDP lineup couldn\u2019t be read, so IDP players aren\u2019t scored' });
+      ST.lg = { site: site, skipped: sk, league: { league_id: String(id), name: o.name || (SITE_NAME[site] + ' league ' + id), scoring_settings: o.rules },
+        rosters: [], users: [], teams: Number(o.teams) || 12, sf: !!o.superflex, idp: site === 'mfl' ? o.idpCounts || null : null };
+      ST.lgList = null; ST.sweep = null;
+    });
+  }
+  // The league finder's status line, kept in state so a redraw doesn't wipe it.
+  function lgMsg(html) { ST.lgMsg = html; var el = $('lgMsg'); if (el) el.innerHTML = html; }
+  function findSite(q) {
+    q = String(q || '').trim(); if (!q) return; ST.lgQ = q;
+    var site = ST.site, m = /leagueId=(\d+)/i.exec(q) || /\/home\/(\d+)/.exec(q) || /[?&]L=(\d+)/.exec(q);
+    var id = m ? m[1] : q;
+    if (!/^\d{3,12}$/.test(id)) { lgMsg('<span class="pos-dn">Type the league number' + (site === 'espn' ? ' (it is the leagueId= part of your ESPN league\u2019s web address).' : ' (it is in your MFL league\u2019s web address, after /home/).') + '</span>'); return; }
+    lgMsg('<span class="loading">Opening the ' + SITE_NAME[site] + ' league\u2026</span>');
+    openSite(site, id).then(function () { ST.proposal = {}; ST.draft = {}; update(); }, function (e) {
+      lgMsg('<span class="pos-dn">' + (e && e.message === 'private'
+        ? (site === 'espn' ? 'That ESPN league is private. Ask your commissioner to make it viewable to the public (League settings), then try again.' : 'That MFL league is private, so its rules can\u2019t be read.')
+        : e && (e.message === 'noleague' || /404/.test(e.message)) ? 'No ' + SITE_NAME[site] + ' league with that number.'
+        : e && e.message === 'norules' ? 'That league has no scoring rules we can read.'
+        : site === 'espn' ? 'Couldn\u2019t open ESPN league ' + esc(id) + '. Check the number, and that the league is viewable to the public.'
+        : SITE_NAME[site] + ' could not be reached right now. Try again.') + '</span>');
+    });
+  }
+  function teamName(r) {
+    var u = ST.lg && ST.lg.users.filter(function (x) { return String(x.user_id) === String(r.owner_id); })[0];
+    return (u && u.metadata && u.metadata.team_name) || (u && u.display_name) || ('Team ' + r.roster_id);
+  }
+  function findLeagues(q) {
+    q = String(q || '').trim(); if (!q) return; ST.lgQ = q;
+    if (/^\d{10,}$/.test(q)) { lgMsg('<span class="loading">Opening the league\u2026</span>'); openLeague(q).then(function () { update(); }, lgFail); return; }
+    lgMsg('<span class="loading">Looking up ' + esc(q) + '\u2026</span>');
+    getJSON(SL + '/user/' + encodeURIComponent(q)).then(function (u) {
+      if (!u || !u.user_id) throw new Error('nouser');
+      var yr = Number(ST.state.league_season || ST.state.season);
+      return Promise.all([getJSON(SL + '/user/' + u.user_id + '/leagues/nfl/' + yr).catch(function () { return []; }), getJSON(SL + '/user/' + u.user_id + '/leagues/nfl/' + (yr - 1)).catch(function () { return []; })]).then(function (x) {
+        var rolled = {}; (x[0] || []).forEach(function (l) { if (l.previous_league_id) rolled[l.previous_league_id] = 1; });
+        ST.lgList = (x[0] || []).concat((x[1] || []).filter(function (l) { return !rolled[l.league_id]; }));
+        ST.lgMsg = ''; renderSetup();
+        if (!ST.lgList.length) lgMsg(esc('No Sleeper leagues found for ' + q + '.'));
+      });
+    }).catch(function (e) { lgFail(e && e.message === 'nouser' ? { message: 'nouser', q: q } : e); });
+  }
+  function lgFail(e) {
+    lgMsg('<span class="pos-dn">' + (e && e.message === 'nouser' ? 'No Sleeper user called \u201c' + esc(e.q) + '\u201d.' : e && (e.message === 'noleague' || /404/.test(e.message)) ? 'No Sleeper league with that ID.' : 'Sleeper could not be reached right now. Try again.') + '</span>');
+  }
+
+  // ── Watched players: search by name ──────────────────────────────────
+  // Players to offer: a typed name (within the Browse position when one is on), or a whole position, best first.
+  function suggestions(q) {
+    q = String(q || '').toLowerCase().replace(/[^a-z0-9 ]/g, '').trim();
+    if (!ST.players) return [];
+    var st = ST.stats[ST.year] || {}, r = rules(), out = [], PL = posNow();
+    if (!ST.wpos && q.length < 2) return [];
+    Object.keys(ST.players).forEach(function (pid) {
+      var p = ST.players[pid];
+      if (ST.wpos ? p[1] !== ST.wpos : PL.indexOf(p[1]) < 0) return;
+      if (q) { var n = p[0].toLowerCase().replace(/[^a-z0-9 ]/g, ''); if (!(n.indexOf(q) === 0 || n.indexOf(' ' + q) > -1)) return; }
+      else if (!(st[pid] && st[pid].gp > 0)) return;
+      out.push({ pid: pid, pts: st[pid] && st[pid].gp ? CC.scoreLine(st[pid], r) : null });
+    });
+    return out.sort(function (a, b) { return (b.pts == null ? -1e9 : b.pts) - (a.pts == null ? -1e9 : a.pts) || ST.players[a.pid][0].localeCompare(ST.players[b.pid][0]); }).slice(0, q ? 12 : 150);
+  }
+  function drawSug() {
+    var box = $('psug'), q = $('pq') ? $('pq').value : ''; if (!box) return;
+    var list = suggestions(q);
+    var head = '<div class="sug-head"><span class="cc-hint">' + (ST.wpos && !q.trim() ? 'Every ' + ST.wpos + ' with ' + esc(ST.year) + ' games, most points first' + (Object.keys(ST.proposal).length ? ' with your changes' : '') + '. Tap to add to Player scoring changes.' : 'Tap a player to add.') + '</span>'
+      + (ST.watch.length ? '<button type="button" class="btn sm gold sug-done" id="sugDone">Done: see results \u2193</button>' : '') + '</div>';
+    // With changes added, every row shows Current rules, what each change adds, and the Total.
+    var ks = Object.keys(ST.proposal), narrow = innerWidth < 640, nw = narrow ? 50 : 84, cw = narrow ? 64 : 96, gap = narrow ? 6 : 10,
+      fixed = nw * 2 + cw * ks.length + gap * (ks.length + 2) + 24, room = (box.clientWidth || innerWidth - 60) - fixed,
+      cols = !ks.length ? '' : (room >= (narrow ? 108 : 200) ? 'minmax(0,1fr)' : (narrow ? 108 : 200) + 'px') + ' ' + nw + 'px' + ks.map(function () { return ' ' + cw + 'px'; }).join('') + ' ' + nw + 'px';
+    if (ks.length) {
+      list.forEach(function (x) { x.tot = x.pts == null ? null : x.pts + ks.reduce(function (a, k) { return a + effect(x.pid, k); }, 0); });
+      list.sort(function (a, b) { return (b.tot == null ? -1e9 : b.tot) - (a.tot == null ? -1e9 : a.tot); });
+      var r0 = rules();
+      head += '<div class="sug-cols" style="grid-template-columns:' + cols + '"><span>Player</span><span>Current rules</span>' + ks.map(function (k) { return '<span class="c">' + esc(ruleName(k)) + '<small>' + esc(narrow ? (ruleVal(k, r0[k]) + ' \u2192 ' + ruleVal(k, ST.proposal[k])).replace(/\s*pts?\b/g, '') : ruleVal(k, r0[k]) + ' \u2192 ' + ruleVal(k, ST.proposal[k])) + '</small></span>'; }).join('') + '<span class="t">Total</span></div>';
+    }
+    box.innerHTML = head + list.map(function (x) {
+      var p = ST.players[x.pid], on = ST.watch.indexOf(x.pid) >= 0;
+      var who = headshot(x.pid, p[1]) + '<span><b>' + esc(p[0]) + (on ? ' (added)' : '') + '</b><small>' + esc(p[1] + ' \u00b7 ' + (p[2] || 'FA')) + '</small></span>';
+      if (!ks.length) return '<button type="button" data-padd="' + esc(x.pid) + '"' + (on ? ' class="on"' : '') + '>' + who + '<em>' + (x.pts != null ? fmt1(x.pts) : '\u2013') + '</em></button>';
+      return '<button type="button" class="sug-row' + (on ? ' on' : '') + '" data-padd="' + esc(x.pid) + '" style="grid-template-columns:' + cols + '"><span class="who">' + who + '</span><span class="n">' + (x.pts != null ? fmt1(x.pts) : '\u2013') + '</span>'
+        + ks.map(function (k) { var v = x.pts == null ? 0 : effect(x.pid, k); return '<span class="n ' + (v > 0.05 ? 'pos-up' : v < -0.05 ? 'pos-dn' : 'muted') + '">' + (Math.abs(v) < 0.05 ? '\u2014' : sgn(v)) + '</span>'; }).join('')
+        + '<span class="n t">' + (x.tot != null ? fmt1(x.tot) : '\u2013') + '</span></button>';
+    }).join('');
+    box.innerHTML = list.length ? box.innerHTML : q.trim().length >= 2 ? head + '<div class="cc-hint" style="padding:8px">No player matches.</div>' : '';
+    box.hidden = !box.innerHTML;
+  }
+  function playerSearch(q) {
+    q = String(q || '').toLowerCase().replace(/[^a-z0-9 ]/g, '').trim();
+    if (q.length < 2 || !ST.players) return [];
+    var st = ST.stats[ST.year] || {};
+    return Object.keys(ST.players).filter(function (pid) {
+      var n = ST.players[pid][0].toLowerCase().replace(/[^a-z0-9 ]/g, '');
+      return (n.indexOf(q) === 0 || n.indexOf(' ' + q) > -1) && ST.watch.indexOf(pid) < 0;
+    }).sort(function (a, b) { return ((st[b] && st[b].gp) ? 1 : 0) - ((st[a] && st[a].gp) ? 1 : 0) || ST.players[a][0].localeCompare(ST.players[b][0]); }).slice(0, 8);
+  }
+
+  // ── Data: one season of stats, the player list ───────────────────────
+  function ensureSeason(yr) {
+    if (ST.stats[yr]) return Promise.resolve(ST.stats[yr]);
+    return getJSON(SL + '/stats/nfl/regular/' + yr).then(function (d) { ST.stats[yr] = d || {}; return ST.stats[yr]; });
+  }
+  function ensurePlayers() {
+    if (ST.players) return Promise.resolve(ST.players);
+    var c = load(PLAYERS_KEY);
+    if (c && c.data && Date.now() - c.ts < PLAYERS_TTL) { ST.players = c.data; return Promise.resolve(ST.players); }
+    return getJSON(SL + '/players/nfl').then(function (all) {
+      var slim = {};
+      Object.keys(all || {}).forEach(function (pid) {
+        var p = all[pid]; if (!p) return;
+        var pos = p.position || '';
+        var fp = p.fantasy_positions || [], g = ['DL', 'LB', 'DB'].filter(function (x) { return fp.indexOf(x) >= 0; })[0];
+        if (!g && /^(DE|DT|NT|DL)$/.test(pos)) g = 'DL'; else if (!g && /^(LB|ILB|OLB)$/.test(pos)) g = 'LB'; else if (!g && /^(CB|S|SS|FS|DB)$/.test(pos)) g = 'DB';
+        if (g && !/^(QB|RB|WR|TE|K|DEF)$/.test(pos)) pos = g;
+        if (!/^(QB|RB|WR|TE|K|DEF|DL|LB|DB)$/.test(pos)) return;
+        var name = pos === 'DEF' ? ((p.first_name || '') + ' ' + (p.last_name || '')).trim() : (p.full_name || ((p.first_name || '') + ' ' + (p.last_name || '')).trim());
+        slim[pid] = [name || pid, pos, p.team || ''];
+      });
+      ST.players = slim; store(PLAYERS_KEY, { ts: Date.now(), data: slim });
+      return slim;
+    });
+  }
+
+  // ── Draw ─────────────────────────────────────────────────────────────
+  function chip(attr, val, label, on, extra) { return '<button type="button" class="chip" ' + attr + '="' + esc(val) + '" aria-pressed="' + !!on + '"' + (extra || '') + '>' + label + '</button>'; }
+  function renderSetup() {
+    if (ST.wpos && posNow().indexOf(ST.wpos) < 0) ST.wpos = null;
+    var r = rules(), keys = Object.keys(ST.draft), pending = !same(ST.draft, ST.proposal), applied = Object.keys(ST.proposal).length;
+    var ruleKeys = Object.keys(RULE).concat(Object.keys(r).filter(function (k) { return !RULE[k]; }));
+    var lgHtml = ST.lg
+      ? '<div class="lg-on"><span><b>Using ' + esc(ST.lg.league.name) + (ST.lg.site !== 'sleeper' ? ' <em class="site-tag">' + SITE_NAME[ST.lg.site] + '</em>' : '') + '</b><small>' + esc(ST.lg.teams + ' teams' + (ST.lg.sf ? ' \u00b7 Superflex' : '') + ' \u00b7 ' + Object.keys(r).length + ' scoring rules') + '</small></span><button type="button" class="btn sm" id="lgOff">Use standard rules instead</button></div>'
+        + (ST.lg.skipped && ST.lg.skipped.length ? '<details class="lg-skip"><summary>' + ST.lg.skipped.length + ' of this league\u2019s rules can\u2019t be matched exactly</summary><ul>' + ST.lg.skipped.map(function (x) { return '<li><b>' + esc(x.label) + '</b> \u2014 ' + esc(x.why) + '</li>'; }).join('') + '</ul></details>' : '')
+      : '<div id="lgMsg" class="cc-hint">' + (ST.lgMsg || '') + '</div>' + (ST.lgList && ST.lgList.length ? '<div class="cc-hint" style="margin-top:6px">Pick your league:</div><div class="cc-leagues" style="margin-top:6px">' + ST.lgList.map(function (l) {
+          return '<button type="button" class="cc-lg" data-lg="' + esc(l.league_id) + '"><span><b>' + esc(l.name) + '</b><small>' + esc(l.season + ' \u00b7 ' + l.total_rosters + ' teams') + '</small></span></button>';
+        }).join('') + '</div>' : '');
+    var ph = { sleeper: 'Username or league ID', espn: 'ESPN league ID', mfl: 'MFL league ID' }[ST.site];
+    var lgFind = ST.lg ? '' : '<div class="lg-find"><span>or use your league</span><span class="site-pick" role="group" aria-label="League site">' + ['sleeper', 'espn', 'mfl'].map(function (k) { return '<button type="button" data-site="' + k + '" aria-pressed="' + (ST.site === k) + '">' + SITE_NAME[k] + '</button>'; }).join('') + '</span><input id="lgq" type="search" value="' + esc(ST.lgQ || '') + '" placeholder="' + ph + '" autocapitalize="none" spellcheck="false" aria-label="' + ph + '"><button type="button" class="btn sm gold" id="lgFind">Find</button></div>';
+    var html = '<div class="card pb"><div class="sec-h lg-head" style="margin-top:0"><h3>1. Your league\u2019s rules</h3>' + lgFind + '</div>' + (ST.lg ? '' : lgHtml)
+      + '<div class="setrow"><div class="chips"><span class="lbl">Season</span>' + ST.years.map(function (y) {
+        var live = String(ST.state.season) === String(y);
+        return chip('data-year', y, esc(y) + (live ? '<small>so far</small>' : ''), ST.year === y);
+      }).join('') + '</div>'
+      + (ST.lg ? '' : '<div class="chips"><span class="lbl">Scoring</span>' + [['ppr', 'PPR'], ['half', 'Half-PPR'], ['std', 'Standard']].map(function (b) { return chip('data-base', b[0], b[1], ST.base === b[0]); }).join('') + '</div>'
+      + '<div class="chips"><span class="lbl">Passing TD</span>' + [4, 6].map(function (v) { return chip('data-td', v, v + ' pts', ST.passTd === v); }).join('') + '</div>'
+      + '<div class="chips"><span class="lbl">TE premium</span>' + [[0, 'None'], [0.5, '+0.5'], [1, '+1']].map(function (v) { return chip('data-tep', v[0], v[1], ST.tep === v[0]); }).join('') + '</div>'
+      + '<div class="chips"><span class="lbl">Teams</span>' + [10, 12, 14, 16].map(function (v) { return chip('data-teams', v, v, ST.teams === v); }).join('') + '</div>'
+      + '<div class="chips"><span class="lbl">QBs</span>' + chip('data-sf', 0, '1QB', !ST.sf) + chip('data-sf', 1, 'Superflex', ST.sf) + '</div>') + (ST.lg ? lgHtml : '') + '</div>'
+      + '<details class="allrules"><summary>See every starting rule</summary><div class="rulegrid">' + Object.keys(r).map(function (k) { return '<span>' + esc(ruleName(k)) + '<b>' + esc(ruleVal(k, r[k])) + '</b></span>'; }).join('') + '</div></details></div>';
+    html += '<div class="card pb" style="margin-top:12px"><div class="sec-h" style="margin-top:0"><h3>2. Try changes</h3><p>Pick as many changes as you like, then press <b class="gold">Add changes</b> to rescore the ' + esc(ST.year) + ' season.</p></div>'
+      + '<div class="chips"><span class="lbl">Quick picks</span>' + PRESETS.map(function (p, i) {
+        var ks = presetKeys(p.o), off = !ks.length;
+        return '<button type="button" class="chip" data-preset="' + i + '" aria-pressed="' + (!off && presetOn(p.o)) + '"' + (off ? ' disabled title="Already your rule"' : '') + '>' + esc(p.label) + (off ? '<small>current</small>' : '') + '</button>';
+      }).join('') + '</div>'
+      + '<div class="pb-row"><select id="ruleKey" aria-label="Rule">' + ruleKeys.map(function (k) { return '<option value="' + esc(k) + '">' + esc(ruleName(k)) + '</option>'; }).join('') + '</select>'
+      + '<span class="cur" id="ruleCur"></span><input id="ruleVal" type="number" step="0.25" aria-label="New value"><button type="button" class="btn sm" id="ruleAdd">+ Put on the list</button></div>'
+      + '<div class="pb-listbox"><span class="lbl">Your changes</span><div class="pb-list">' + (keys.length ? keys.map(function (k) {
+        var waiting = ST.proposal[k] !== ST.draft[k];
+        return '<span class="pb-item' + (waiting ? ' waiting' : '') + '"><b>' + esc(ruleName(k)) + '</b> ' + esc(ruleVal(k, r[k])) + ' <span class="ar">\u2192</span> <b class="gold">' + esc(ruleVal(k, ST.draft[k])) + '</b>' + (waiting ? '<small>not added yet</small>' : '') + '<button type="button" data-unset="' + esc(k) + '" aria-label="Remove">\u00d7</button></span>';
+      }).join('') : '<span class="pb-empty">Nothing yet: tap quick picks or put any rule on the list.</span>') + '</div></div>'
+      + '<div class="pb-go"><button type="button" class="btn gold" id="applyBtn"' + (pending ? '' : ' disabled') + '>' + (pending ? (keys.length ? 'Add changes (' + keys.length + ')' : 'Remove all changes') : applied ? 'Changes added \u2713' : 'Add changes') + '</button>'
+      + (keys.length || applied ? '<button type="button" class="btn sm" id="clearAll">Start over</button>' : '')
+      + '<span class="cc-hint">' + (pending ? '<b class="gold">' + (keys.length ? 'Press Add changes to see the results.' : 'Press to clear the results.') + '</b>' : applied ? 'The results below are for these changes.' : '') + '</span></div></div>';
+    html += '<div class="card pb" style="margin-top:12px"><div class="sec-h" style="margin-top:0"><h3>3. Watch players (optional)</h3><p>See exactly how the change hits the players you care about.</p></div>'
+      + '<div class="chips wpos"><span class="lbl">Browse</span>' + posNow().map(function (p) { return chip('data-wpos', p, p, ST.wpos === p); }).join('') + '</div>'
+      + '<div class="pb-list watched">' + (ST.watch.length || wTeams().length ? '<span class="lbl">Watching</span><button type="button" class="btn sm rm-all" id="clearWatch">\u00d7 Remove all</button>' + wTeams().map(function (t) {
+        return '<span class="pb-item wt"><span class="tm-ic">\u{1F465}</span><b>' + esc(teamName(t)) + '</b><small>' + (t.players || []).length + ' players</small><button type="button" data-unteam="' + esc(t.roster_id) + '" aria-label="Remove team">\u00d7</button></span>';
+      }).join('') + (ST.watchAll ? ST.watch : ST.watch.slice(0, 10)).map(function (pid) {
+        var p = ST.players && ST.players[pid];
+        return '<span class="pb-item wp">' + headshot(pid, p ? p[1] : '') + '<b>' + esc(p ? p[0] : pid) + '</b><button type="button" data-unwatch="' + esc(pid) + '" aria-label="Remove">\u00d7</button></span>';
+      }).join('') + (ST.watch.length > 10 ? '<button type="button" class="btn sm" id="moreWatch">' + (ST.watchAll ? 'Show fewer' : '+' + (ST.watch.length - 10) + ' more') + '</button>' : '') : '<span class="pb-empty">No players yet: browse a position or type a name.</span>') + '</div>'
+      + '<div class="pb-row"><div class="psearch"><input id="pq" type="search" placeholder="' + (ST.wpos ? 'Search ' + ST.wpos + 's, or scroll the list' : 'Add a player: type a name') + '" autocomplete="off" spellcheck="false" aria-label="Add a player"><div id="psug" class="psug" hidden></div></div>'
+      + (ST.lg && ST.lg.rosters.length ? '<select id="teamPick" aria-label="Add a team\u2019s roster"><option value="">Add a team\u2019s roster\u2026</option>' + ST.lg.rosters.map(function (t) { return '<option value="' + esc(t.roster_id) + '">' + esc(teamName(t)) + '</option>'; }).join('') + '</select>' : '') + '</div>' + '</div>';
+    $('setup').innerHTML = html;
+    var sel = $('ruleKey'), first = ST.ruleSel || keys[0] || 'rec';
+    if (ruleKeys.indexOf(first) >= 0) sel.value = first;
+    function syncCur() { var k = sel.value; $('ruleCur').textContent = 'now ' + ruleVal(k, r[k]); $('ruleVal').value = ST.draft[k] != null ? ST.draft[k] : (Number(r[k]) || 0); $('ruleVal').step = /_yd$/.test(k) ? '0.01' : '0.25'; }
+    sel.addEventListener('change', function () { ST.ruleSel = sel.value; syncCur(); }); syncCur();
+  }
+  function presetKeys(o) { var r = rules(); return Object.keys(o).filter(function (k) { return Math.abs((Number(r[k]) || 0) - o[k]) > 1e-9; }); }
+  function presetOn(o) { var ks = presetKeys(o); return ks.length > 0 && ks.every(function (k) { return ST.draft[k] === o[k]; }); }
+
+  var POS_NAME = { QB: 'QBs', RB: 'RBs', WR: 'WRs', TE: 'TEs', K: 'Kickers', DEF: 'Defenses', DL: 'DLs', LB: 'LBs', DB: 'DBs' };
+  // Watched players and the linked league's teams: shown with or without a change.
+  // ── Change-by-change: each rule scores its own stat, so a change's effect on a
+  // player is exactly (his season count of that stat) x (new value - old value),
+  // and current + every change = the total with all changes.
+  var UNIT = { rec: 'catches', pass_yd: 'passing yards', pass_td: 'passing TDs', pass_int: 'interceptions thrown', pass_2pt: 'passing 2-pt conversions', pass_cmp: 'completions', pass_inc: 'incompletions', pass_att: 'pass attempts', pass_sack: 'times sacked', pass_fd: 'passing first downs',
+    rush_yd: 'rushing yards', rush_td: 'rushing TDs', rush_att: 'carries', rush_2pt: 'rushing 2-pt conversions', rush_fd: 'rushing first downs', rec_yd: 'receiving yards', rec_td: 'receiving TDs', rec_2pt: 'receiving 2-pt conversions', rec_fd: 'receiving first downs', rec_tgt: 'targets',
+    bonus_rec_te: 'TE catches', bonus_rec_rb: 'RB catches', bonus_rec_wr: 'WR catches', fum_lost: 'fumbles lost', fum: 'fumbles', bonus_rush_yd_100: '100-199 yard rushing games', bonus_rush_yd_200: '200+ yard rushing games', bonus_rec_yd_100: '100-199 yard receiving games', bonus_rec_yd_200: '200+ yard receiving games',
+    bonus_pass_yd_300: '300-399 yard passing games', bonus_pass_yd_400: '400+ yard passing games', xpm: 'extra points', fgmiss: 'missed field goals', sack: 'sacks', int: 'interceptions', fum_rec: 'fumble recoveries', def_td: 'defensive TDs', safe: 'safeties',
+    idp_sack: 'sacks', idp_tkl_solo: 'solo tackles', idp_tkl_ast: 'assisted tackles', idp_tkl_loss: 'tackles for loss', idp_int: 'interceptions', idp_ff: 'forced fumbles', idp_fum_rec: 'fumble recoveries', idp_pass_def: 'passes defended', idp_qb_hit: 'QB hits', idp_def_td: 'defensive TDs' };
+  function chgKeys() { return Object.keys(ST.proposal); }
+  function chgHead(k) { var r = rules(); return '<th class="chg"><span>' + esc(ruleName(k)) + '</span><small>' + esc(ruleVal(k, r[k]) + ' \u2192 ' + ruleVal(k, ST.proposal[k])) + '</small></th>'; }
+  function statOf(pid, k) { var line = (ST.stats[ST.year] || {})[pid]; var v = line && line[k]; return typeof v === 'number' ? v : 0; }
+  function effect(pid, k) { return statOf(pid, k) * ((Number(ST.proposal[k]) || 0) - (Number(rules()[k]) || 0)); }
+  function chgCell(v) { return '<td class="chg ' + (v > 0.05 ? 'pos-up' : v < -0.05 ? 'pos-dn' : 'muted') + '">' + (Math.abs(v) < 0.05 ? '\u2014' : sgn(v)) + '</td>'; }
+  function nfmt(v) { return Math.abs(v - Math.round(v)) < 1e-9 ? Math.round(v).toLocaleString('en-US') : (Math.round(v * 100) / 100).toLocaleString('en-US'); }
+  function whyLine(pid, k) {
+    var n = statOf(pid, k), d = (Number(ST.proposal[k]) || 0) - (Number(rules()[k]) || 0), name = '<b>' + esc(ruleName(k)) + '</b>: ';
+    if (!n) return name + 'no ' + esc(UNIT[k] || ('\u201c' + ruleName(k) + '\u201d')) + ' this season, so no effect.';
+    return name + nfmt(n) + ' ' + esc(UNIT[k] || ('\u00d7 \u201c' + ruleName(k) + '\u201d')) + ' \u00d7 ' + sgn(d, Math.abs(d) < 0.1 ? 2 : Math.abs(d) < 1 && Math.round(d * 10) !== d * 10 ? 2 : 1) + ' = <b class="' + (n * d > 0 ? 'pos-up' : n * d < 0 ? 'pos-dn' : '') + '">' + sgn(n * d) + '</b>';
+  }
+  function whyBox(x, ks) {
+    return '<div class="why">' + ks.map(function (k) { return '<div>' + whyLine(x.pid, k) + '</div>'; }).join('') + '<div class="why-sum">' + fmt1(x.before) + ' today ' + ks.map(function (k) { var v = effect(x.pid, k); return Math.abs(v) < 0.05 ? '' : (v < 0 ? '\u2212 ' : '+ ') + fmt1(Math.abs(v)); }).filter(Boolean).join(' ') + ' = <b>' + fmt1(x.after) + '</b> with every change</div></div>';
+  }
+  // Bring a watched team's block to the top of the screen (Summary tab).
+  function showTeam(id) {
+    var go = function () {
+      var sum = document.querySelector('[data-rtab="sum"]'); if (sum && ST.rtab === 'deep') sum.click();
+      var row = document.querySelector('tr.grp[data-team="' + id + '"]'); if (!row) return false;
+      var head = row.closest('.card').previousElementSibling || row;
+      var top = head.getBoundingClientRect().top + scrollY - 12;
+      scrollTo({ top: top, behavior: 'smooth' }); row.classList.add('flash'); setTimeout(function () { row.classList.remove('flash'); }, 1600);
+      return true;
+    };
+    if (!go()) setTimeout(go, 400);
+  }
+  // Whole teams being watched (linked league rosters), kept as teams rather than 50 separate players.
+  function wTeams() {
+    if (!ST.lg || !ST.lg.rosters.length) return [];
+    return ST.wteams.map(function (id) { return ST.lg.rosters.filter(function (r) { return String(r.roster_id) === String(id); })[0]; }).filter(Boolean);
+  }
+  var POS_ORDER = ['QB', 'RB', 'WR', 'TE', 'K', 'DEF', 'DL', 'LB', 'DB'];
+  function linkedHtml(R) {
+    var html = '';
+    // watched players: whole teams (grouped by position) and single players
+    var teams = wTeams();
+    if (ST.watch.length || teams.length) {
+      var byId = {}; R.rows.forEach(function (x) { byId[x.pid] = x; });
+      var nc = !Object.keys(ST.proposal).length;   // no change yet: just points and rank today
+      var ks = chgKeys(), ncol = nc ? 3 : 4 + ks.length;
+      var row = function (pid, grp) {
+        var x = byId[pid], p = ST.players && ST.players[pid];
+        if (!x) return '<tr><td class="l"><span class="team">' + headshot(pid, p ? p[1] : '') + '<span><b>' + esc(p ? p[0] : pid) + '</b><small>' + esc(p ? p[1] + ' · ' + (p[2] || 'FA') : '') + '</small></span></span></td><td colspan="' + (ncol - 1) + '" class="muted" style="text-align:center">No ' + esc(ST.year) + ' games' + (p && posNow().indexOf(p[1]) < 0 ? ' (position not scored here)' : '') + '</td></tr>';
+        var who = '<td class="l"><span class="team" data-card="' + esc(x.pid) + '" title="Open ' + esc(x.name) + '\u2019s player card">' + headshot(x.pid, x.pos) + '<span><b>' + esc(x.name) + '</b><small>' + esc(x.pos + ' · ' + (x.team || 'FA') + ' · ' + x.gp + ' games') + '</small></span></span></td>';
+        if (nc) return '<tr>' + who + '<td><b>' + fmt1(x.after) + '</b></td><td>' + x.pos + x.posRankAfter + '</td></tr>';
+        var key = 'p' + grp + '-' + x.pid, open = ST.why === key;
+        return '<tr class="tap' + (open ? ' open' : '') + '" data-why="' + esc(key) + '" tabindex="0" aria-expanded="' + open + '">' + who + '<td>' + fmt1(x.before) + '</td>' + ks.map(function (k) { return chgCell(effect(x.pid, k)); }).join('')
+          + '<td class="tot"><b>' + fmt1(x.after) + '</b></td><td>' + x.pos + x.posRankBefore + (x.posRankAfter !== x.posRankBefore ? ' → <b style="color:' + POS_COLOR[x.pos] + '">' + x.pos + x.posRankAfter + '</b>' : '') + '</td></tr>'
+          + (open ? '<tr class="whyrow"><td colspan="' + ncol + '">' + whyBox(x, ks) + '</td></tr>' : '');
+      };
+      var body = '';
+      teams.forEach(function (t) {
+        var ids = (t.players || []).filter(function (pid) { return byId[pid]; }), none = (t.players || []).length - ids.length;
+        ids.sort(function (a, b) { var A = byId[a], B = byId[b]; return POS_ORDER.indexOf(A.pos) - POS_ORDER.indexOf(B.pos) || B.after - A.after; });
+        var tb = 0, ta = 0; ids.forEach(function (pid) { tb += byId[pid].before; ta += byId[pid].after; });
+        body += '<tr class="grp" data-team="' + esc(t.roster_id) + '"><td colspan="' + ncol + '"><span class="grp-name">\u{1F465} ' + esc(teamName(t)) + '</span><span class="grp-sum">' + ids.length + ' players' + (none ? ' (+' + none + ' with no ' + esc(ST.year) + ' games)' : '') + ' · ' + (nc ? fmt1(tb) + ' pts' : fmt1(tb) + ' → <b>' + fmt1(ta) + '</b> <em class="' + (ta - tb > 0.05 ? 'pos-up' : ta - tb < -0.05 ? 'pos-dn' : 'muted') + '">' + sgn(ta - tb) + '</em>') + '</span></td></tr>';
+        var last = '';
+        ids.forEach(function (pid) { var ps = byId[pid].pos; if (ps !== last) { body += '<tr class="possep"><td colspan="' + ncol + '" style="color:' + POS_COLOR[ps] + '">' + ps + '</td></tr>'; last = ps; } body += row(pid, 't' + t.roster_id); });
+      });
+      if (ST.watch.length) {
+        if (teams.length) body += '<tr class="grp"><td colspan="' + ncol + '"><span class="grp-name">Other players</span></td></tr>';
+        body += ST.watch.map(function (pid) { return row(pid, 'w'); }).join('');
+      }
+      html += '<div class="sec-h"><h3>Player scoring changes</h3><p>' + (nc ? 'Season points and position rank under your rules. Pick a change to see how they move.' : 'Season points under your rules, what each change adds, and the total. Tap a name for his player card, or the numbers to see why.') + '</p></div><div class="card scroll" style="padding:4px 8px"><table class="tbl bychg"><thead><tr><th class="l">Player</th>'
+        + (nc ? '<th>Points</th><th>Pos rank</th>' : '<th>Current rules</th>' + ks.map(chgHead).join('') + '<th class="tot">Total</th><th>Pos rank</th>') + '</tr></thead><tbody>' + body + '</tbody></table></div>';
+    }
+    // every team in the linked league: today's rosters, this season's points
+    if (ST.lg && ST.lg.rosters.length) {
+      var idx = {}; R.rows.forEach(function (x) { idx[x.pid] = x; });
+      var teamsR = ST.lg.rosters.map(function (t) {
+        var b = 0, a = 0;
+        (t.players || []).forEach(function (pid) { var x = idx[pid]; if (x) { b += x.before; a += x.after; } });
+        var by = chgKeys().map(function (k) { var tot = 0, tops = []; (t.players || []).forEach(function (pid) { if (!idx[pid]) return; var v = effect(pid, k); if (v) { tot += v; tops.push({ n: idx[pid].name, v: v }); } }); tops.sort(function (p, q) { return Math.abs(q.v) - Math.abs(p.v); }); return { k: k, v: tot, tops: tops.slice(0, 3) }; });
+        return { id: t.roster_id, name: teamName(t), before: b, after: a, delta: a - b, by: by };
+      });
+      var tk = chgKeys(), rb = {}; teamsR.slice().sort(function (x, y) { return y.before - x.before; }).forEach(function (t, i) { rb[t.id] = i + 1; });
+      teamsR.sort(function (x, y) { return y.after - x.after; });
+      html += '<div class="sec-h"><h3>Every team in ' + esc(ST.lg.league.name) + '</h3><p>Total ' + esc(ST.year) + ' points of each team\u2019s current roster' + (ST.lg.idp ? ', IDP players included' : '') + (chgKeys().length ? '. Tap a team to see who drives each change.' : '.') + '</p></div><div class="card scroll" style="padding:4px 8px"><table class="tbl bychg"><thead><tr><th class="c">Rank</th><th class="c hide-m">Move</th><th class="l">Team</th>' + (tk.length ? '<th>Current rules</th>' + tk.map(chgHead).join('') + '<th class="tot">Total</th>' : '<th>Points</th>') + '</tr></thead><tbody>'
+        + teamsR.map(function (t, i) {
+          var mvN = rb[t.id] - (i + 1), mv = mvN > 0 ? '<span class="mv up">\u25B2' + mvN + '</span>' : mvN < 0 ? '<span class="mv dn">\u25BC' + (-mvN) + '</span>' : '<span class="mv eq">\u2013</span>';
+          var name = '<td class="l"><span class="team"><span><b>' + esc(t.name) + '</b></span></span></td>';
+          if (!tk.length) return '<tr><td class="c"><span class="rk">' + (i + 1) + '</span></td><td class="c hide-m">' + mv + '</td>' + name + '<td><b>' + fmt1(t.after) + '</b></td></tr>';
+          var open = ST.why === 't' + t.id;
+          return '<tr class="tap' + (open ? ' open' : '') + '" data-why="t' + esc(t.id) + '" tabindex="0" aria-expanded="' + open + '"><td class="c"><span class="rk">' + (i + 1) + '</span><span class="mv-m">' + mv + '</span></td><td class="c hide-m">' + mv + '</td>' + name + '<td>' + fmt1(t.before) + '</td>' + t.by.map(function (c) { return chgCell(c.v); }).join('') + '<td class="tot"><b>' + fmt1(t.after) + '</b></td></tr>'
+            + (open ? '<tr class="whyrow"><td colspan="' + (5 + tk.length) + '"><div class="why">' + t.by.map(function (c) { return '<div><b>' + esc(ruleName(c.k)) + '</b>: <b class="' + (c.v > 0.05 ? 'pos-up' : c.v < -0.05 ? 'pos-dn' : '') + '">' + sgn(c.v) + '</b>' + (c.tops.length ? ' \u2014 most from ' + c.tops.map(function (p) { return esc(p.n) + ' ' + sgn(p.v); }).join(', ') : ', no one on this roster is affected') + '</div>'; }).join('') + '</div></td></tr>' : '');
+        }).join('') + '</tbody></table></div>';
+    }
+    return html;
+  }
+  function renderResult() {
+    if (ST.pos !== 'ALL' && posNow().indexOf(ST.pos) < 0) ST.pos = 'ALL';
+    var box = $('result'), keys = Object.keys(ST.proposal);
+    if (!keys.length) {
+      // no change yet: the watched players and league teams still show, at today's rules
+      var R0 = (ST.watch.length || wTeams().length || ST.lg) && ST.stats[ST.year] && ST.players ? CC.compare(ST.stats[ST.year], ST.players, rules(), {}, league()) : null;
+      box.innerHTML = '<div class="empty" style="margin-top:14px">Put your changes on the list above and press <b class="gold">Add changes</b>: the whole season is rescored, with rankings, positions and the players who gain or lose the most.</div>' + (R0 ? linkedHtml(R0) : '');
+      $('how').innerHTML = HOW; return;
+    }
+    var stats = ST.stats[ST.year], R = CC.compare(stats, ST.players, rules(), ST.proposal, league()), rr = rules();
+    var change = keys.map(function (k) { return ruleName(k) + ' ' + ruleVal(k, rr[k]) + ' → ' + ruleVal(k, ST.proposal[k]); }).join(' · ');
+    var LG = league(), N = LG.teams;
+    var byAfter = R.rows.slice().sort(function (a, b) { return b.after - a.after; }), byBefore = R.rows.slice().sort(function (a, b) { return b.before - a.before; });
+    var relevant = R.rows.filter(function (x) { return x.rankBefore <= 300 || x.rankAfter <= 300; });
+    var gainers = relevant.slice().sort(function (a, b) { return b.delta - a.delta; }).filter(function (x) { return x.delta > 0; }).slice(0, 10);
+    var losers = relevant.slice().sort(function (a, b) { return a.delta - b.delta; }).filter(function (x) { return x.delta < 0; }).slice(0, 10);
+    var climber = relevant.filter(function (x) { return x.rankAfter <= 100; }).sort(function (a, b) { return (b.rankBefore - b.rankAfter) - (a.rankBefore - a.rankAfter); })[0];
+    // One plain number per position: what the N best at it score in a season, before and after.
+    var topAvg = function (rows, key) { var t = rows.slice().sort(function (a, b) { return b[key] - a[key]; }).slice(0, N); return t.length ? t.reduce(function (s, x) { return s + x[key]; }, 0) / t.length : 0; };
+    var pc = posNow().map(function (p) {
+      var rows = R.rows.filter(function (x) { return x.pos === p; }), b = topAvg(rows, 'before'), a = topAvg(rows, 'after');
+      return { pos: p, before: b, after: a, change: Math.round((a - b) * 10) / 10 };
+    });
+    pc = pc.filter(function (p) { return p.before || p.after; });
+    var up = pc.slice().sort(function (a, b) { return b.change - a.change; })[0], down = pc.slice().sort(function (a, b) { return a.change - b.change; })[0];
+    var NAME1 = { QB: 'QB', RB: 'RB', WR: 'WR', TE: 'TE', K: 'kicker', DEF: 'defense', DL: 'DL', LB: 'LB', DB: 'DB' };
+    var head, headSub;
+    if (up.change < 0.5 && down.change > -0.5) { head = 'Hardly anything changes'; headSub = 'No position’s top players move by even half a point over a season.'; }
+    else if (up.change >= 0.5 && down.change <= -0.5) { head = '<span>' + POS_NAME[up.pos] + '</span> win, <span>' + POS_NAME[down.pos] + '</span> lose'; headSub = 'A top-' + N + ' ' + NAME1[up.pos] + ' scores ' + fmt1(up.change) + ' more points a season. A top-' + N + ' ' + NAME1[down.pos] + ' scores ' + fmt1(-down.change) + ' fewer.'; }
+    else if (up.change >= 0.5) { head = '<span>' + POS_NAME[up.pos] + '</span> get the biggest boost'; headSub = 'A top-' + N + ' ' + NAME1[up.pos] + ' scores ' + fmt1(up.change) + ' more points a season.'; }
+    else { head = '<span>' + POS_NAME[down.pos] + '</span> take the biggest hit'; headSub = 'A top-' + N + ' ' + NAME1[down.pos] + ' scores ' + fmt1(-down.change) + ' fewer points a season.'; }
+    var bullets = [];
+    bullets.push(Math.abs(R.totalPct) < 0.5 ? 'Total scoring stays about the same.' : 'Total scoring goes ' + (R.totalPct > 0 ? 'up' : 'down') + ' <b>' + Math.abs(R.totalPct).toFixed(1) + '%</b>, so scores run ' + (R.totalPct > 0 ? 'higher' : 'lower') + ' every week.');
+    bullets.push(byAfter[0].pid !== byBefore[0].pid ? 'New #1 player: <b>' + esc(byAfter[0].name) + '</b> (' + byAfter[0].pos + ') passes ' + esc(byBefore[0].name) + ' (' + byBefore[0].pos + ').' : '<b>' + esc(byAfter[0].name) + '</b> (' + byAfter[0].pos + ') stays the #1 player.');
+    var html = '<div class="verdict" style="margin-top:16px"><span class="k">What happens if you change ' + esc(change) + '</span><h2>' + head + '</h2><p class="vsub">' + headSub + '</p><ul class="vlist">' + bullets.map(function (b) { return '<li>' + b + '</li>'; }).join('') + '</ul></div>';
+    // How each position changes: one row each, one bar, one number.
+    var maxC = Math.max.apply(null, pc.map(function (p) { return Math.abs(p.change); }).concat([1]));
+    var tab = ST.rtab === 'deep' ? 'deep' : 'sum';
+    html += '<div class="rtabs" role="tablist"><button type="button" role="tab" data-rtab="sum" class="' + (tab === 'sum' ? 'on' : '') + '" aria-selected="' + (tab === 'sum') + '">Summary</button><button type="button" role="tab" data-rtab="deep" class="' + (tab === 'deep' ? 'on' : '') + '" aria-selected="' + (tab === 'deep') + '">Deep Data</button></div>'
+      + '<div data-rpanel="sum"' + (tab === 'sum' ? '' : ' hidden') + '>';
+    html += '<div class="sec-h"><h3>How each position changes</h3><p>Season points for the ' + N + ' best players at each position.</p></div><div class="card pchg">'
+      + pc.slice().sort(function (a, b) { return b.change - a.change; }).map(function (p) {
+        var cls = p.change >= 0.5 ? 'up' : p.change <= -0.5 ? 'dn' : 'eq';
+        return '<div class="pc-row ' + cls + '"><b class="pc-pos" style="color:' + POS_COLOR[p.pos] + '">' + p.pos + '</b>'
+          + '<span class="pc-txt">' + fmt1(p.before) + ' → <b>' + fmt1(p.after) + '</b> pts</span>'
+          + '<span class="pc-bar"><i style="width:' + (Math.abs(p.change) / maxC * 100).toFixed(1) + '%"></i></span>'
+          + '<em class="pc-num">' + (cls === 'eq' ? 'No change' : sgn(p.change)) + '</em></div>';
+      }).join('') + '</div>';
+    html += linkedHtml(R) + '</div><div data-rpanel="deep"' + (tab === 'deep' ? '' : ' hidden') + '>';
+    // movers
+    var mrow = function (m) { return '<div class="mrow">' + headshot(m.pid, m.pos) + '<span><b>' + esc(m.name) + '</b><small>' + esc(m.pos + m.posRankBefore + (m.posRankAfter !== m.posRankBefore ? ' → ' + m.pos + m.posRankAfter : '') + ' · ' + fmt1(m.before) + ' → ' + fmt1(m.after) + ' pts') + '</small></span><em class="' + (m.delta > 0 ? 'pos-up' : 'pos-dn') + '">' + sgn(m.delta) + '</em></div>'; };
+    var w5 = gainers.slice(0, 5), l5 = losers.slice(0, 5), mcard = function (t, list) { return '<div class="card"><div class="cc-hint" style="margin-bottom:8px">' + t + '</div><div class="mlist">' + list.map(mrow).join('') + '</div></div>'; };
+    html += '<div class="sec-h"><h3>' + (w5.length && l5.length ? 'Biggest winners and losers' : w5.length ? 'Biggest winners' : l5.length ? 'Biggest losers' : 'Players') + '</h3><p>' + (w5.length && !l5.length ? 'Nobody loses points. ' : !w5.length && l5.length ? 'Nobody gains points. ' : '') + 'Change in season points.</p></div>'
+      + (w5.length && l5.length ? '<div class="movers">' + mcard('Winners', w5) + mcard('Losers', l5) + '</div>'
+        : w5.length || l5.length ? '<div class="movers one">' + mcard(w5.length ? 'Winners' : 'Losers', w5.length ? w5 : l5) + '</div>'
+        : '<div class="card muted">No player gains or loses points.</div>');
+    // rankings
+    var list = (ST.pos === 'ALL' ? R.rows : R.rows.filter(function (x) { return x.pos === ST.pos; })).slice().sort(function (a, b) { return b.after - a.after; });
+    html += '<div class="sec-h"><h3>New rankings</h3><div class="chips">' + ['ALL'].concat(posNow().filter(function (q) { return pc.some(function (x) { return x.pos === q; }); })).map(function (p) { return chip('data-pos', p, p === 'ALL' ? 'All' : p, ST.pos === p); }).join('') + '</div></div>'
+      + '<p class="cc-hint" style="margin:-4px 0 8px">Season points under your rules, what each change adds, and the total. Tap a name for his player card, or the numbers to see why.</p>'
+      + '<div class="card scroll" style="padding:4px 8px"><table class="tbl bychg"><thead><tr><th class="c">Rank</th><th class="c hide-m">Move</th><th class="l">Player</th><th>Pos rank</th><th>Current rules</th>' + keys.map(chgHead).join('') + '<th class="tot">Total</th></tr></thead><tbody>'
+      + list.slice(0, ST.shown).map(function (x, i) {
+        var was = ST.pos === 'ALL' ? x.rankBefore : x.posRankBefore, now = i + 1, mvN = was - now;
+        var mv = mvN > 0 ? '<span class="mv up">▲' + mvN + '</span>' : mvN < 0 ? '<span class="mv dn">▼' + (-mvN) + '</span>' : '<span class="mv eq">–</span>';
+        var open = ST.why === 'r' + x.pid;
+        return '<tr class="tap' + (open ? ' open' : '') + '" data-why="r' + esc(x.pid) + '" tabindex="0" aria-expanded="' + open + '"><td class="c"><span class="rk">' + now + '</span><span class="mv-m">' + mv + '</span></td><td class="c hide-m">' + mv + '</td><td class="l"><span class="team" data-card="' + esc(x.pid) + '" title="Open ' + esc(x.name) + '\u2019s player card">' + headshot(x.pid, x.pos) + '<span><b>' + esc(x.name) + '</b><small>' + esc(x.team || '') + ' · ' + x.gp + ' games</small></span></span></td>'
+          + '<td><b style="color:' + POS_COLOR[x.pos] + '">' + x.pos + x.posRankAfter + '</b>' + (x.posRankAfter !== x.posRankBefore ? '<small class="was">was ' + x.pos + x.posRankBefore + '</small>' : '') + '</td><td>' + fmt1(x.before) + '</td>' + keys.map(function (k) { return chgCell(effect(x.pid, k)); }).join('') + '<td class="tot"><b>' + fmt1(x.after) + '</b></td></tr>'
+          + (open ? '<tr class="whyrow"><td colspan="' + (6 + keys.length) + '">' + whyBox(x, keys) + '</td></tr>' : '');
+      }).join('') + '</tbody></table>' + (list.length > ST.shown ? '<button type="button" class="more" id="more">Show more (' + (list.length - ST.shown) + ' left)</button>' : '') + '</div>';
+    // tipping point + summary
+    var one = keys.length === 1;
+    html += '<div class="sec-h"><h3>Try a range</h3><p>' + (one ? 'Run ' + esc(ruleName(keys[0])) + ' through a range of values and see how much of the scoring each position gets at each one.' : 'Works with one rule change at a time.') + '</p></div>'
+      + '<div class="card"><button type="button" class="btn sm" id="sweepBtn"' + (one ? '' : ' disabled') + '>Run the range</button><div id="sweep"></div></div></div>'
+      + '<div class="sec-h"><h3>Take it to the league</h3><p>A plain-text summary for the group chat, plus a link that opens this exact comparison.</p></div><div class="card pb-go"><button type="button" class="btn sm gold" id="copySum">Copy the summary</button><button type="button" class="btn sm" id="copyLink">Copy the link</button></div>';
+    box.innerHTML = html;
+    ST._last = { R: R, gainers: gainers, losers: losers, pc: pc, N: N, byAfter: byAfter, byBefore: byBefore, change: change };
+    if (ST.sweep && ST.sweep.sig === sig()) drawSweep(ST.sweep.rows, ST.sweep.key);
+    $('how').innerHTML = HOW;
+  }
+  var HOW = '<b>How it works.</b> Every NFL player’s real season is scored twice from Sleeper’s official stats: once under your rules, once with your change. Only the difference is shown. Your starting rules are Sleeper’s PPR, Half-PPR or Standard (checked against Sleeper’s own season totals: every QB, RB and TE matches exactly) with the usual kicker and team-defense scoring. Starters are what a league of your size fields: QB, 2 RB, 2 WR, TE, a FLEX, K and DEF per team (plus a second QB in superflex, and the league\u2019s own DL, LB, DB and IDP flex spots when a linked league starts IDP players). Every number is a full season of points.';
+  function sig() { return [ST.year, ST.base, ST.passTd, ST.tep, ST.teams, ST.sf, Object.keys(ST.proposal).map(function (k) { return k + ':' + ST.proposal[k]; }).join(',')].join('|'); }
+
+  function runSweep() {
+    var k = Object.keys(ST.proposal)[0]; if (!k) return;
+    var vals = CC.sweepValues(Number(rules()[k]) || 0, ST.proposal[k]);
+    var rows = CC.sweep(ST.stats[ST.year], ST.players, rules(), k, vals, league());
+    ST.sweep = { sig: sig(), rows: rows, key: k }; drawSweep(rows, k);
+  }
+  function drawSweep(rows, k) {
+    var el = $('sweep'); if (!el) return;
+    var cur = Number(rules()[k]) || 0, pos = ['QB', 'RB', 'WR', 'TE'];
+    var cross = null;
+    for (var i = 1; i < rows.length && !cross; i++) {
+      pos.forEach(function (a) { pos.forEach(function (b) {
+        if (cross || a === b) return;
+        var p0 = rows[i - 1].share, p1 = rows[i].share;
+        if (p0[a] < p0[b] && p1[a] >= p1[b] && Math.abs(p0[a] - p0[b]) < 15) cross = { a: a, b: b, at: rows[i].value };
+      }); });
+    }
+    el.innerHTML = '<div class="scroll" style="margin-top:10px"><table class="tbl"><thead><tr><th class="l">' + esc(ruleName(k)) + '</th>' + pos.map(function (p) { return '<th>' + p + ' share</th>'; }).join('') + '<th class="l hide-m">#1 overall</th></tr></thead><tbody>'
+      + rows.map(function (x) {
+        var mark = x.value === cur ? ' <span class="pill dim">your rule</span>' : x.value === ST.proposal[k] ? ' <span class="pill in">your pick</span>' : '';
+        return '<tr' + (cross && cross.at === x.value ? ' class="newin"' : '') + '><td class="l"><b>' + esc(ruleVal(k, x.value)) + '</b>' + mark + '</td>' + pos.map(function (p) { return '<td>' + x.share[p].toFixed(1) + '%</td>'; }).join('')
+          + '<td class="l hide-m">' + (x.top ? esc(x.top.name) + ' <span class="muted">' + x.top.pos + '</span>' : '') + '</td></tr>';
+      }).join('') + '</tbody></table></div><p class="cc-hint" style="margin-top:8px">' + (cross ? '<b class="gold">' + POS_NAME[cross.a] + ' pass ' + POS_NAME[cross.b] + '</b> in share of starter points at ' + esc(ruleVal(k, cross.at)) + '.' : 'No position passes another in this range.') + '</p>';
+  }
+  function summaryText() {
+    var x = ST._last; if (!x) return '';
+    var R = x.R, L = [];
+    L.push('SCORING CHANGE CHECK (' + ST.year + ' season)');
+    L.push('Starting rules: ' + { ppr: 'PPR', half: 'Half-PPR', std: 'Standard' }[ST.base] + ', ' + ST.passTd + '-pt passing TDs' + (ST.tep ? ', TE premium +' + ST.tep : '') + ' · ' + ST.teams + ' teams' + (ST.sf ? ', superflex' : ''));
+    L.push('Change: ' + x.change);
+    L.push('');
+    L.push('Season points for the top ' + x.N + ' at each position: ' + x.pc.map(function (p) { return p.pos + ' ' + fmt1(p.before) + ' -> ' + fmt1(p.after) + ' (' + sgn(p.change) + ')'; }).join(', '));
+    L.push('Total scoring: ' + sgn(R.totalPct) + '%');
+    L.push('#1 overall: ' + x.byAfter[0].name + ' ' + x.byAfter[0].pos + (x.byAfter[0].pid !== x.byBefore[0].pid ? ' (was ' + x.byBefore[0].name + ' ' + x.byBefore[0].pos + ')' : ' (holds)'));
+    if (x.gainers.length) L.push('Biggest winners: ' + x.gainers.slice(0, 4).map(function (m) { return m.name + ' +' + fmt1(m.delta); }).join(', '));
+    if (x.losers.length) L.push('Biggest losers: ' + x.losers.slice(0, 4).map(function (m) { return m.name + ' ' + fmt1(m.delta); }).join(', '));
+    L.push('');
+    L.push('Every player’s real season scored twice from official stats; the difference is the rule change alone.');
+    L.push('See it: ' + location.href);
+    return L.join('\n');
+  }
+  function copy(text, msg) {
+    var done = function () { toast(msg || 'Copied.'); };
+    if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(text).then(done, function () { fallbackCopy(text, msg); });
+    else fallbackCopy(text, msg);
+  }
+  function fallbackCopy(text, msg) {
+    var ta = document.createElement('textarea'); ta.value = text; ta.style.position = 'fixed'; ta.style.opacity = '0'; document.body.appendChild(ta); ta.select();
+    try { document.execCommand('copy'); toast(msg || 'Copied.'); } catch (e) { toast('Copy failed: select the text and copy it.'); }
+    ta.remove();
+  }
+
+  // Everything that changes a setting goes through here.
+  function update(keepSweep) {
+    cleanProposal(); setHash();
+    if (!keepSweep) ST.sweep = ST.sweep && ST.sweep.sig === sig() ? ST.sweep : null;
+    renderSetup();
+    if (!ST.stats[ST.year] || !ST.players) {
+      $('result').innerHTML = '<div class="loading" style="margin-top:14px">Loading the ' + esc(ST.year) + ' season…</div>';
+      Promise.all([ensureSeason(ST.year), ensurePlayers()]).then(function () { renderSetup(); renderResult(); }, function () {
+        $('result').innerHTML = '<div class="cc-msg err" style="margin-top:14px">The NFL stats could not be loaded from Sleeper right now. <button type="button" class="btn sm" id="retry">Try again</button></div>';
+      });
+      return;
+    }
+    renderResult();
+  }
+  document.addEventListener('click', function (e) {
+    var t = e.target, b;
+    if ((b = t.closest('[data-year]'))) { ST.year = Number(b.dataset.year); ST.shown = 40; update(); return; }
+    if ((b = t.closest('[data-base]'))) { ST.base = b.dataset.base; update(); return; }
+    if ((b = t.closest('[data-td]'))) { ST.passTd = Number(b.dataset.td); update(); return; }
+    if ((b = t.closest('[data-tep]'))) { ST.tep = Number(b.dataset.tep); update(); return; }
+    if ((b = t.closest('[data-teams]'))) { ST.teams = Number(b.dataset.teams); update(); return; }
+    if ((b = t.closest('[data-sf]'))) { ST.sf = b.dataset.sf === '1'; update(); return; }
+    if ((b = t.closest('[data-card]')) && window.DHQPlayerCard) {
+      var lgOn = !!(ST.lg && ST.lg.site === 'sleeper' && ST.lg.rosters.length);
+      DHQPlayerCard.open(b.getAttribute('data-card'), { leagueId: lgOn ? ST.lg.league.league_id : undefined, league: lgOn, scoringSettings: rules() });
+      return;
+    }
+    if ((b = t.closest('[data-why]'))) { ST.why = ST.why === b.dataset.why ? null : b.dataset.why; renderResult(); var again = document.querySelector('[data-why="' + b.dataset.why + '"]'); if (again) again.focus({ preventScroll: true }); return; }
+    if ((b = t.closest('[data-rtab]'))) {
+      ST.rtab = b.dataset.rtab;
+      document.querySelectorAll('[data-rtab]').forEach(function (x) { var on = x.dataset.rtab === ST.rtab; x.classList.toggle('on', on); x.setAttribute('aria-selected', on); });
+      document.querySelectorAll('[data-rpanel]').forEach(function (x) { x.hidden = x.dataset.rpanel !== ST.rtab; });
+      return;
+    }
+    if ((b = t.closest('[data-pos]'))) { ST.pos = b.dataset.pos; ST.shown = 40; update(true); return; }
+    if ((b = t.closest('[data-preset]'))) {
+      var o = PRESETS[Number(b.dataset.preset)].o;
+      if (presetOn(o)) presetKeys(o).forEach(function (k) { delete ST.draft[k]; });
+      else Object.keys(o).forEach(function (k) { ST.draft[k] = o[k]; });
+      cleanProposal(); renderSetup(); return;
+    }
+    if ((b = t.closest('[data-unset]'))) { delete ST.draft[b.dataset.unset]; renderSetup(); return; }
+    if (t.id === 'clearAll') { ST.draft = {}; ST.proposal = {}; ST.watch = []; ST.wteams = []; ST.why = null; update(); toast('Cleared: no changes, no players.'); return; }
+    if (t.id === 'moreWatch') { ST.watchAll = !ST.watchAll; renderSetup(); return; }
+    if (t.id === 'applyBtn') { ST.proposal = copyOf(ST.draft); ST.shown = 40; update(); toast(Object.keys(ST.proposal).length ? 'Changes added. Results below.' : 'Changes cleared.'); var rs = $('result'); if (rs && rs.scrollIntoView) rs.scrollIntoView({ behavior: 'smooth', block: 'start' }); return; }
+    if (t.id === 'ruleAdd') {
+      var k = $('ruleKey').value, raw = String($('ruleVal').value).trim(), v = Number(raw);
+      ST.ruleSel = k;
+      if (raw === '' || !isFinite(v)) { toast('Type a number for the new value.'); return; }
+      if (Math.abs((Number(rules()[k]) || 0) - v) < 1e-9) { delete ST.draft[k]; toast('That is already your rule.'); } else { ST.draft[k] = v; toast('On the list. Press Add changes when you\u2019re ready.'); }
+      renderSetup(); return;
+    }
+    if (t.id === 'more') { ST.shown += 60; renderResult(); return; }
+    if (t.id === 'sweepBtn') { runSweep(); return; }
+    if (t.id === 'copySum') { copy(summaryText(), 'Copied. Paste it into the league chat.'); return; }
+    if (t.id === 'copyLink') { copy(location.href, 'Link copied. It opens this exact comparison.'); return; }
+    if (t.id === 'retry') { update(); return; }
+    if (t.id === 'lgFind') { if (ST.site === 'sleeper') findLeagues($('lgq').value); else findSite($('lgq').value); return; }
+    if ((b = t.closest('[data-site]'))) { if (ST.site !== b.dataset.site) { ST.site = b.dataset.site; ST.lgList = null; ST.lgQ = ''; ST.lgMsg = ''; renderSetup(); var q = $('lgq'); if (q) q.focus(); } return; }
+    if ((b = t.closest('[data-lg]'))) { lgMsg('<span class="loading">Opening the league\u2026</span>'); openLeague(b.dataset.lg).then(function () { ST.proposal = {}; ST.draft = {}; update(); }, lgFail); return; }
+    if (t.id === 'lgOff') { ST.wteams = []; ST.lg = null; ST.proposal = {}; ST.draft = {}; update(); return; }
+    if ((b = t.closest('[data-padd]'))) {
+      var q0 = $('pq') ? $('pq').value : '', sc = $('psug') ? $('psug').scrollTop : 0;
+      if (ST.watch.indexOf(b.dataset.padd) < 0) { ST.watch.push(b.dataset.padd); toast((ST.players[b.dataset.padd] || [b.dataset.padd])[0] + ' added. Tap \u201cDone\u201d to see the results.'); }
+      update(true);
+      if (ST.wpos) { $('pq').value = q0; drawSug(); $('psug').scrollTop = sc; } else if ($('pq')) $('pq').focus();
+      return;
+    }
+    if (t.id === 'sugDone') {
+      ST.wpos = null; renderSetup();
+      var yp = [].slice.call(document.querySelectorAll('#result h3')).filter(function (h) { return /player scoring changes/i.test(h.textContent); })[0];
+      if (yp) { var rd = $('result').querySelector('[data-rpanel="sum"]'); if (rd && rd.hidden) { ST.rtab = 'sum'; document.querySelector('[data-rtab="sum"]').click(); } yp.scrollIntoView({ behavior: 'smooth', block: 'start' }); }
+      return;
+    }
+    if ((b = t.closest('[data-wpos]'))) { ST.wpos = ST.wpos === b.dataset.wpos ? null : b.dataset.wpos; var q1 = $('pq') ? $('pq').value : ''; renderSetup(); if ($('pq')) $('pq').value = q1; drawSug(); return; }
+    if ((b = t.closest('[data-unwatch]'))) { ST.watch = ST.watch.filter(function (x) { return x !== b.dataset.unwatch; }); update(true); return; }
+    if (t.id === 'clearWatch') { ST.watch = []; ST.wteams = []; update(true); return; }
+    if ((b = t.closest('[data-unteam]'))) { ST.wteams = ST.wteams.filter(function (x) { return String(x) !== b.dataset.unteam; }); update(true); return; }
+    if (!t.closest('.psearch') && !t.closest('.wpos') && $('psug')) $('psug').hidden = true;
+  });
+  document.addEventListener('input', function (e) { if (e.target.id === 'pq') drawSug(); });
+  document.addEventListener('keydown', function (e) {
+    if ((e.key === 'Enter' || e.key === ' ') && e.target.dataset && e.target.dataset.why) { e.preventDefault(); e.target.click(); return; }
+    if (e.key === 'Enter' && e.target.id === 'lgq') { e.preventDefault(); if (ST.site === 'sleeper') findLeagues(e.target.value); else findSite(e.target.value); }
+    if (e.key === 'Enter' && e.target.id === 'pq') { e.preventDefault(); var f = document.querySelector('#psug [data-padd]'); if (f) f.click(); }
+    if (e.key === 'Escape' && e.target.id === 'pq') { $('psug').hidden = true; }
+  });
+  document.addEventListener('change', function (e) {
+    if (e.target.id !== 'teamPick' || !e.target.value || !ST.lg) return;
+    var r = ST.lg.rosters.filter(function (x) { return String(x.roster_id) === e.target.value; })[0];
+    if (r) { ST.wteams = ST.wteams.filter(function (x) { return x !== String(r.roster_id); }); ST.wteams.unshift(String(r.roster_id)); }
+    update(true);
+    if (r) showTeam(r.roster_id);
+  });
+  window.addEventListener('hashchange', function () { fromLink(hashParams()); });
+
+  // ── Boot: this season once it has games, and last season ─────────────
+  getJSON(SL + '/state/nfl').then(function (s) { return s; }, function () { return null; }).then(function (s) {
+    var now = new Date().getFullYear();
+    ST.state = s || { season: String(now), week: 1 };
+    var yr = Number(ST.state.season) || now, live = (Number(ST.state.week) > 1 && ST.state.season_type === 'regular') || ST.state.season_type === 'post';
+    ST.years = live ? [yr, yr - 1] : [yr - 1, yr - 2];
+    ST.year = ST.years[0];
+    var h = hashParams();
+    fromLink(h);
+  });
+})();
+</script>
+</body>
+</html>

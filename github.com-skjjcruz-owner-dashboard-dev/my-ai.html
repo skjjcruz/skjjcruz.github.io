@@ -1,0 +1,20 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'unsafe-inline'; base-uri 'self'; object-src 'none';">
+<title>Ask your AI · Dynasty HQ</title>
+<!-- Old address of the "Your AI" page (owner ask 2026-11-17: one Ask your AI box, on the
+     front page). Members go to the front page with the box open; everyone else to the
+     AI sign-up (account only, no league). -->
+<script src="reconai-shared/identity.js"></script>
+<script>
+(function () {
+  var o = null; try { o = window.OD && OD.identity && OD.identity.currentOwner(); } catch (e) { o = null; }
+  location.replace(o && o !== 'guest' ? 'landing.html?home&ai=1' : 'landing.html?signin=ai');
+})();
+</script>
+</head>
+<body style="background:#0A0A0C;color:#A9A9B3;font:16px system-ui,sans-serif;padding:24px">Opening Ask your AI… <a href="landing.html?signin=ai" style="color:#D4AF37">Continue</a></body>
+</html>

@@ -1,0 +1,872 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Trade Calculator · Dynasty HQ</title>
+<meta name="description" content="Grade any dynasty trade with DHQ values. Pick who you're dealing with and DHQ adds the taxes they charge in their head.">
+<link rel="icon" href="icon-192.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&family=Rajdhani:wght@600;700&display=swap" rel="stylesheet">
+<!--
+  DHQ public Trade Calculator, Lab edition (owner ask 2026-11-10).
+  The app's trade builder without the user's leagues:
+   - Values: the engine server's finished DHQ values for one built league
+     (The Psycho League: 16 teams, Superflex, Half-PPR), read from the public
+     dhq-league endpoint. No value formula runs here. The league-type toggles
+     refine those numbers with simple position factors (marked "estimated");
+     server-built values per format replace them later.
+   - Grading: the shared App.TradeEngine (reconai-shared/trade-engine.js),
+     the same fairnessGrade / calcPsychTaxes / calcOwnerPosture /
+     calcAcceptanceLikelihood the app's Trade Center uses.
+   - Owner DNA labels, descriptions and strategies: the app's DNA_TYPES
+     (js/trade-calc.js).
+  Published to the Lab by scripts/publish-lab.cjs (copied to trade.html and
+  gated like every Lab page).
+-->
+<style>
+/* Look: the app's Trade Builder (index.html .tc-dhq-panel / .tc-ta-* rules):
+   one quiet panel, blue / red side cards, a filterable list grouped by
+   position, a plain tax table. Owner ask 2026-11-11: elegant, not cartoonish. */
+:root{
+  color-scheme:dark;
+  --page:#08080B; --off-black:#1B1B22; --panel:rgba(16,16,22,.96); --charcoal:#27262E;
+  --white:#F5F2EA; --silver:#BDB8AD; --soft:rgba(207,207,214,.88); --faint:rgba(189,184,173,.6);
+  --gold:#D4AF37; --good:#2ECC71; --warn:#F0A500; --bad:#E74C3C; --info:#5DADE2;
+  --send:#5dade2; --get:#e74c3c;
+  --line:rgba(212,175,55,.16); --line2:rgba(212,175,55,.25); --hair:rgba(255,255,255,.06);
+  --r-xs:5px; --r-sm:8px; --r:10px; --r-lg:14px;
+  --display:'Rajdhani','Arial Narrow',system-ui,sans-serif;
+  --body:'DM Sans',system-ui,-apple-system,'Segoe UI',sans-serif;
+  --mono:'IBM Plex Mono',ui-monospace,Menlo,monospace;
+  --sat:env(safe-area-inset-top,0px); --sab:env(safe-area-inset-bottom,0px);
+}
+*{box-sizing:border-box}
+html,body{background:var(--page)}
+body{margin:0;color:var(--white);font:14.5px/1.5 var(--body);-webkit-font-smoothing:antialiased;padding-inline:max(20px,env(safe-area-inset-left,0px)) max(20px,env(safe-area-inset-right,0px))}
+button,input,select{font:inherit;color:inherit}
+:focus-visible{outline:2px solid var(--gold);outline-offset:2px}
+.brandwash{position:fixed;inset:0;z-index:0;pointer-events:none;background:url("img/logo.png") no-repeat center 16%/min(720px,86vw) auto;opacity:.07;mix-blend-mode:screen;filter:blur(4px);-webkit-mask-image:radial-gradient(125% 105% at 50% 20%,#000 26%,transparent 74%);mask-image:radial-gradient(125% 105% at 50% 20%,#000 26%,transparent 74%)}
+.wrap{position:relative;z-index:1;max-width:1200px;margin:0 auto}
+
+.top{display:flex;align-items:center;justify-content:space-between;gap:16px;padding-block:calc(12px + var(--sat)) 12px;box-shadow:0 0 0 100vmax var(--page),0 1px 0 100vmax #ffffff18;clip-path:inset(0 -100vmax -1px)}
+.brand{display:flex;align-items:center;gap:12px;text-decoration:none;color:var(--white)}
+.brand img{width:44px;height:44px;border-radius:var(--r);box-shadow:0 2px 12px rgba(212,175,55,.3)}
+.brand span{font:700 20px/1 var(--display);letter-spacing:.06em}
+.back{color:#98A1AD;text-decoration:none;font-size:14px;padding:10px 14px;border:1px solid #232932;border-radius:var(--r-sm)}
+.back:hover{color:var(--white);border-color:#333A45}
+
+/* the panel */
+.panel{margin:28px 0 0;border:1px solid var(--line);background:var(--panel);border-radius:var(--r-sm);padding:18px 20px 20px}
+.panel-head{display:flex;align-items:baseline;justify-content:space-between;gap:12px;flex-wrap:wrap;padding-bottom:12px;border-bottom:1px solid rgba(212,175,55,.12)}
+.panel-head h1,.panel-head h2{margin:0;color:var(--gold);font:700 19px/1.1 var(--display);letter-spacing:.1em;text-transform:uppercase}
+.panel-head em{color:var(--faint);font-size:13.5px}
+.source{margin:14px 0;color:var(--soft);font-size:14px}
+.source b{color:var(--gold);font-weight:600}
+.source .est{color:var(--faint)}
+
+.sel{background:var(--charcoal);border:1px solid var(--line2);color:var(--white);font:500 13.5px var(--body);padding:9px 10px;border-radius:var(--r-xs);cursor:pointer;width:100%}
+.sel:focus{outline:none;border-color:var(--gold)}
+.league{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:10px;margin-bottom:16px}
+.idpnote{margin:-8px 0 14px;font-size:11.5px;color:var(--faint)}
+.idpnote[hidden]{display:none}
+.fld{display:flex;flex-direction:column;gap:5px;min-width:0}
+.fld > span{font-size:10.5px;color:var(--faint);text-transform:uppercase;letter-spacing:.08em}
+
+.sides{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:20px}
+.side{background:var(--panel);border:1px solid var(--line);border-radius:var(--r-sm);padding:16px;display:flex;flex-direction:column;gap:10px;min-width:0}
+.side.a{border-color:rgba(93,173,226,.35)} .side.b{border-color:rgba(231,76,60,.35)}
+.side-title{font:700 17px/1 var(--display);letter-spacing:.12em;text-transform:uppercase}
+.side.a .side-title{color:var(--send)} .side.b .side-title{color:var(--get)}
+.side-sel{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:8px}
+.side-sel.one{grid-template-columns:minmax(0,1fr)}
+
+.rows{display:flex;flex-direction:column;gap:5px}
+.row{background:var(--charcoal);border-radius:var(--r-xs);padding:9px 11px;display:flex;align-items:center;gap:10px}
+.dot{width:8px;height:8px;border-radius:50%;flex:none}
+.item .face{width:28px;height:28px}
+.face{width:32px;height:32px;border-radius:50%;flex:none;overflow:hidden;background:#15151b;box-shadow:0 0 0 1.5px var(--pc,var(--silver))}
+.face img{display:block;width:100%;height:100%;object-fit:cover;object-position:center 15%}
+.row .face{width:36px;height:36px}
+.row .who{flex:1.4;min-width:0}
+.row .who b{display:block;font-size:14px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.row .who small{display:block;font-size:11.5px;color:var(--faint);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.barw{flex:1;height:4px;background:rgba(255,255,255,.07);border-radius:2px;overflow:hidden;min-width:30px}
+.barw i{display:block;height:100%;border-radius:2px;transition:width .4s ease}
+.row .v{width:56px;text-align:right;font-size:13.5px;font-weight:700;color:var(--gold);font-variant-numeric:tabular-nums;flex:none}
+.rm{background:transparent;border:0;color:rgba(231,76,60,.6);cursor:pointer;font-size:13px;padding:2px;flex:none}
+.rm:hover{color:var(--bad)}
+
+.filter{width:100%;background:var(--charcoal);border:1px solid var(--line2);color:var(--white);font:400 14.5px var(--body);padding:11px 13px;border-radius:var(--r-xs) var(--r-xs) 0 0}
+.filter:focus{outline:none;border-color:var(--gold)}
+.filter::placeholder{color:rgba(255,255,255,.22)}
+.list{max-height:340px;overflow-y:auto;background:var(--charcoal);border:1px solid rgba(212,175,55,.2);border-top:0;border-radius:0 0 var(--r-xs) var(--r-xs);margin-top:-10px}
+.grp{font-size:13px;font-weight:700;padding:6px 11px;background:rgba(255,255,255,.03);letter-spacing:.06em;text-transform:uppercase;position:sticky;top:0;z-index:1;backdrop-filter:blur(6px)}
+.item{width:100%;padding:6px 11px;min-height:42px;cursor:pointer;display:flex;align-items:center;gap:8px;font-size:13px;border:0;border-bottom:1px solid rgba(255,255,255,.04);background:transparent;text-align:left;transition:background .1s}
+.item:hover{background:rgba(212,175,55,.08)}
+.item.added{opacity:.3;cursor:default;pointer-events:none}
+.item .nm{flex:1;min-width:0;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.item .tm{font-size:10.5px;color:var(--faint);flex:none;white-space:nowrap;font-variant-numeric:tabular-nums}
+.item .v{font-size:12.5px;font-weight:700;color:var(--gold);flex:none;min-width:40px;text-align:right;font-variant-numeric:tabular-nums}
+/* columns: photo | name | pos | team | age | proj | value, shared by the group headings */
+.grp,.item{display:grid;grid-template-columns:28px minmax(0,1fr) 25px 32px 23px 37px 21px 31px 32px 62px;column-gap:6px;align-items:center}
+.item .nm{padding-left:4px;font-size:12.5px}
+.grp .gname{grid-column:1 / 3}
+.grp .gc{font-size:9px;font-weight:600;letter-spacing:.08em;color:var(--faint);text-align:center}
+.grp .gv{grid-column:10;text-align:center;white-space:nowrap;justify-self:center}
+.grp .gv,.item .v{grid-column:10}
+.item .v{text-align:center;justify-self:center}
+.item .c.bye{color:var(--warn);font-weight:600;letter-spacing:.04em}
+.item .c{font-size:11px;color:var(--faint);text-align:center;white-space:nowrap;font-variant-numeric:tabular-nums}
+.item .tm{display:none}
+.item.pk .nm{grid-column:2 / 10}
+.item.pk .dot{justify-self:center}
+.list-empty{padding:14px;font-size:13.5px;color:var(--faint);text-align:center}
+.total{display:flex;align-items:center;justify-content:space-between;padding:8px 4px 0;margin-top:auto}
+.total span{font-size:12px;color:var(--soft);text-transform:uppercase;letter-spacing:.06em}
+.total b{font:500 24px/1 var(--body);font-variant-numeric:tabular-nums}
+.side.a .total b{color:var(--send)} .side.b .total b{color:var(--get)}
+.chk{display:flex;align-items:center;gap:8px;font-size:13px;color:var(--soft)}
+.chk input{accent-color:var(--gold);width:15px;height:15px}
+.dna-line{font-size:13px;color:var(--soft);line-height:1.5}
+.dna-line b{color:var(--white);font-weight:600}
+
+/* trade analysis */
+.verdict{margin-top:20px;background:var(--panel);border:1px solid rgba(212,175,55,.2);border-radius:var(--r-sm);padding:16px;display:flex;flex-direction:column;gap:12px}
+.sec{font:500 13.5px var(--body);color:var(--gold);letter-spacing:.12em;border-bottom:1px solid rgba(212,175,55,.2);padding-bottom:6px;text-transform:uppercase}
+.sec-split{display:flex;justify-content:flex-start;align-items:baseline;gap:4px 14px;flex-wrap:wrap}
+.sec-split em{font-style:normal;font-size:12px;letter-spacing:.06em;color:var(--faint)}
+.call{border:1px solid var(--cc);border-radius:var(--r-sm);padding:10px 12px;background:rgba(255,255,255,.02)}
+.call-top{display:flex;align-items:baseline;gap:10px;flex-wrap:wrap}
+.call-top b{font:700 17px/1 var(--display);letter-spacing:.04em;color:var(--cc);text-transform:uppercase}
+.call-top span{margin-left:auto;font:500 13px var(--mono);color:var(--cc)}
+.call p{margin:5px 0 0;font-size:13.5px;line-height:1.45}
+.gline{display:flex;align-items:baseline;gap:12px;flex-wrap:wrap}
+.gline .g{font:500 38px/1 var(--body)}
+.gline .gl{font:700 17px/1 var(--display);letter-spacing:.04em;text-transform:uppercase}
+.gline .gd{font:600 16px var(--mono)}
+.gline .gs{font-size:12.5px;color:var(--faint)}
+.impact{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:8px}
+.impact div{background:rgba(255,255,255,.025);border:1px solid var(--hair);border-radius:6px;padding:9px 10px;min-width:0}
+.impact span{display:block;color:var(--faint);font-size:10.5px;text-transform:uppercase;letter-spacing:.08em;margin-bottom:3px}
+.impact strong{display:block;font:700 16px/1.2 var(--display);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.impact em{display:block;color:var(--faint);font-style:normal;font-size:11.5px;margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.lk{display:flex;align-items:center;gap:10px;font-size:12px;color:var(--faint);text-transform:uppercase;letter-spacing:.06em}
+.lkbar{flex:1;height:10px;background:rgba(255,255,255,.07);border-radius:5px;overflow:hidden}
+.lkbar i{display:block;height:100%;border-radius:5px;transition:width .5s ease}
+.badge{font-size:11.5px;font-weight:700;letter-spacing:.07em;padding:3px 7px;border-radius:3px;border:1px solid;text-transform:uppercase}
+.taxes{display:flex;flex-direction:column;border:1px solid rgba(255,255,255,.07);border-radius:6px;overflow:hidden}
+.tax{display:flex;align-items:center;gap:10px;padding:8px 12px;border-bottom:1px solid rgba(255,255,255,.05);font-size:13px}
+.tax:last-child{border-bottom:0}
+.tax.BONUS{background:rgba(46,204,113,.05)} .tax.TAX{background:rgba(231,76,60,.05)}
+.tax.net{background:rgba(212,175,55,.06);border-top:1px solid rgba(212,175,55,.2);font-weight:700}
+.tax .n{flex:1;font-weight:600}
+.tax .d{flex:2;color:var(--faint)}
+.tax .i{width:48px;text-align:right;font-weight:700;flex:none;font-variant-numeric:tabular-nums}
+.tax.TAX .i{color:var(--bad)} .tax.BONUS .i{color:var(--good)} .tax.net .i{color:var(--gold)}
+.approach{font-size:13.5px;color:var(--soft)}
+.approach b{color:var(--gold);font-weight:600}
+.actions{display:flex;gap:8px;flex-wrap:wrap}
+.btn{padding:9px 14px;border:1px solid var(--line2);background:var(--charcoal);color:var(--gold);border-radius:var(--r-xs);cursor:pointer;font:600 13px var(--body)}
+.btn:hover{border-color:var(--gold)}
+.btn.ghost{color:var(--silver)}
+.empty{color:var(--faint);font-size:13.5px;padding:6px 2px}
+
+/* owner DNA guide */
+.guide{margin-top:20px;border:1px solid var(--line);background:var(--panel);border-radius:var(--r-sm);padding:14px 16px}
+.guide summary{cursor:pointer;color:var(--gold);font:700 15px/1.2 var(--display);letter-spacing:.1em;text-transform:uppercase;list-style:none;display:flex;justify-content:space-between;align-items:center}
+.guide summary::-webkit-details-marker{display:none}
+.guide summary::after{content:"Show";font:500 12px var(--body);letter-spacing:0;text-transform:none;color:var(--faint)}
+.guide[open] summary::after{content:"Hide"}
+.guide-intro{margin:10px 0 14px;color:var(--soft);font-size:13.5px;max-width:84ch}
+.guide-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(270px,1fr));gap:10px}
+.gcard{display:flex;flex-direction:column;gap:7px;padding:13px;background:rgba(255,255,255,.025);border:1px solid var(--hair);border-radius:6px}
+.gcard h3{margin:0;font:700 16px/1 var(--display);letter-spacing:.06em;text-transform:uppercase;display:flex;align-items:center;gap:8px}
+.gcard p{margin:0;font-size:13px;color:var(--soft)}
+.gcard .gl{font-size:10.5px;letter-spacing:.08em;text-transform:uppercase;color:var(--faint);margin-top:4px}
+.gcard ul{margin:0;padding-left:17px;font-size:13px;color:var(--soft)}
+.gcard .tx{font-size:12.5px;font-variant-numeric:tabular-nums}
+.gcard .tx .TAX{color:#F1948A} .gcard .tx .BONUS{color:#7DDCA3}
+.gcard .btn{margin-top:auto;align-self:flex-start}
+
+.foot-note{margin:16px 0 40px;font-size:12px;line-height:1.6;color:var(--faint)}
+.loading{display:flex;align-items:center;gap:10px;color:var(--soft);font-size:13.5px;padding:12px}
+.loading::before{content:"";width:13px;height:13px;border-radius:50%;border:2px solid var(--gold);border-right-color:transparent;animation:spin .8s linear infinite}
+@keyframes spin{to{transform:rotate(360deg)}}
+.err{color:#F1948A;font-size:14px}
+.toast{position:fixed;left:50%;bottom:calc(24px + var(--sab));transform:translate(-50%,20px);opacity:0;pointer-events:none;z-index:50;background:var(--off-black);border:1px solid var(--line2);padding:10px 16px;border-radius:var(--r-sm);font-size:14px;transition:opacity .2s,transform .2s;max-width:calc(100vw - 32px)}
+.toast.on{opacity:1;transform:translate(-50%,0)}
+
+@media (max-width:1100px){
+  .sides{grid-template-columns:minmax(0,1fr)}
+}
+@media (max-width:900px){
+  .sides{grid-template-columns:minmax(0,1fr)}
+  .league{grid-template-columns:repeat(3,minmax(0,1fr))}
+  .impact{grid-template-columns:repeat(2,minmax(0,1fr))}
+  .tax .d{display:none}
+}
+@media (max-width:480px){
+  .league{grid-template-columns:repeat(2,minmax(0,1fr))}
+  .panel{padding:14px 12px}
+  .brand span{font-size:17px}
+  .barw{display:none}
+  /* too narrow for one line: the facts sit under the name */
+  .item{display:grid;grid-template-columns:28px minmax(0,1fr) auto;column-gap:9px;row-gap:1px}
+  .item .c,.grp .gc:not(.gv){display:none}
+  .item .tm{display:block}
+  .grp{grid-template-columns:minmax(0,1fr) auto}
+  .grp .gname{grid-column:1}
+  .grp .gv{grid-column:2}
+  .item.pk .nm{grid-column:2;grid-row:1 / span 2}
+  .item .face{grid-row:1 / span 2;align-self:center}
+  .item .nm{grid-column:2;grid-row:1}
+  .item .tm{grid-column:2;grid-row:2;overflow:hidden;text-overflow:ellipsis}
+  .item .v{grid-column:3;grid-row:1 / span 2;align-self:center}
+}
+@media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
+@media (max-width:600px){
+  /* Phones (owner ask 2026-11-18): the Lab tools' shared phone layout: slim top bar, no box around the page,
+     one-line title, settings as one scrolling row of small pills (same as Player Values). */
+  body{padding-inline:max(12px,env(safe-area-inset-left,0px)) max(12px,env(safe-area-inset-right,0px))}
+  .top{padding-block:calc(8px + var(--sat)) 8px}
+  .brand{gap:8px}.brand img{width:30px;height:30px;box-shadow:none;border-radius:var(--r-sm)}.brand span{font-size:15px}
+  .back{padding:7px 12px;font-size:13px;border-radius:999px}
+  .panel{margin-top:4px;padding:10px 0 0;border:0;background:transparent}
+  .panel-head{padding-bottom:0;border-bottom:0;flex-wrap:nowrap}
+  .panel-head h1{font-size:17px;white-space:nowrap}
+  .panel-head em{display:none}
+  .source{display:none}
+  .league{display:flex;flex-wrap:nowrap;overflow-x:auto;gap:6px;margin:10px -12px 8px;padding:0 12px 2px;scrollbar-width:none;-webkit-overflow-scrolling:touch}
+  .league::-webkit-scrollbar{display:none}
+  .fld{flex:none;flex-direction:row;align-items:center;gap:0;height:34px;padding:0 0 0 12px;border:1px solid var(--line2);border-radius:999px;background:var(--charcoal)}
+  .fld > span{font-size:11px;letter-spacing:0;text-transform:none;white-space:nowrap}
+  .fld .sel{width:auto;height:32px;padding:0 10px 0 6px;border:0;background:transparent;font:600 13px var(--body)}
+}
+@media (max-width:600px){
+  /* Trade Calculator on phones: each side's choices as pills, the player list in the War Room app's row style
+     (position badge, bold name, one short line, the value on the right). */
+  .sides{gap:12px}
+  .side{padding:12px;gap:8px}
+  .side-title{font-size:15px}
+  .side-sel,.side-sel.one{display:flex;flex-wrap:nowrap;overflow-x:auto;gap:6px;scrollbar-width:none}
+  .side-sel::-webkit-scrollbar{display:none}
+  .side .filter{font-size:16px;min-height:42px}
+  .list{max-height:360px}
+  .item{grid-template-columns:auto minmax(0,1fr) auto!important;column-gap:10px;min-height:52px;padding:7px 10px}
+  .item .face{display:none}
+  .item .nm + .c{display:grid!important;grid-column:1;grid-row:1 / span 2;place-items:center;min-width:34px;height:26px;padding:0 4px;border:1px solid var(--pc,var(--silver));border-radius:var(--r-xs);background:rgba(255,255,255,.05);color:var(--pc,var(--silver));font:700 11px var(--mono)}
+  .item .nm{grid-column:2;grid-row:1;font-size:14.5px;padding-left:0}
+  .item .tm{display:block;grid-column:2;grid-row:2;font-size:12px;overflow:hidden;text-overflow:ellipsis}
+  .item .v{grid-column:3!important;grid-row:1 / span 2;font-size:14px}
+  .item.pk{grid-template-columns:auto minmax(0,1fr) auto!important}
+  .item.pk .dot{grid-column:1;grid-row:1}
+  .item.pk .nm{grid-row:1}
+}
+/* Match the War Room header (owner ask 2026-11-18): gold DM Sans wordmark, the app's logo size and
+   its "My Profile" pill shape for the back button (js/hub-v2.css .hv2-header). */
+.top{min-height:68px}
+.brand img{border-radius:var(--r,10px);box-shadow:0 2px 12px rgba(212,175,55,.3)}
+.brand span{font:700 1.1rem/1.1 var(--body,'DM Sans',system-ui,sans-serif);letter-spacing:.06em;background:linear-gradient(135deg,#D4AF37 0%,#F5F2EA 50%,#D4AF37 100%);background-size:200% auto;-webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent;color:#D4AF37;animation:dhq-shimmer 3s linear infinite}
+@keyframes dhq-shimmer{0%{background-position:0% center}100%{background-position:200% center}}
+@media (prefers-reduced-motion:reduce){.brand span{animation:none}}
+.back{display:inline-flex;align-items:center;min-height:44px;padding:0 16px;border:1px solid #ffffff18;border-radius:30px;background:#ffffff08;color:var(--white,#F5F2EA);font:500 13px var(--body,'DM Sans',system-ui,sans-serif)}
+.back:hover{border-color:rgba(212,175,55,.5);color:var(--white,#F5F2EA)}
+@media (max-width:600px){
+  .top{min-height:68px;padding-block:calc(10px + var(--sat,0px)) 10px}
+  .brand{gap:9px}.brand img{width:34px;height:34px;border-radius:var(--r,10px);box-shadow:0 2px 12px rgba(212,175,55,.3)}
+  .brand span{font-size:16px;letter-spacing:.025em;white-space:nowrap}
+  .back{min-height:44px;padding:0 14px;font-size:13px;border-radius:30px}
+}
+</style>
+</head>
+<body>
+<div class="brandwash" aria-hidden="true"></div>
+<div class="wrap">
+  <header class="top">
+    <a class="brand" href="landing.html?home" aria-label="Dynasty HQ front page"><img src="img/logo.png" alt="" width="44" height="44"><span>DYNASTY HQ</span></a>
+    <a class="back" href="landing.html?home">&larr; Front page</a>
+  </header>
+
+  <section class="panel" aria-labelledby="tb-title">
+    <div class="panel-head"><h1 id="tb-title">Trade Calculator</h1><em>Build any trade. No league or sign-up needed.</em></div>
+    <p class="source">Values sourced from <b>DHQ Engine</b> (dynasty valuations)<span class="est" id="basis"></span>.</p>
+
+    <div class="league" role="group" aria-label="Your league">
+      <label class="fld"><span>Scoring</span><select class="sel" data-key="scoring"><option value="ppr">PPR</option><option value="half">Half-PPR</option><option value="std">Standard</option></select></label>
+      <label class="fld"><span>Quarterbacks</span><select class="sel" data-key="qb"><option value="sf">Superflex</option><option value="1qb">1QB</option></select></label>
+      <label class="fld"><span>TE premium</span><select class="sel" data-key="tep"><option value="0">Off</option><option value="1">On</option></select></label>
+      <label class="fld"><span>League size</span><select class="sel" data-key="teams"><option value="10">10 teams</option><option value="12">12 teams</option><option value="14">14 teams</option><option value="16">16 teams</option></select></label>
+      <label class="fld"><span>Defenders (IDP)</span><select class="sel" data-key="idp"><option value="0">Off</option><option value="1">On</option></select></label>
+    </div>
+    <p class="idpnote" id="idpNote" hidden>Defenders are scored with a sample IDP league’s rules (sacks, tackles, turnovers and passes defended).</p>
+
+    <div class="sides">
+      <section class="side a" aria-label="You send">
+        <div class="side-title">You send</div>
+        <div class="side-sel one">
+          <label class="fld"><span>Your roster status</span><select class="sel" id="myTeam"><option value="">Not sure</option><option value="ELITE">Elite</option><option value="CONTENDER">Contender</option><option value="CROSSROADS">Crossroads</option><option value="REBUILDING">Rebuilding</option></select></label>
+        </div>
+        <div class="rows" id="rowsA"></div>
+        <input class="filter" id="qA" type="search" placeholder="Filter players &amp; picks…" autocomplete="off" aria-label="Filter players and picks you send">
+        <div class="list" id="listA"></div>
+        <div class="total"><span>Total value</span><b id="totA">––</b></div>
+      </section>
+      <section class="side b" aria-label="You get">
+        <div class="side-title">You get</div>
+        <div class="side-sel">
+          <label class="fld"><span>Opponent trading DNA</span><select class="sel" id="dnaSel"></select></label>
+          <label class="fld"><span>Opponent roster status</span><select class="sel" id="theirTeam"><option value="">Not sure</option><option value="ELITE">Elite</option><option value="CONTENDER">Contender</option><option value="CROSSROADS">Crossroads</option><option value="REBUILDING">Rebuilding</option></select></label>
+        </div>
+        <div class="rows" id="rowsB"></div>
+        <input class="filter" id="qB" type="search" placeholder="Filter players &amp; picks…" autocomplete="off" aria-label="Filter players and picks you get">
+        <div class="list" id="listB"></div>
+        <label class="chk"><input type="checkbox" id="fills"> My side fills a hole on their roster</label>
+        <div class="total"><span>Total value</span><b id="totB">––</b></div>
+      </section>
+    </div>
+
+    <section class="verdict" aria-live="polite">
+      <div class="sec">Trade analysis</div>
+      <div id="result"></div>
+    </section>
+  </section>
+
+  <details class="guide" id="guide">
+    <summary>Owner DNA guide</summary>
+    <p class="guide-intro">Every manager trades with a pattern. In your league DHQ reads it from their trade history; here, pick the one that sounds like them. The taxes shown match your settings above.</p>
+    <div class="guide-grid" id="guideGrid"></div>
+  </details>
+
+  <details class="guide" id="statusGuide" style="margin-top:12px">
+    <summary>Roster status guide</summary>
+    <p class="guide-intro">In your league DHQ ranks every team on roster strength and record (half each) and puts it in one of four groups. Here, pick the one that fits each team. The team counts shown are for your league size above.</p>
+    <div class="guide-grid" id="statusGrid"></div>
+  </details>
+
+  <p class="foot-note" id="footNote"></p>
+</div>
+<div class="toast" id="toast" role="status"></div>
+
+<script src="reconai-shared/trade-engine.js"></script>
+<script>
+(function () {
+  'use strict';
+  // ── Source league: the engine server's finished values ───────────────────
+  // The Psycho League (Sleeper): 16 teams, Superflex, Half-PPR, IDP. Owner
+  // ruling 2026-11-10: its values as-is; the toggles refine them.
+  var SOURCE = { id: '1312100327931019264', teams: 16, qb: 'sf', scoring: 'half', tep: '0' };
+  var VALUES_URL = 'https://hovnqztlbsgsywrbidbh.supabase.co/functions/v1/dhq-league?league=' + SOURCE.id;
+  var PLAYERS_URL = 'https://api.sleeper.app/v1/players/nfl';
+  var VALUES_KEY = 'dhq_tc_values_v1', PLAYERS_KEY = 'dhq_tc_players_v1', PREF_KEY = 'dhq_tc_league_v1', STATS_KEY = 'dhq_tc_stats_v2';
+  // This season's actual points and games (Sleeper season stats, the same feed the app reads; actual results, not projections).
+  var SEASON = 2026, STATS_URL = 'https://api.sleeper.app/v1/stats/nfl/regular/' + SEASON, STATS_TTL = 6 * 3600e3;
+  var STATS = {};
+  // Defenders' points (launch QA 2026-11-17), as on the projections page: Sleeper's pts_* leave IDP
+  // stats out, so a DL / LB / DB is scored from his raw IDP stats with the default league's IDP rules
+  // (The Psycho League's scoring_settings: the idp_* keys and the defensive bonuses), cached a day.
+  var LEAGUE_URL = 'https://api.sleeper.app/v1/league/' + SOURCE.id, IDPR_KEY = 'dhq_tc_idp_rules_v1';
+  var IDPR = { idp_tkl_solo: 0.5, idp_tkl_ast: 0.25, idp_tkl_loss: 2, idp_sack: 5, idp_sack_yd: 0.1, idp_qb_hit: 1.25, idp_int: 5, idp_int_ret_yd: 0.1, idp_pass_def: 5, idp_pass_def_3p: 1, idp_ff: 3, idp_fum_rec: 3, idp_fum_ret_yd: 0.1, idp_def_td: 6, idp_safe: 2, idp_blk_kick: 3 }; // the league's rules on 2026-11-17, used if Sleeper cannot be reached
+  function isDefKey(k) { return /^idp_/.test(k) || /^bonus_(tkl|sack|def)_/.test(k); }
+  function defLine(l) { var o = {}; Object.keys(l || {}).forEach(function (k) { if (isDefKey(k) && l[k]) o[k] = l[k]; }); return o; }
+  function loadIdpRules() {
+    var c = load(IDPR_KEY);
+    if (c && c.rules && Date.now() - c.ts < 86400e3) { IDPR = c.rules; return Promise.resolve(IDPR); }
+    return getJSON(LEAGUE_URL).then(function (lg) {
+      var r = defLine(lg && lg.scoring_settings);
+      if (Object.keys(r).length) { IDPR = r; store(IDPR_KEY, { ts: Date.now(), rules: r }); }
+      return IDPR;
+    }).catch(function () { if (c && c.rules) IDPR = c.rules; return IDPR; });
+  }
+  function idpPts(line) { var t = 0; for (var k in IDPR) if (line && line[k]) t += line[k] * IDPR[k]; return t; }
+  // This week's bye teams: the app's scoreboard relay (ESPN's slate, nfl-scoreboard) for the current NFL week.
+  var STATE_URL = 'https://api.sleeper.app/v1/state/nfl', SCOREBOARD_URL = 'https://sxshiqyxhhifvtfqawbq.supabase.co/functions/v1/nfl-scoreboard', BYE_KEY = 'dhq_tc_bye_v1';
+  var BYE = {}, ESPN_TEAM = { WSH: 'WAS', JAC: 'JAX', LA: 'LAR' };
+  function loadByes() {
+    var c = load(BYE_KEY);
+    if (c && Date.now() - c.ts < 3 * 3600e3) { BYE = c.teams || {}; return Promise.resolve(); }
+    return getJSON(STATE_URL).then(function (st) {
+      if (!st || st.season_type !== 'regular' || !st.week) return {};
+      return getJSON(SCOREBOARD_URL + '?week=' + st.week + '&seasontype=2').then(function (sb) {
+        var out = {}; ((sb.week && sb.week.teamsOnBye) || []).forEach(function (t) { var a = String(t.abbreviation || '').toUpperCase(); out[ESPN_TEAM[a] || a] = st.week; });
+        return out;
+      });
+    }).then(function (teams) { BYE = teams || {}; store(BYE_KEY, { ts: Date.now(), teams: BYE }); }).catch(function () { BYE = (c && c.teams) || {}; });
+  }
+  function onBye(team) { return !!BYE[String(team || '').toUpperCase()]; }
+  var VALUES_TTL = 3 * 3600e3, PLAYERS_TTL = 3 * 86400e3;
+  var IDP = { DL: 1, LB: 1, DB: 1, DE: 1, DT: 1, CB: 1, S: 1, ILB: 1, OLB: 1 };
+  var MAX = 10000;
+
+  // The app's DNA_TYPES (js/trade-calc.js), word for word.
+  var DNA = [
+    { k: 'FLEECER', l: 'Fleecer', c: '#e74c3c', desc: 'High activity, always hunting asymmetric value. Sends lowball offers constantly. Sharp but impatient — will counter-offer if you decline.', strategy: 'Lead with clean surplus. They respect boldness, but the math still moves linearly.' },
+    { k: 'DOMINATOR', l: 'Dominator', c: '#e67e22', desc: 'High ego, requires visible surplus to pull the trigger. Motivated by status and bragging rights above all else.', strategy: 'Frame your offer as giving them the "better" side. Let them feel like they won.' },
+    { k: 'STALWART', l: 'Stalwart', c: '#5dade2', desc: 'High stability, emotionally attached to their roster. Slow to move but reliable when they engage.', strategy: 'Lead with clear value. Never low-ball. Highlight how the trade improves both sides.' },
+    { k: 'ACCEPTOR', l: 'Acceptor', c: '#2ecc71', desc: 'Low attachment, willing to sell current assets for future picks and young players. Rebuilding or just indifferent.', strategy: 'Offer future assets (picks, young upside). They discount current stars through the tax layer.' },
+    { k: 'DESPERATE', l: 'Desperate', c: '#bb8fce', desc: 'High urgency triggered by injuries, bye-weeks, or playoff push. Will overpay for an immediate starter.', strategy: 'Identify their empty slot or injury. Strike fast — desperation fades after their bye.' },
+    { k: 'NONE', l: 'Not sure', c: '#95a5a6', desc: 'No read on this manager yet. DHQ applies the standard endowment tax only.', strategy: 'Lead with a fair offer and learn how they counter.' }
+  ];
+
+  // How to spot each type: the signals the app's DNA detection reads from a
+  // league's trade history (DHQ-Shared analytics-engine.js), in plain words.
+  var SPOT = {
+    FLEECER: ['Wins most of their trades, usually by twice as often as they lose', 'Sells draft picks for proven players', 'Opens with lowball offers and counters fast when you decline'],
+    DOMINATOR: ['Trades a lot, and comes out ahead more often than not', 'Moves picks aggressively', 'Has to look like the winner of every deal'],
+    STALWART: ['At least half their trades are even swaps', 'Trades rarely and stays loyal to their guys', 'Never takes a lowball seriously'],
+    ACCEPTOR: ['Loses more trades than they win', 'Buys draft picks and young players', 'Happy to move veterans for the future'],
+    DESPERATE: ['Trades late in the season', 'Gives up value to fill a hole now', 'Buying for a playoff push or after an injury'],
+    NONE: ['No trade history to go on yet', 'New to the league, or rarely trades']
+  };
+  var $ = function (id) { return document.getElementById(id); };
+  var esc = function (s) { return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]; }); };
+  var fmt = function (n) { return Math.round(n).toLocaleString('en-US'); };
+  function store(k, v) { try { localStorage.setItem(k, JSON.stringify(v)); } catch (e) { /* full or blocked: run without */ } }
+  function load(k) { try { return JSON.parse(localStorage.getItem(k) || 'null'); } catch (e) { return null; } }
+  var tt; function toast(m) { var t = $('toast'); t.textContent = m; t.classList.add('on'); clearTimeout(tt); tt = setTimeout(function () { t.classList.remove('on'); }, 2400); }
+
+  // ── State ────────────────────────────────────────────────────────────────
+  var S = { scoring: 'ppr', qb: 'sf', tep: '0', teams: '12', idp: '0' };
+  Object.assign(S, load(PREF_KEY) || {});
+  var T = { A: [], B: [], dna: 'NONE', their: '', mine: '', fills: false };
+  var DATA = null;      // { builtAt, week, values:{pid:[value, age, projMedian, ppg]}, picks:{overall:value} }
+  var PLAYERS = null;   // { pid: [name, pos, team] }
+  var SEARCH = [];      // [{ id, name, pos, team, base }]
+
+  // ── Refinements (owner 2026-11-10): estimated, on top of the server values ─
+  // Position factors from the source league's format to the visitor's. They
+  // never touch picks' order and never exceed the 10,000 scale.
+  function factor(pos, base) {
+    var f = 1;
+    var sc = { ppr: { RB: 1.03, WR: 1.06, TE: 1.06 }, half: {}, std: { RB: 0.98, WR: 0.93, TE: 0.93 } };
+    f *= (sc[S.scoring][pos] || 1);
+    if (S.qb === '1qb' && pos === 'QB') f *= 0.42 + 0.22 * Math.min(1, base / 8000);
+    if (S.tep === '1' && pos === 'TE') f *= 1.15;
+    return f;
+  }
+  function teamsCurve(v) {
+    // Fewer teams: depth is easier to find, so lesser players are worth less.
+    var k = 1 + (SOURCE.teams - Number(S.teams)) * 0.025;
+    return MAX * Math.pow(Math.max(0, v) / MAX, k);
+  }
+  function isEstimated() { return S.scoring !== SOURCE.scoring || S.qb !== SOURCE.qb || S.tep !== SOURCE.tep || Number(S.teams) !== SOURCE.teams; }
+  function playerValue(pid) {
+    var r = DATA && DATA.values[pid]; if (!r) return 0;
+    var pos = (PLAYERS && PLAYERS[pid] && PLAYERS[pid][1]) || '';
+    var v = r[0] * factor(pos, r[0]);
+    return Math.round(Math.min(MAX - 1, teamsCurve(v)));
+  }
+  // Picks: the source league's DHQ pick curve (overall pick 1..112), placed by
+  // where the slot sits in the round; later drafts lose 12% a year (the app's
+  // default future-pick discount, reconai-shared/player-value.js).
+  var NEXT_DRAFT = 2027;
+  var SLOT = { early: 0.15, mid: 0.5, late: 0.85 };
+  function pickValue(p) {
+    if (!DATA) return 0;
+    var round = Number(p.round), within = Math.max(1, Math.round(SLOT[p.slot] * SOURCE.teams));
+    var overall = (round - 1) * SOURCE.teams + within;
+    var v = DATA.picks[overall] || 0;
+    v *= Math.pow(0.88, Math.max(0, Number(p.year) - NEXT_DRAFT));
+    return Math.round(v);
+  }
+  function itemValue(it) { return it.type === 'pick' ? pickValue(it) : playerValue(it.id); }
+  function itemLabel(it) {
+    if (it.type === 'pick') return it.year + ' ' + ({ 1: '1st', 2: '2nd', 3: '3rd', 4: '4th' }[it.round] || 'Rd ' + it.round) + ' (' + it.slot + ')';
+    var p = PLAYERS && PLAYERS[it.id]; return p ? p[0] : 'Player ' + it.id;
+  }
+
+  // ── Data loading (finished numbers only; nothing is computed here) ───────
+  function slimValues(d) {
+    var out = { builtAt: d.built_at, week: d.dhq_proj && d.dhq_proj.week, values: {}, picks: {} };
+    var ps = (d.intel && d.intel.playerScores) || {}, pm = (d.intel && d.intel.playerMeta) || {}, pj = (d.dhq_proj && d.dhq_proj.players) || {};
+    Object.keys(ps).forEach(function (pid) {
+      var v = ps[pid]; if (!(v > 0)) return;
+      var m = pm[pid] || {}, j = pj[pid] || {};
+      out.values[pid] = [v, m.age || null, (j.no_line || j.median == null) ? null : Math.round(j.median * 10) / 10, m.ppg != null ? m.ppg : null];
+    });
+    var pv = (d.intel && d.intel.dhqPickValues) || {};
+    Object.keys(pv).forEach(function (n) { if (pv[n] && pv[n].value > 0) out.picks[n] = pv[n].value; });
+    return out;
+  }
+  function slimPlayers(all, keep) {
+    var out = {};
+    Object.keys(keep).forEach(function (pid) {
+      var p = all[pid]; if (!p) return;
+      var name = p.full_name || ((p.first_name || '') + ' ' + (p.last_name || '')).trim();
+      var pos = p.position || (p.fantasy_positions && p.fantasy_positions[0]) || '';
+      if (pos === 'DE' || pos === 'DT') pos = 'DL'; else if (pos === 'CB' || pos === 'S') pos = 'DB'; else if (pos === 'ILB' || pos === 'OLB') pos = 'LB';
+      out[pid] = [name, pos, p.team || 'FA'];
+    });
+    return out;
+  }
+  function getJSON(url) { return fetch(url, { cache: 'no-cache' }).then(function (r) { if (!r.ok) throw new Error(r.status); return r.json(); }); }
+  function loadData() {
+    var cv = load(VALUES_KEY), cp = load(PLAYERS_KEY), now = Date.now();
+    var vP = (cv && now - cv.ts < VALUES_TTL) ? Promise.resolve(cv.data)
+      : getJSON(VALUES_URL).then(function (d) { var s = slimValues(d); store(VALUES_KEY, { ts: now, data: s }); return s; })
+        .catch(function (e) { if (cv) return cv.data; throw e; });
+    return vP.then(function (vals) {
+      DATA = vals;
+      var have = cp && now - cp.ts < PLAYERS_TTL && Object.keys(vals.values).every(function (pid) { return cp.data[pid]; });
+      if (have) return cp.data;
+      return getJSON(PLAYERS_URL).then(function (all) { var s = slimPlayers(all, vals.values); store(PLAYERS_KEY, { ts: now, data: s }); return s; })
+        .catch(function (e) { if (cp) return cp.data; throw e; });
+    }).then(function (pl) {
+      PLAYERS = pl;
+      var cs = load(STATS_KEY);
+      var sP = (cs && Date.now() - cs.ts < STATS_TTL) ? Promise.resolve(cs.data)
+        : getJSON(STATS_URL).then(function (all) {
+            // [PPR, Half, Std, games, catches, defenders' raw IDP stats]
+            var out = {}; Object.keys(DATA.values).forEach(function (pid) { var r = all[pid]; if (r && r.gp > 0) out[pid] = [r.pts_ppr || 0, r.pts_half_ppr || 0, r.pts_std || 0, r.gp, r.rec || 0, IDP[(PLAYERS[pid] || [])[1]] ? defLine(r) : 0]; });
+            store(STATS_KEY, { ts: Date.now(), data: out }); return out;
+          }).catch(function () { return cs ? cs.data : {}; });
+      return Promise.all([sP, loadByes(), loadIdpRules()]).then(function (res) { STATS = res[0] || {}; return pl; });
+    }).then(function (pl) {
+      // Only players on an NFL roster today (owner 2026-11-11): free agents stay out of the lists.
+      SEARCH = Object.keys(DATA.values).filter(function (pid) { return PLAYERS[pid] && PLAYERS[pid][2] && PLAYERS[pid][2] !== 'FA'; }).map(function (pid) {
+        var p = PLAYERS[pid]; return { id: pid, name: p[0], pos: p[1], team: p[2], key: p[0].toLowerCase().replace(/[^a-z0-9 ]/g, '') };
+      });
+    });
+  }
+
+  // ── League settings ──────────────────────────────────────────────────────
+  document.querySelectorAll('.league .sel').forEach(function (sel) {
+    sel.addEventListener('change', function () {
+      var key = sel.dataset.key; S[key] = sel.value; store(PREF_KEY, S);
+      if (key === 'idp' && S.idp === '0') { ['A', 'B'].forEach(function (s) { T[s] = T[s].filter(function (it) { return it.type === 'pick' || !IDP[(PLAYERS && PLAYERS[it.id] || [])[1]]; }); }); }
+      render();
+    });
+  });
+  function syncSeg() { document.querySelectorAll('.league .sel').forEach(function (sel) { sel.value = S[sel.dataset.key]; }); }
+
+  // ── The picker: one filterable list per side, grouped by position ────────
+  // (the app's roster list, with every player in place of one roster)
+  var POS_COLOR = { QB: '#ff6b6b', RB: '#4ecdc4', WR: '#45b7d1', TE: '#f7dc6f', K: '#bb8fce', DL: '#e67e22', LB: '#F0A500', DB: '#5DADE2', PICK: '#D4AF37' };
+  var GROUPS = ['QB', 'RB', 'WR', 'TE', 'K', 'DL', 'LB', 'DB'];
+  var ROUND = { 1: '1st', 2: '2nd', 3: '3rd', 4: '4th' };
+  var ALL_PICKS = [];
+  [NEXT_DRAFT, NEXT_DRAFT + 1, NEXT_DRAFT + 2].forEach(function (y) { [1, 2, 3, 4].forEach(function (r) { ['early', 'mid', 'late'].forEach(function (sl) { ALL_PICKS.push({ type: 'pick', year: y, round: r, slot: sl }); }); }); });
+  // Sleeper's player headshots, the same ones the app shows; a missing photo leaves the position-coloured ring.
+  function face(pid, col) { return '<span class="face" style="--pc:' + col + '"><img src="https://sleepercdn.com/content/nfl/players/thumb/' + encodeURIComponent(pid) + '.jpg" alt="" loading="lazy" decoding="async" onerror="this.remove()"></span>'; }
+  // One line of player facts: position, team, age, this week's DHQ projection.
+  // Season points in the visitor's scoring (TE premium: +0.5 a catch for tight ends), games, per game.
+  // Defenders add their IDP stats scored with the league's IDP rules (Sleeper's pts_* leave them out).
+  function season(pid, pos) {
+    var r = STATS[pid]; if (!r) return null;
+    var pts = r[{ ppr: 0, half: 1, std: 2 }[S.scoring]] + (S.tep === '1' && pos === 'TE' ? 0.5 * r[4] : 0) + (IDP[pos] ? idpPts(r[5]) : 0);
+    return { pts: pts, gp: r[3], ppg: r[3] ? pts / r[3] : 0 };
+  }
+
+  // ── This week's DHQ projection (launch QA 2026-11-17) ────────────────────
+  // The same number as the projections page's Weekly tab (DHQ Proj): the Lab's lock file for the
+  // current NFL week (Sleeper's state week), rescored to the visitor's scoring exactly as there.
+  // While it loads, the feed's projection stands in only if it is for the same week.
+  var CUR = null, WK = null;
+  var REC_POS = { RB: 1, WR: 1, TE: 1, QB: 1 }, REC_PTS = { ppr: 1, half: 0.5, std: 0 };
+  var OFF_RULES = ['pass_yd', 'pass_td', 'pass_int', 'pass_2pt', 'rush_yd', 'rush_td', 'rush_2pt', 'rec_yd', 'rec_td', 'rec_2pt', 'fum_lost'];
+  function teamKey(t) { var a = String(t || '').toUpperCase(); return ESPN_TEAM[a] || a; }
+  // projections.html loadWeek(): { h: Half-PPR points, r: receptions }; defenders from the lock's
+  // copy scored with the source league's own rules (their IDP rules, no catches).
+  function slimLock(d) {
+    var half = (d.scorings && d.scorings.half) || {}, rules = half.scoring || {}, hp = half.players || {};
+    var w = { week: d.week, info: d.players || {}, dhq: {}, lg: {} }, pprSet = null;
+    Object.keys(d.scorings || {}).forEach(function (k) {
+      var sc = d.scorings[k].scoring || {}; if (pprSet || sc.rec !== 1 || sc.bonus_rec_te) return;
+      if (OFF_RULES.every(function (x) { return (sc[x] || 0) === (rules[x] || 0); })) pprSet = d.scorings[k].players || {};
+    });
+    Object.keys(hp).forEach(function (pid) {
+      var r = hp[pid], q = pprSet && pprSet[pid], catches = REC_POS[(w.info[pid] || {}).pos];
+      if (r && r[0] != null) w.dhq[pid] = { h: r[0], r: catches && q && q[0] != null ? Math.max(0, 2 * (q[0] - r[0])) : 0 };
+    });
+    var lg = d.scorings && d.scorings['league_' + SOURCE.id];
+    Object.keys((lg && lg.players) || {}).forEach(function (pid) { var r = lg.players[pid]; if (r && r[0] != null && IDP[(w.info[pid] || {}).pos]) w.lg[pid] = { h: r[0], r: 0 }; });
+    return w;
+  }
+  function loadProj() {
+    return getJSON(STATE_URL).then(function (st) {
+      CUR = { week: st && st.week, season: (st && st.season) || SEASON };
+      if (!CUR.week) return;
+      return getJSON((/(^|\.)dhq-lab\.pages\.dev$/.test(location.hostname) ? 'data/locks/' : 'https://dhq-lab.pages.dev/data/locks/') + CUR.season + '-w' + CUR.week + '.json').then(function (d) { WK = slimLock(d); });
+    }).catch(function () { CUR = CUR || { failed: true }; WK = { failed: true }; });
+  }
+  function pts(o, pos) { return o == null ? null : o.h + (REC_PTS[S.scoring] - 0.5) * o.r + (S.tep === '1' && pos === 'TE' ? 0.5 * o.r : 0); }
+  // { bye, proj } for one player this week (proj null = no line: shown as a dash, never 0)
+  function thisWeek(pid, pos, team) {
+    if (WK && !WK.failed) {
+      var bye = onBye(teamKey((WK.info[pid] && WK.info[pid].team) || team));
+      return { bye: bye, proj: bye ? null : pts(IDP[pos] && WK.lg[pid] ? WK.lg[pid] : WK.dhq[pid], pos) };
+    }
+    var r = (DATA && DATA.values[pid]) || [], b = onBye(team);
+    return { bye: b, proj: !b && CUR && CUR.week && DATA && DATA.week === CUR.week && r[2] != null ? r[2] : null };
+  }
+  // Phones (owner ask 2026-11-18): one short line under the name; the badge shows the position.
+  var PHONE_MQ = window.matchMedia ? window.matchMedia('(max-width:600px)') : null;
+  function PHONE() { return !!(PHONE_MQ && PHONE_MQ.matches); }
+  function shortMeta(pid, pos, team) { var r = (DATA && DATA.values[pid]) || [], z = season(pid, pos), t = thisWeek(pid, pos, team); return [team, r[1] ? 'age ' + r[1] : '', z ? z.ppg.toFixed(1) + ' ppg' : '', t.bye ? 'bye' : t.proj != null ? 'proj ' + t.proj.toFixed(1) : ''].filter(Boolean).join(' \u00b7 '); }
+  function metaLine(pid, pos, team) { var r = (DATA && DATA.values[pid]) || [], z = season(pid, pos), t = thisWeek(pid, pos, team); return [pos, team, r[1] ? 'age ' + r[1] : '', z ? z.pts.toFixed(1) + ' pts / ' + z.gp + ' gp (' + z.ppg.toFixed(1) + ' apg)' : '', t.bye ? 'bye' : t.proj != null ? 'proj ' + t.proj.toFixed(1) : ''].filter(Boolean).join(' \u00b7 '); }
+  // The same facts as columns, so every row lines up under the group heading.
+  function cols(pid, pos, team) {
+    var r = (DATA && DATA.values[pid]) || [], z = season(pid, pos), d = '\u2013', t = thisWeek(pid, pos, team);
+    return '<span class="c">' + pos + '</span><span class="c">' + esc(team) + '</span><span class="c">' + (r[1] || d) + '</span>'
+      + '<span class="c">' + (z ? z.pts.toFixed(1) : d) + '</span><span class="c">' + (z ? z.gp : d) + '</span><span class="c">' + (z ? z.ppg.toFixed(1) : d) + '</span>'
+      + (t.bye ? '<span class="c bye">BYE</span>' : '<span class="c proj">' + (t.proj != null ? t.proj.toFixed(1) : d) + '</span>');
+  }
+  function head(label, col, picks) { return '<div class="grp"><span class="gname" style="color:' + col + '">' + label + '</span>' + (picks ? '' : '<span class="gc">Pos</span><span class="gc">Team</span><span class="gc">Age</span><span class="gc" title="Total points this season">Pts</span><span class="gc" title="Games played">GP</span><span class="gc" title="Average points per game">APG</span><span class="gc" title="DHQ projection this week">Proj</span>') + '<span class="gc gv">DHQ Value</span></div>'; }
+  function pickKey(it) { return it.year + '.' + it.round + '.' + it.slot; }
+  function renderList(side) {
+    var box = $('list' + side); if (!DATA) return;
+    var keep = box.scrollTop; // adding a player must not jump the list back to the top
+    var q = $('q' + side).value.toLowerCase().replace(/[^a-z0-9 ]/g, '').trim();
+    var used = {}; T.A.concat(T.B).forEach(function (it) { used[it.type === 'pick' ? 'k' + pickKey(it) : it.id] = 1; });
+    var html = '', shown = 0;
+    function item(r) { var g = r.p.pos; return '<button type="button" class="item' + (used[r.p.id] ? ' added' : '') + '" style="--pc:' + (POS_COLOR[g] || 'var(--silver)') + '" data-add="' + r.p.id + '" data-side="' + side + '">' + face(r.p.id, POS_COLOR[g]) + '<span class="nm">' + esc(r.p.name) + '</span>' + cols(r.p.id, g, r.p.team) + '<span class="tm">' + esc(PHONE() ? shortMeta(r.p.id, g, r.p.team) : metaLine(r.p.id, g, r.p.team)) + '</span><span class="v">' + fmt(r.v) + '</span></button>'; }
+    // A query that is a whole word of a name ("chase") puts those players first, by DHQ value,
+    // whatever their position, so Ja'Marr Chase is not under Chase Brown. Other matches stay grouped.
+    var best = {}, bestRows = !q ? [] : SEARCH.filter(function (p) { return (S.idp === '1' || !IDP[p.pos]) && GROUPS.indexOf(p.pos) > -1 && (' ' + p.key + ' ').indexOf(' ' + q + ' ') > -1; })
+      .map(function (p) { best[p.id] = 1; return { p: p, v: playerValue(p.id) }; }).sort(function (a, b) { return b.v - a.v; });
+    if (bestRows.length) { html += head('Best matches', 'var(--gold)') + bestRows.map(item).join(''); shown += bestRows.length; }
+    GROUPS.forEach(function (g) {
+      if (S.idp === '0' && IDP[g]) return;
+      var rows = SEARCH.filter(function (p) { return p.pos === g && !best[p.id] && (!q || p.key.indexOf(q) === 0 || p.key.indexOf(' ' + q) > -1 || p.team.toLowerCase() === q); })
+        .map(function (p) { return { p: p, v: playerValue(p.id) }; }).sort(function (a, b) { return b.v - a.v; });
+      if (!rows.length) return;
+      html += head(g, POS_COLOR[g]) + rows.map(item).join('');
+      shown += rows.length;
+    });
+    var picks = ALL_PICKS.filter(function (pk) { return !q || itemLabel(pk).toLowerCase().indexOf(q) > -1 || 'picks'.indexOf(q) === 0; });
+    if (picks.length) {
+      html += head('Picks', POS_COLOR.PICK, true) + picks.map(function (pk) {
+        return '<button type="button" class="item pk' + (used['k' + pickKey(pk)] ? ' added' : '') + '" data-addpick="' + pickKey(pk) + '" data-side="' + side + '"><span class="dot" style="background:' + POS_COLOR.PICK + '"></span><span class="nm">' + esc(itemLabel(pk)) + '</span><span class="v">' + fmt(pickValue(pk)) + '</span></button>';
+      }).join('');
+      shown += picks.length;
+    }
+    box.innerHTML = shown ? html : '<div class="list-empty">No player or pick matches "' + esc($('q' + side).value) + '".</div>';
+    box.scrollTop = keep;
+  }
+  ['A', 'B'].forEach(function (side) { $('q' + side).addEventListener('input', function () { renderList(side); $('list' + side).scrollTop = 0; }); });
+  document.addEventListener('click', function (e) {
+    var a = e.target.closest('[data-add]'), k = e.target.closest('[data-addpick]'), r = e.target.closest('[data-rm]');
+    if (a) { T[a.dataset.side].push({ type: 'player', id: a.dataset.add }); render(); }
+    else if (k) { var m = k.dataset.addpick.split('.'); T[k.dataset.side].push({ type: 'pick', year: Number(m[0]), round: Number(m[1]), slot: m[2] }); render(); }
+    else if (r) { T[r.dataset.side].splice(Number(r.dataset.rm), 1); render(); }
+  });
+
+  // ── Who you're dealing with ──────────────────────────────────────────────
+  $('dnaSel').innerHTML = [DNA[5]].concat(DNA.slice(0, 5)).map(function (d) { return '<option value="' + d.k + '">' + (d.k === 'NONE' ? 'Not sure' : 'The ' + d.l) + '</option>'; }).join('');
+  $('dnaSel').addEventListener('change', function () { T.dna = this.value; render(); });
+  $('theirTeam').addEventListener('change', function () { T.their = this.value; render(); });
+  $('myTeam').addEventListener('change', function () { T.mine = this.value; render(); });
+  $('fills').addEventListener('change', function () { T.fills = this.checked; render(); });
+
+  // Stand-ins for the app's team assessments (tier / panic / window / needs),
+  // built from what the visitor tells us. The shared engine does the rest.
+  var WINDOW = { ELITE: 'CONTEND', CONTENDER: 'CONTEND', CROSSROADS: 'MIDDLE', REBUILDING: 'REBUILD' };
+  function assessments(dna) {
+    var desperate = dna === 'DESPERATE';
+    var theirs = (T.their || desperate || T.fills) ? {
+      tier: T.their || 'CROSSROADS', panic: desperate ? 4 : (T.their === 'ELITE' ? 0 : 1),
+      window: T.their ? WINDOW[T.their] : null, needs: T.fills ? [{ pos: 'X', urgency: 'deficit' }] : [], strengths: []
+    } : null;
+    var mine = (T.mine || T.fills) ? { tier: T.mine || 'CROSSROADS', panic: 1, window: T.mine ? WINDOW[T.mine] : null, needs: [], strengths: T.fills ? ['X'] : [] } : null;
+    return { mine: mine, theirs: theirs };
+  }
+
+  // The shared engine's taxes for one DNA type under the visitor's settings.
+  function taxesFor(dna) {
+    var E = window.App.TradeEngine, as = assessments(dna);
+    var posture = E.calcOwnerPosture(as.theirs, dna);
+    var taxes = E.calcPsychTaxes(as.mine, as.theirs, dna, posture);
+    // A window read needs both teams; "Not sure" on either side drops it.
+    if (!(as.mine && as.mine.window && as.theirs && as.theirs.window)) taxes = taxes.filter(function (t) { return !/^Window /.test(t.name); });
+    return { posture: posture, taxes: taxes };
+  }
+  // Roster status: the app's league-relative tiers (DHQ-Shared team-assess.js:
+  // tierBandCounts / windowForTier) in plain words.
+  var TIERS = [
+    { k: 'ELITE', l: 'Elite', c: '#D4AF37', win: 'Contending', desc: 'The best teams in the league: a strong roster and the record to match. Title favorites.',
+      deal: 'Happy with what they have. Very hard to move; bring an offer that clearly makes them better right now.' },
+    { k: 'CONTENDER', l: 'Contender', c: '#2ECC71', win: 'Contending', desc: 'In the playoff hunt, one or two pieces from the top group.',
+      deal: 'Open to deals that help them win now. Fair value required; they pay for proven starters.' },
+    { k: 'CROSSROADS', l: 'Crossroads', c: '#F0A500', win: 'In transition', desc: 'Middle of the pack. Could push for the playoffs or start selling; they have not decided.',
+      deal: 'Find out which way they lean. Veterans if they are buying, picks and youth if they are selling.' },
+    { k: 'REBUILDING', l: 'Rebuilding', c: '#E74C3C', win: 'Rebuilding', desc: 'The bottom of the league. Playing for next year and beyond.',
+      deal: 'Actively shopping veterans. Offer draft picks and young players.' }
+  ];
+  function tierBands(n) { var e = Math.max(1, Math.ceil(n / 6)), c = Math.max(e, Math.round(n * 0.45)), x = Math.max(c, Math.round(n * 0.75)); return { ELITE: [1, e], CONTENDER: [e + 1, c], CROSSROADS: [c + 1, x], REBUILDING: [x + 1, n] }; }
+  function renderStatusGuide() {
+    var E = window.App.TradeEngine, n = Number(S.teams), bands = tierBands(n);
+    $('statusGrid').innerHTML = TIERS.map(function (t) {
+      var b = bands[t.k], where = b[0] > b[1] ? 'none at this size' : (b[0] === 1 ? 'Top ' + b[1] : 'Teams ' + b[0] + (b[1] > b[0] ? '–' + b[1] : '')) + ' of ' + n;
+      var theirs = { tier: t.k, panic: t.k === 'ELITE' ? 0 : 1, window: WINDOW[t.k], needs: [], strengths: [] };
+      var tx = E.calcPsychTaxes(null, theirs, 'NONE', E.calcOwnerPosture(theirs, 'NONE')).filter(function (x) { return x.name !== 'Endowment Effect'; });
+      return '<div class="gcard"><h3 style="color:' + t.c + '"><span class="dot" style="background:' + t.c + '"></span>' + t.l + '</h3><p>' + esc(t.desc) + '</p>'
+        + '<span class="gl">Where they rank</span><p>' + where + '</p>'
+        + '<span class="gl">Trade window</span><p>' + t.win + '</p>'
+        + '<span class="gl">As your opponent, DHQ adds</span><div class="tx">' + (tx.length ? tx.map(function (x) { return '<span class="' + x.type + '" title="' + esc(x.desc) + '">' + esc(x.name) + ' ' + (x.impact > 0 ? '+' : '') + x.impact + '</span>'; }).join(' &middot; ') : 'Nothing on its own') + '</div>'
+        + '<span class="gl">How to deal with them</span><p>' + esc(t.deal) + '</p>'
+        + '<div class="actions"><button type="button" class="btn' + (T.their === t.k ? ' ghost' : '') + '" data-their="' + t.k + '">' + (T.their === t.k ? 'Opponent: selected' : 'Set as opponent') + '</button><button type="button" class="btn' + (T.mine === t.k ? ' ghost' : '') + '" data-mine="' + t.k + '">' + (T.mine === t.k ? 'Mine: selected' : 'Set as mine') + '</button></div></div>';
+    }).join('')
+      + '<div class="gcard"><h3 style="color:var(--gold)"><span class="dot" style="background:var(--gold)"></span>Trade windows</h3><p>When both teams are set, DHQ compares their trade windows.</p>'
+      + '<span class="gl">Opposite windows</span><div class="tx"><span class="BONUS">Window Alignment +8</span></div><p>A contender and a rebuilder want different things, so a deal comes naturally.</p>'
+      + '<span class="gl">Same window</span><div class="tx"><span class="TAX">Window Friction -5</span></div><p>Two teams chasing the same thing have less reason to swap.</p></div>';
+  }
+  document.addEventListener('click', function (e) {
+    var a = e.target.closest('[data-their]'), m = e.target.closest('[data-mine]'); if (!a && !m) return;
+    if (a) { T.their = a.dataset.their; $('theirTeam').value = T.their; } else { T.mine = m.dataset.mine; $('myTeam').value = T.mine; }
+    render();
+  });
+  function renderGuide() {
+    $('guideGrid').innerHTML = DNA.map(function (d) {
+      var tx = taxesFor(d.k).taxes;
+      return '<div class="gcard"><h3 style="color:' + d.c + '"><span class="dot" style="background:' + d.c + '"></span>' + (d.k === 'NONE' ? 'Not sure' : 'The ' + d.l) + '</h3><p>' + esc(d.desc) + '</p>'
+        + '<span class="gl">How to spot them</span><ul>' + SPOT[d.k].map(function (x) { return '<li>' + esc(x) + '</li>'; }).join('') + '</ul>'
+        + '<span class="gl">Taxes DHQ adds</span><div class="tx">' + tx.map(function (t) { return '<span class="' + t.type + '" title="' + esc(t.desc) + '">' + esc(t.name) + ' ' + (t.impact > 0 ? '+' : '') + t.impact + '</span>'; }).join(' &middot; ') + '</div>'
+        + '<span class="gl">How to approach them</span><p>' + esc(d.strategy) + '</p>'
+        + '<button type="button" class="btn' + (T.dna === d.k ? ' ghost' : '') + '" data-use="' + d.k + '">' + (T.dna === d.k ? 'Selected' : 'Use this DNA') + '</button></div>';
+    }).join('');
+  }
+  document.addEventListener('click', function (e) { var b = e.target.closest('[data-use]'); if (!b) return; T.dna = b.dataset.use; render(); $('tb-title').scrollIntoView({ behavior: 'smooth', block: 'start' }); });
+
+  // ── The verdict: same math as the app's computeManualVerdict ─────────────
+  function verdict() {
+    var E = window.App && window.App.TradeEngine;
+    var totalA = T.A.reduce(function (s, it) { return s + itemValue(it); }, 0);
+    var totalB = T.B.reduce(function (s, it) { return s + itemValue(it); }, 0);
+    var has = T.A.length + T.B.length > 0;
+    var as = assessments(T.dna);
+    var tp = taxesFor(T.dna), posture = tp.posture, taxes = tp.taxes;
+    var grade = E.fairnessGrade(totalA, totalB);
+    var pieces = T.A.length + T.B.length;
+    var likelihood = has && (totalA > 0 || totalB > 0) ? E.calcAcceptanceLikelihood(totalA, totalB, T.dna, taxes, as.mine, as.theirs, { totalPieces: pieces }) : 50;
+    return { totalA: totalA, totalB: totalB, has: has, grade: grade, taxes: taxes, posture: posture, likelihood: likelihood, gain: totalB - totalA };
+  }
+  // DHQ's call: the grade says if it's good for you, the odds say if they'll take it.
+  function call(v) {
+    var good = ['A+', 'A', 'B+', 'B'].indexOf(v.grade.grade) > -1;
+    if (good && v.likelihood >= 50) return { w: 'Send it', c: 'var(--good)', t: 'Good value for you and they should bite.' };
+    if (!good && (v.grade.grade === 'D' || v.grade.grade === 'F')) return { w: 'Pass', c: 'var(--bad)', t: 'You are overpaying. Ask for more back or walk away.' };
+    if (good && v.likelihood < 20) return { w: 'Counter', c: 'var(--warn)', t: 'Great for you, but it will be a tough deal to pull off as built. Add value or reframe it for this manager.' };
+    if (v.likelihood < 20) return { w: 'Pass', c: 'var(--bad)', t: 'It will be a tough deal to pull off as built, and it does not help you enough to chase.' };
+    return { w: 'Counter', c: 'var(--warn)', t: good ? 'Fair for you, but they will probably say no. Sweeten it a little or reframe it for this manager.' : 'Close. A small tweak gets this to fair.' };
+  }
+
+  // ── Render ───────────────────────────────────────────────────────────────
+  function rowHTML(it, side, i) {
+    var v = itemValue(it), pos = 'PICK', meta = '';
+    if (it.type === 'player') {
+      var p = PLAYERS && PLAYERS[it.id] || ['?', '', ''], r = DATA.values[it.id] || [];
+      pos = p[1] || '?';
+      var z = season(it.id, pos);
+      var t = thisWeek(it.id, pos, p[2]);
+      meta = [pos, p[2], r[1] ? 'age ' + r[1] : '', z ? z.ppg.toFixed(1) + ' apg' : '', t.bye ? 'bye this week' : t.proj != null ? 'proj ' + t.proj.toFixed(1) : ''].filter(Boolean).join(' \u00b7 ');
+    } else meta = it.year === NEXT_DRAFT ? 'Pick · next draft' : 'Pick · ' + (it.year - NEXT_DRAFT) + ' yr' + (it.year - NEXT_DRAFT > 1 ? 's' : '') + ' out';
+    var col = POS_COLOR[pos] || 'var(--silver)';
+    return '<div class="row">' + (it.type === 'player' ? face(it.id, col) : '<span class="dot" style="background:' + col + ';margin:0 14px"></span>') + '<span class="who"><b>' + esc(itemLabel(it)) + '</b><small>' + esc(meta) + '</small></span>'
+      + '<span class="barw"><i style="width:' + Math.min(100, v / MAX * 100) + '%;background:' + col + '"></i></span><span class="v">' + fmt(v) + '</span>'
+      + '<button class="rm" type="button" data-side="' + side + '" data-rm="' + i + '" aria-label="Remove ' + esc(itemLabel(it)) + '">&#10005;</button></div>';
+  }
+  function render() {
+    syncSeg(); footNote(); $('idpNote').hidden = S.idp !== '1';
+    $('basis').textContent = isEstimated() ? ', adjusted for your league settings (estimate)' : '';
+    if (!DATA) return;
+    $('dnaSel').value = T.dna;
+    ['A', 'B'].forEach(function (s) {
+      $('rows' + s).innerHTML = T[s].map(function (it, i) { return rowHTML(it, s, i); }).join('');
+      renderList(s);
+    });
+    renderGuide(); renderStatusGuide();
+    var v = verdict(), d = DNA.filter(function (x) { return x.k === T.dna; })[0];
+    $('totA').textContent = T.A.length ? fmt(v.totalA) : '––'; $('totB').textContent = T.B.length ? fmt(v.totalB) : '––';
+    if (!v.has) { $('result').innerHTML = '<p class="empty">Add players or picks to each side and DHQ grades the deal.</p>'; writeHash(); return; }
+    var c = call(v), net = v.taxes.reduce(function (s, t) { return s + (Number(t.impact) || 0); }, 0);
+    var lc = v.likelihood >= 70 ? 'var(--good)' : v.likelihood >= 45 ? 'var(--warn)' : 'var(--bad)';
+    var gc = v.grade.color || 'var(--gold)';
+    var diff = v.gain > 0 ? '+' + fmt(v.gain) : v.gain < 0 ? '-' + fmt(-v.gain) : '+/-0';
+    var pickDelta = T.B.filter(function (x) { return x.type === 'pick'; }).reduce(function (s, x) { return s + pickValue(x); }, 0) - T.A.filter(function (x) { return x.type === 'pick'; }).reduce(function (s, x) { return s + pickValue(x); }, 0);
+    var playerDelta = v.gain - pickDelta;
+    var sgn = function (n) { return (n >= 0 ? '+' : '-') + fmt(Math.abs(n)); };
+    $('result').innerHTML =
+      '<div style="display:flex;flex-direction:column;gap:12px">'
+      + '<div class="call" style="--cc:' + c.c + '"><div class="call-top"><b>' + c.w + '</b><span>' + v.likelihood + '% to accept</span></div><p>' + esc(c.t) + '</p></div>'
+      + '<div class="gline"><span class="g" style="color:' + gc + '">' + esc(v.grade.grade) + '</span><span class="gl" style="color:' + gc + '">' + esc(v.grade.label || '') + '</span><span class="gd" style="color:' + gc + '">' + diff + '</span><span class="gs">(gave ' + fmt(v.totalA) + ' / received ' + fmt(v.totalB) + ')</span></div>'
+      + '<div class="impact">'
+      + '<div><span>Players</span><strong>' + sgn(playerDelta) + '</strong><em>player DHQ value</em></div>'
+      + '<div><span>Pick capital</span><strong>' + sgn(pickDelta) + '</strong><em>pick DHQ value</em></div>'
+      + '<div><span>Their taxes</span><strong>' + (net > 0 ? '+' : '') + net + '%</strong><em>' + esc(d.k === 'NONE' ? 'no DNA set' : 'The ' + d.l) + '</em></div>'
+      + '<div><span>Acceptance</span><strong style="color:' + lc + '">' + v.likelihood + '%</strong><em>chance they say yes</em></div>'
+      + '</div>'
+      + '<div class="lk"><span>Acceptance</span><span class="lkbar"><i style="width:' + v.likelihood + '%;background:' + lc + '"></i></span>'
+      + (v.posture ? '<span class="badge" style="color:' + (v.posture.color || 'var(--silver)') + ';border-color:' + (v.posture.color || 'var(--silver)') + '" title="' + esc(v.posture.desc || '') + '">' + esc(v.posture.label || '') + '</span>' : '') + '</div>'
+      + '<div class="sec sec-split" style="margin-top:4px"><span>Psychological tax breakdown</span><em>Based on opponent trade DNA type</em></div>'
+      + '<div class="taxes">'
+      + v.taxes.map(function (t) { return '<div class="tax ' + t.type + '"><span class="n">' + esc(t.name) + '</span><span class="d">' + esc(t.desc) + '</span><span class="i">' + (t.impact > 0 ? '+' : '') + t.impact + '%</span></div>'; }).join('')
+      + '<div class="tax net"><span class="n">Net modifier</span><span class="d"></span><span class="i">' + (net > 0 ? '+' : '') + net + '%</span></div></div>'
+      + '<div class="dna-line"><b>' + (d.k === 'NONE' ? 'No DNA set.' : 'The ' + d.l + '.') + '</b> ' + esc(d.desc) + '</div>'
+      + '<div class="approach"><b>Approach:</b> ' + esc(d.strategy) + '</div>'
+      + '<div class="actions"><button class="btn" type="button" id="shareBtn">Share this trade</button><button class="btn ghost" type="button" id="resetBtn">Start over</button></div>'
+      + '</div>';
+    $('shareBtn').onclick = shareTrade;
+    $('resetBtn').onclick = function () { T.A = []; T.B = []; T.dna = 'NONE'; T.their = ''; T.mine = ''; T.fills = false; $('theirTeam').value = ''; $('myTeam').value = ''; $('fills').checked = false; $('qA').value = ''; $('qB').value = ''; render(); };
+    writeHash();
+  }
+
+  // ── Share: the trade lives in the link ───────────────────────────────────
+  function enc(it) { return it.type === 'pick' ? 'k' + it.year + '.' + it.round + '.' + it.slot.charAt(0) : 'p' + it.id; }
+  function dec(s) {
+    if (s.charAt(0) === 'p') return { type: 'player', id: s.slice(1) };
+    var m = s.match(/^k(\d{4})\.(\d)\.([eml])$/); if (!m) return null;
+    return { type: 'pick', year: Number(m[1]), round: Number(m[2]), slot: { e: 'early', m: 'mid', l: 'late' }[m[3]] };
+  }
+  function writeHash() {
+    var parts = ['a=' + T.A.map(enc).join(','), 'b=' + T.B.map(enc).join(','), 'd=' + T.dna, 't=' + T.their, 'm=' + T.mine, 'f=' + (T.fills ? 1 : 0),
+      's=' + [S.scoring, S.qb, S.tep, S.teams, S.idp].join('.')];
+    var h = '#' + parts.join('&');
+    if (location.hash !== h) { try { history.replaceState(null, '', location.pathname + location.search + h); } catch (e) { /* ignore */ } }
+  }
+  function readHash() {
+    var q = {}; (location.hash || '').replace(/^#/, '').split('&').forEach(function (kv) { var i = kv.indexOf('='); if (i > 0) q[kv.slice(0, i)] = decodeURIComponent(kv.slice(i + 1)); });
+    if (!q.a && !q.b) return;
+    T.A = (q.a || '').split(',').filter(Boolean).map(dec).filter(Boolean);
+    T.B = (q.b || '').split(',').filter(Boolean).map(dec).filter(Boolean);
+    if (DNA.some(function (d) { return d.k === q.d; })) T.dna = q.d;
+    T.their = WINDOW[q.t] ? q.t : ''; T.mine = WINDOW[q.m] ? q.m : ''; T.fills = q.f === '1';
+    $('theirTeam').value = T.their; $('myTeam').value = T.mine; $('fills').checked = T.fills;
+    var s = (q.s || '').split('.');
+    if (s.length === 5) { S.scoring = { ppr: 1, half: 1, std: 1 }[s[0]] ? s[0] : S.scoring; S.qb = s[1] === '1qb' ? '1qb' : 'sf'; S.tep = s[2] === '1' ? '1' : '0'; S.teams = { 10: 1, 12: 1, 14: 1, 16: 1 }[s[3]] ? s[3] : S.teams; S.idp = s[4] === '1' ? '1' : '0'; }
+  }
+  function shareTrade() {
+    writeHash();
+    var url = location.href;
+    var done = function () { toast('Link copied. Paste it anywhere to share this trade.'); };
+    if (navigator.share && /Mobi|iPhone|iPad|Android/i.test(navigator.userAgent)) { navigator.share({ title: 'DHQ trade check', url: url }).catch(function () { /* cancelled */ }); return; }
+    if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(url).then(done, function () { prompt('Copy this link:', url); });
+    else prompt('Copy this link:', url);
+  }
+
+  // ── Boot ─────────────────────────────────────────────────────────────────
+  if (!(window.App && window.App.TradeEngine)) { $('result').innerHTML = '<p class="err">The trade engine did not load. Refresh the page.</p>'; return; }
+  readHash();
+  syncSeg();
+  ['A', 'B'].forEach(function (s) { $('list' + s).innerHTML = '<div class="loading">Loading DHQ values…</div>'; });
+  $('result').innerHTML = '<div class="loading">Loading DHQ values and the player list. The first visit takes a few seconds.</div>';
+  function footNote() {
+    if (!DATA) return;
+    var built = DATA.builtAt ? new Date(DATA.builtAt) : null, wk = CUR && CUR.week;
+    $('footNote').innerHTML = '<b>Where the numbers come from.</b> DHQ dynasty values from DHQ\'s engine for a 16-team Superflex Half-PPR league'
+      + (built ? ', rebuilt ' + built.toLocaleString([], { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' }) : '')
+      + '. Other league settings adjust those values by position and are estimates. Draft picks use DHQ\'s pick curve; later years lose 12% a year.'
+      + (wk ? ' Projections are DHQ\'s for week ' + wk + ', in your scoring.' : '');
+  }
+  var projP = loadProj();
+  loadData().then(function () {
+    render();
+    projP.then(render);
+  }).catch(function () {
+    $('result').innerHTML = '<p class="err">DHQ values could not be loaded right now. Check your connection and refresh the page.</p>';
+    ['A', 'B'].forEach(function (s) { $('list' + s).innerHTML = ''; });
+  });
+})();
+</script>
+</body>
+</html>

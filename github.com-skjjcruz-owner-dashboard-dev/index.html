@@ -3,7 +3,7 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="dhq-build" content="b194a-b309696d0d">
+    <meta name="dhq-build" content="b194a-a7b53f2eb0">
     <meta name="dhq-engine-v" content="15d59f6d2f">
     <meta name="dhq-proj-model" content="00516df75ee1">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, minimum-scale=1.0, viewport-fit=cover">
@@ -106,6 +106,12 @@
     })();
     </script>
 
+    <script>/* Front page hand-offs (website 2026-11-19). DHQ_FRONT turns on the hand-offs further down this
+       page (Wire, AI key, add-a-league box, greeting, "Or ask your AI").
+       Phone app: the website's one-time "see the new front page first" stop (landing.html?home, key
+       dhq_seen_front_v1) is OFF here, because the phone app opens straight to the member's leagues. */
+    window.DHQ_FRONT = true;
+    </script>
     <title>Dynasty HQ</title>
     <link rel="manifest" href="manifest.json">
     <link rel="icon" type="image/png" sizes="192x192" href="icon-192.png">
@@ -3161,7 +3167,7 @@ WRShared.preloadMany(WR_SHARED_FILES);
 <script>window._sharedCanAccess = window.canAccess;</script>
 <!-- Scout-free vs Pro gate: wrIsPro() + chrome + lock card; boots loadUserTier().
      Must run after the shared tier chain above, before any tab code. -->
-<script src="js/shared/pro-gate.js?v=36d43c7fde"></script>
+<script src="js/shared/pro-gate.js?v=35695623ed"></script>
 <script src="js/pro-launch.js?v=9e7a0fc41c"></script>
 <!-- Apple IAP via RevenueCat: identifies the SDK with the signed-in account so
      App Store purchases map to app_users (no-op on web / when signed out). -->
@@ -3206,6 +3212,12 @@ WRShared.preloadMany(WR_SHARED_FILES);
          card back. Team defenses and unsigned players keep the old card. -->
     <link rel="stylesheet" href="js/vendor/dhq-player-card.css?v=20261116card3">
     <script src="js/vendor/dhq-player-card.js?v=c81a35ec31"></script>
+    <!-- The Compare drop-in (owner ask 2026-11-18): the Lab's Start/Sit player boxes, copied
+         as they are from lab/compare/ on the Lab tools branch (window.DHQCompare). The Compare
+         tab (js/tabs/compare.js) shows them above its own comparison. data-dhqss stops the
+         module adding its stylesheet a second time. -->
+    <link rel="stylesheet" data-dhqss="1" href="js/vendor/dhq-compare.css?v=20261119cmp1a">
+    <script src="js/vendor/dhq-compare.js?v=023f84f72a"></script>
     <script src="js/components/player-card.js?v=0ca001e367"></script>
 <!-- 2c. Saved List Views (SI-1) — window.WR.SavedViews — shared across list surfaces -->
 <script src="js/shared/saved-views.js?v=48a1747f17"></script>
@@ -3410,7 +3422,7 @@ WRShared.preloadMany(WR_SHARED_FILES);
 <script type="text/wr-deferred" data-wr-defer="analysis" src="js/tabs/league-map.js?v=c546cf86c9"></script>
 <script type="text/wr-deferred" data-wr-defer="myteam" src="js/tabs/my-team.js?v=a6750e63c9"></script>
 <!-- Compare: extracted from My Roster's former sub-view, now a top-level ROSTER-group tab. -->
-<script type="text/wr-deferred" data-wr-defer="compare" src="js/tabs/compare.js?v=3e0f57e48c"></script>
+<script type="text/wr-deferred" data-wr-defer="compare" src="js/tabs/compare.js?v=cd4fe49413"></script>
 <script type="text/wr-deferred" data-wr-defer="analysis" src="js/tabs/analytics.js?v=3dbbe51e8a"></script>
 <script type="text/wr-deferred" data-wr-defer="trophies" src="js/tabs/trophy-room.js?v=784bd3612e"></script>
 <script src="js/tabs/calendar.js?v=275d34c7b2"></script>
@@ -3496,6 +3508,153 @@ window.addEventListener('appinstalled', () => {
 <!-- Deploy tag (owner ask 2026-08-19): a tiny always-visible build code so the
      owner can read back exactly which version his device is running before
      testing — kills the stale-cache guessing game. Bump the code every deploy. -->
+<script>/* Lab (owner ask 2026-11-17): a member with an AI key and no league gets a way to ask
+   their AI about any player, no league needed (lab/my-ai.html). Shown only on the empty leagues page. */
+(function () {
+  if (!window.DHQ_FRONT) return;
+  setInterval(function () {
+    try {
+      var empty = document.querySelector('.hv2-empty');
+      if (!empty || document.getElementById('dhq-ai-free') || !/first league starts here/i.test(empty.textContent)) return;
+      if (document.querySelector('#hv2-league-results > *')) return;
+      var idn = window.OD && window.OD.identity, owner = idn && idn.currentOwner ? idn.currentOwner() : null;
+      var rec = JSON.parse(localStorage.getItem('dhq_member_ai_v1') || 'null');
+      if (!owner || owner === 'guest' || !rec || !rec.key || rec.owner !== owner) return;
+      var a = document.createElement('a');
+      a.id = 'dhq-ai-free'; a.href = 'landing.html?home&ai=1'; a.className = 'hv2-add-button'; a.style.margin = '10px 0 0 8px';
+      a.textContent = 'Or ask your AI about any player \u2192';
+      empty.appendChild(a);
+    } catch (e) { /* the leagues page works without it */ }
+  }, 1500);
+})();</script>
+<script>/* Lab (owner ask 2026-11-17): a guest's AI sign-up is one smooth path. The guest's
+   "Bring Your Own AI" card and the members-only AI notice sign up in AI mode
+   (landing.html?signin=ai: no league step, their leagues come along), and back
+   in the app the "Add my AI key" box opens by itself, one time. */
+(function () {
+  if (!window.DHQ_FRONT) return;
+  document.addEventListener('click', function (e) {
+    var a = e.target.closest && e.target.closest('.hv2-signup a[href*="signin=new"], .askdhq-mo a[href*="signin=new"]');
+    if (a) a.setAttribute('href', a.getAttribute('href').replace('signin=new', 'signin=ai'));
+  }, true);
+  var tries = 0;
+  var t = setInterval(function () {
+    try {
+      if (sessionStorage.getItem('dhq_open_ai_key_v1') !== '1' || ++tries > 60) { clearInterval(t); return; }
+      var A = window.App && window.App.AskDHQ;
+      if (!A || !A.openKeySetup || !A.isMember || !A.isMember() || !document.querySelector('.hv2-shell')) return;
+      sessionStorage.removeItem('dhq_open_ai_key_v1'); clearInterval(t);
+      if (!(A.savedKey && A.savedKey())) A.openKeySetup();
+    } catch (e) { clearInterval(t); }
+  }, 1000);
+})();</script>
+<script>/* Lab (owner ask 2026-11-17): adding a league in the War Room is ONE box, the front page's:
+   Sleeper / MFL / ESPN, one field, See my league. On the empty leagues page of a signed-in member it
+   replaces "Connect a league" (and "+ Add league" jumps to it). It hands what was typed to the connect
+   page, which links it to the account and goes straight in (the front page's own handoff). */
+(function () {
+  if (!window.DHQ_FRONT) return;
+  var COPY = {
+    sleeper: { ph: 'Your Sleeper username', mode: 'text', auto: 'username' },
+    mfl: { ph: 'Your MFL league ID', mode: 'numeric', auto: 'off' },
+    espn: { ph: 'Your ESPN league ID', mode: 'numeric', auto: 'off' }
+  };
+  var plat = 'sleeper';
+  var CSS = '#dhq-add-league{margin:14px auto 0;max-width:520px;text-align:left}'
+    + '#dhq-add-league .pf{display:inline-grid;grid-template-columns:repeat(3,1fr);gap:4px;padding:4px;margin:0 0 10px;background:#11151C;border:1px solid rgba(255,255,255,.14);border-radius:var(--card-radius-sm,8px)}'
+    + '#dhq-add-league .pf button{min-width:84px;height:36px;padding:0 12px;border:1px solid transparent;border-radius:var(--card-radius-xs,5px);background:transparent;color:#A9B0BB;cursor:pointer;font:700 14px/1 Rajdhani,"DM Sans",system-ui,sans-serif;letter-spacing:.1em;text-transform:uppercase}'
+    + '#dhq-add-league .pf button[aria-pressed="true"]{background:#1A1F27;color:#D4AF37;border-color:rgba(212,175,55,.45)}'
+    + '#dhq-add-league form{display:flex;gap:10px}'
+    + '#dhq-add-league .fld{flex:1;position:relative;min-width:0}'
+    + '#dhq-add-league .fld svg{position:absolute;left:14px;top:50%;transform:translateY(-50%);width:18px;height:18px;color:#5A626E}'
+    + '#dhq-add-league input{width:100%;height:52px;padding:0 14px 0 42px;background:#11151C;color:#F2F2F2;border:1px solid rgba(255,255,255,.14);border-radius:var(--card-radius-sm,8px);font:500 16px/1 "DM Sans",system-ui,sans-serif;box-sizing:border-box}'
+    + '#dhq-add-league input:focus{outline:none;border-color:#D4AF37;box-shadow:0 0 0 3px rgba(212,175,55,.12)}'
+    + '#dhq-add-league .go{height:52px;padding:0 20px;border:0;border-radius:var(--card-radius-sm,8px);background:#D4AF37;color:#15110A;cursor:pointer;font:700 16px/1 Rajdhani,"DM Sans",system-ui,sans-serif;letter-spacing:.08em;text-transform:uppercase;white-space:nowrap}'
+    + '#dhq-add-league .err{margin:10px 0 0;color:#f87171;font-size:14px}'
+    + '@media (max-width:520px){#dhq-add-league form{flex-direction:column}#dhq-add-league .pf{display:grid;width:100%}}';
+  function setPlat(box, p) {
+    plat = p;
+    box.querySelectorAll('.pf button').forEach(function (b) { b.setAttribute('aria-pressed', String(b.getAttribute('data-p') === p)); });
+    var i = box.querySelector('input'), c = COPY[p];
+    i.placeholder = c.ph; i.setAttribute('aria-label', c.ph); i.inputMode = c.mode; i.setAttribute('autocomplete', c.auto); i.value = '';
+    box.querySelector('.err').hidden = true;
+  }
+  function err(box, t) { var e = box.querySelector('.err'); e.textContent = t; e.hidden = false; box.querySelector('input').focus(); }
+  function submit(box) {
+    var v = (box.querySelector('input').value || '').trim();
+    if (plat === 'sleeper') {
+      v = v.replace(/^@/, '');
+      if (!v) return err(box, 'Type your Sleeper username. It is the name on your Sleeper profile, not your email.');
+    } else {
+      var m = plat === 'mfl' ? (v.match(/[?&]L=(\d+)/i) || v.match(/\/home\/(\d+)/i)) : v.match(/leagueId=(\d+)/i);
+      v = m ? m[1] : v.replace(/\D/g, '');
+      if (!/^\d{3,12}$/.test(v)) return err(box, plat === 'mfl' ? 'Type your MFL league ID. It is the number after L= in your MFL web address, like 41208.' : "Type your ESPN league ID. It is the number after leagueId= in your ESPN league's web address.");
+    }
+    try { sessionStorage.setItem('dhq_connect_prefill', JSON.stringify({ platform: plat, value: v, ts: Date.now() })); } catch (e) { /* the connect page asks again */ }
+    // No league on the account yet: the connect page takes it from here (it skips anyone already set up).
+    try { var pf = JSON.parse(localStorage.getItem('od_profile_v1') || 'null'); if (pf && pf.onboardingComplete) { delete pf.onboardingComplete; localStorage.setItem('od_profile_v1', JSON.stringify(pf)); } } catch (e) { /* fine */ }
+    location.href = 'connect-sleeper.html';
+  }
+  function build(empty) {
+    if (!document.querySelector('style[data-dhq-add-league]')) { var st = document.createElement('style'); st.setAttribute('data-dhq-add-league', '1'); st.textContent = CSS; document.head.appendChild(st); }
+    var box = document.createElement('div'); box.id = 'dhq-add-league';
+    box.innerHTML = '<div class="pf" role="group" aria-label="Where your league lives">'
+      + '<button type="button" data-p="sleeper" aria-pressed="true">Sleeper</button><button type="button" data-p="mfl" aria-pressed="false">MFL</button><button type="button" data-p="espn" aria-pressed="false">ESPN</button></div>'
+      + '<form novalidate><div class="fld"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="8" r="4"/><path d="M4 21c0-4 3.6-7 8-7s8 3 8 7"/></svg>'
+      + '<input type="text" autocapitalize="none" spellcheck="false" autocomplete="username" placeholder="Your Sleeper username" aria-label="Your Sleeper username"></div>'
+      + '<button class="go" type="submit">See my league</button></form><p class="err" role="alert" hidden></p>';
+    box.querySelectorAll('.pf button').forEach(function (b) { b.addEventListener('click', function () { setPlat(box, b.getAttribute('data-p')); box.querySelector('input').focus(); }); });
+    box.querySelector('form').addEventListener('submit', function (e) { e.preventDefault(); submit(box); });
+    box.querySelector('input').addEventListener('input', function () { box.querySelector('.err').hidden = true; });
+    var p = empty.querySelector('p');
+    if (p && p.nextSibling) empty.insertBefore(box, p.nextSibling); else empty.appendChild(box);
+  }
+  setInterval(function () {
+    try {
+      var empty = document.querySelector('.hv2-empty');
+      if (!empty || !/first league starts here/i.test(empty.textContent) || document.querySelector('#hv2-league-results > *')) return;
+      var idn = window.OD && window.OD.identity, owner = idn && idn.currentOwner ? idn.currentOwner() : null;
+      if (!owner || owner === 'guest') return;
+      if (!document.getElementById('dhq-add-league')) build(empty);
+      empty.querySelectorAll('button.hv2-add-button').forEach(function (b) { if (/connect a league/i.test(b.textContent)) b.style.display = 'none'; });
+    } catch (e) { /* the leagues page works without it */ }
+  }, 700);
+  // "+ Add league" while the box is showing: go to the box.
+  document.addEventListener('click', function (e) {
+    var b = e.target.closest && e.target.closest('.hv2-section-heading .hv2-add-button'), box = document.getElementById('dhq-add-league');
+    if (!b || !box) return;
+    e.preventDefault(); e.stopPropagation();
+    box.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    setTimeout(function () { try { box.querySelector('input').focus({ preventScroll: true }); } catch (e2) { /* fine */ } }, 350);
+  }, true);
+})();</script>
+<script>/* Lab (owner ask 2026-11-17): "Welcome back" is only for people who have been here before. A member
+   who just created their account (this visit) is greeted "Welcome to the War Room." instead. */
+(function () {
+  if (!window.DHQ_FRONT) return;
+  setInterval(function () {
+    try {
+      if (sessionStorage.getItem('dhq_new_member_v1') !== '1') return;
+      var h = document.querySelector('.hv2-welcome h1');
+      if (h && h.textContent === 'Welcome back.') h.textContent = 'Welcome to the War Room.';
+    } catch (e) { /* the greeting stays as is */ }
+  }, 250);
+})();</script>
+<script>/* Lab (owner ask 2026-11-18): the front page's League Wire button opens the Wire here, once the
+   leagues page has it (a note in sessionStorage, 15 minutes). */
+(function () {
+  if (!window.DHQ_FRONT) return;
+  var t0 = Date.now();
+  var t = setInterval(function () {
+    try {
+      var n = JSON.parse(sessionStorage.getItem('dhq_open_wire_v1') || 'null');
+      if (!n || Date.now() - n.ts > 15 * 60e3) { clearInterval(t); return; }
+      var b = document.querySelector('.wr-all-wire-launch');
+      if (b && !b.disabled) { sessionStorage.removeItem('dhq_open_wire_v1'); clearInterval(t); b.click(); }
+      else if (Date.now() - t0 > 60000) clearInterval(t);
+    } catch (e) { clearInterval(t); }
+  }, 700);
+})();</script>
 <div id="dhq-build-tag" style="position:fixed;bottom:2px;right:6px;z-index:2147483647;font:700 9px/1.4 monospace;color:rgba(255,255,255,0.30);pointer-events:none;user-select:none;">b194a</div>
 </body>
 </html>

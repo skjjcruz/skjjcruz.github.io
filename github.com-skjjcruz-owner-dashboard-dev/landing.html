@@ -2,9 +2,9 @@
 <html lang="en">
 <head>
 <meta charset="utf-8">
-<meta name="dhq-build" content="b194a-b309696d0d">
+<meta name="dhq-build" content="b194a-a7b53f2eb0">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com data:; img-src 'self' data: blob: https:; connect-src 'self' https://sxshiqyxhhifvtfqawbq.supabase.co https://api.sleeper.app https://api.myfantasyleague.com https://*.myfantasyleague.com https://lm-api-reads.fantasy.espn.com https://fantasysports.yahooapis.com https://*.sentry.io; worker-src 'self' blob:; frame-ancestors 'none'; base-uri 'self'; object-src 'none';">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com data:; img-src 'self' data: blob: https:; connect-src 'self' https://sxshiqyxhhifvtfqawbq.supabase.co https://hovnqztlbsgsywrbidbh.supabase.co https://api.anthropic.com https://api.openai.com https://generativelanguage.googleapis.com https://dhq-lab.pages.dev https://api.sleeper.app https://api.myfantasyleague.com https://*.myfantasyleague.com https://lm-api-reads.fantasy.espn.com https://fantasysports.yahooapis.com https://*.sentry.io; worker-src 'self' blob:; frame-ancestors 'none'; base-uri 'self'; object-src 'none';">
 <title>Dynasty HQ — Generic advice stops here.</title>
   <meta name="description" content="Dynasty HQ reads your Sleeper, MFL or ESPN league and shows you who to start, which trades your leaguemates will take, and where you really stand. Free this season.">
 <link rel="icon" href="icon-192.png">
@@ -438,29 +438,469 @@
 </style>
 <!-- Live update: reloads onto a new deploy at a safe moment (js/shared/live-update.js) -->
 <script src="js/shared/live-update.js?v=f09653177c"></script>
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style id="lab-front-page">
+/* DHQ front page, Lab edition (owner design 2026-11-10).
+   Appended to landing.html's own stylesheet by scripts/lab-front-page.cjs.
+   Every rule sits under .fg (the new layout's wrapper) so the auth sheet and
+   the page's scripts keep their own styling; corners use the page's radius
+   tokens (--r-xs/-sm/-/-lg = 5/8/10/14). */
+.fg {
+  --fg-white: #F5F2EA; --fg-silver: #BDB8AD; --fg-gold: #D4AF37;
+  --fg-line: #ffffff18;
+  max-width: 1200px; margin: 0 auto;
+  font-family: 'DM Sans', var(--sans);
+  color: var(--fg-white);
+}
+.fg :focus-visible { outline: 3px solid var(--fg-gold); outline-offset: 4px; }
+
+/* Top bar: a full-width line under it without widening the page */
+.fg-header {
+  display: flex; align-items: center; justify-content: space-between; gap: 18px;
+  padding-block: calc(12px + var(--sat)) 12px;
+  box-shadow: 0 0 0 100vmax var(--bg), 0 1px 0 100vmax var(--fg-line);
+  clip-path: inset(0 -100vmax -1px);
+  position: relative; z-index: 2;
+}
+.fg-brand { display: flex; align-items: center; gap: 12px; text-decoration: none; color: var(--fg-white); }
+.fg-brand img { width: 44px; height: 44px; border-radius: var(--r); box-shadow: 0 2px 12px rgba(212,175,55,.3); }
+.fg-brand span { font: 700 20px/1 var(--display); letter-spacing: .06em; }
+.fg .fg-signin {
+  cursor: pointer; background: transparent; font: 500 14px/1 'DM Sans', var(--sans); color: var(--text-2);
+  padding: 10px 14px; border: 1px solid var(--border); border-radius: var(--r-sm);
+  transition: color .15s, border-color .15s;
+}
+.fg .fg-signin:hover { color: var(--fg-white); border-color: var(--border-strong); }
+
+.fg-main { padding-block: 40px 24px; }
+
+/* Welcome rows */
+.fg-row { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 12px 24px; }
+.fg h1 {
+  margin: 0; text-transform: uppercase; text-wrap: balance;
+  font: 700 clamp(26px, 3.4vw, 40px)/1.05 'DM Sans', var(--sans); letter-spacing: .01em; color: var(--fg-white);
+}
+.fg h1 span { color: var(--fg-gold); }
+.fg-tagrow { margin-top: 16px; }
+.fg-tagrow p { margin: 0; font: 500 clamp(13px, 1.5vw, 17px)/1.4 'DM Sans', var(--sans); letter-spacing: .08em; text-transform: uppercase; color: var(--fg-silver); }
+.fg-eyebrow { display: inline-flex; align-items: center; gap: 8px; font: 500 11px/1 var(--mono); letter-spacing: .14em; text-transform: uppercase; color: var(--forge); }
+.fg-eyebrow::before { content: ""; width: 8px; height: 8px; border-radius: 50%; background: var(--pos); box-shadow: 0 0 0 4px rgba(47,191,136,.15); }
+
+/* "Bring your own AI" banner (opens the sign-up sheet) */
+.fg-announce {
+  display: flex; width: fit-content; max-width: 100%; align-items: center; gap: 11px;
+  padding: 8px 14px 8px 10px; border: 1px solid rgba(212,175,55,.4); border-radius: var(--r-lg);
+  background: linear-gradient(180deg, rgba(212,175,55,.13), rgba(212,175,55,.04));
+  box-shadow: 0 6px 24px rgba(0,0,0,.25); color: var(--fg-white); text-decoration: none;
+  transition: border-color .15s, background .15s;
+}
+.fg-announce:hover, .fg-announce:focus-visible { border-color: var(--forge); background: linear-gradient(180deg, rgba(212,175,55,.18), rgba(212,175,55,.06)); }
+.fg-announce-text { display: flex; flex-direction: column; gap: 3px; min-width: 0; }
+.fg-announce-title { font: 700 14px/1.1 var(--display); letter-spacing: .05em; text-transform: uppercase; }
+.fg-announce-sub { font: 500 11.5px/1.3 'DM Sans', var(--sans); color: var(--text-2); }
+.fg-announce-tag { flex: none; padding: 4px 7px; border-radius: 999px; background: var(--forge); color: #15120a; font: 700 9.5px/1 var(--mono); letter-spacing: .12em; text-transform: uppercase; }
+.fg-announce-go { flex: none; color: var(--forge); font: 600 15px/1 'DM Sans', var(--sans); }
+
+/* Tools on the left, the War Room door on the right */
+.fg-lower { display: grid; grid-template-columns: minmax(0, 440px) minmax(0, 470px); justify-content: space-between; align-items: start; gap: 40px; margin-top: 60px; }
+.fg-entries { display: grid; grid-template-columns: minmax(0, 1fr); gap: 16px; }
+.fg-entry {
+  width: 100%; display: flex; align-items: center; gap: 14px; padding: 16px; min-height: 76px; text-align: left;
+  background: #ffffff04; color: var(--fg-white); border: 1px solid var(--fg-line); border-radius: var(--r);
+  font-family: 'DM Sans', var(--sans); cursor: pointer; transition: border-color .18s, transform .18s, box-shadow .18s;
+}
+a.fg-entry { text-decoration: none; }
+.fg-entry:hover { border-color: rgba(212,175,55,.45); transform: translateY(-1px); box-shadow: 0 4px 24px rgba(212,175,55,.1); }
+.fg-entry-icon { display: grid; place-items: center; width: 40px; height: 40px; flex: none; background: #e9e3d4; color: #27231b; font: 700 24px Georgia, serif; border-radius: var(--r-sm); }
+.fg-entry > span:nth-child(2) { display: grid; gap: 4px; min-width: 0; }
+.fg-entry strong { font-size: 16px; }
+.fg-entry > span:nth-child(2) > span { font-size: 14px; line-height: 1.4; color: var(--fg-silver); }
+.fg-entry b { margin-left: auto; color: var(--fg-gold); font-size: 20px; }
+
+.fg-gate { padding: 30px; border: 1px solid #4b4432; border-radius: var(--r-lg); background: linear-gradient(110deg, rgba(39,37,29,.92), rgba(24,24,23,.92)); box-shadow: 0 10px 40px rgba(0,0,0,.35); }
+.fg-kicker { font: 500 11px/1 var(--mono); letter-spacing: .14em; text-transform: uppercase; color: var(--forge); }
+.fg-gate h2 { margin: 10px 0 8px; font: 700 30px/1 var(--display); letter-spacing: .04em; text-transform: uppercase; color: var(--fg-white); }
+.fg-gate h2 span { color: var(--fg-gold); }
+.fg-copy { margin: 0 0 24px; font-size: 14.5px; line-height: 1.55; color: var(--fg-silver); }
+.fg-copy #ask { color: var(--fg-white); }
+.fg .platform { margin-bottom: 12px; }
+.fg form.go { max-width: none; }
+.fg .field input { height: 50px; font-size: 15px; }
+.fg button.cta { height: 50px; font-size: 16px; padding: 0 18px; }
+.fg .fine { font-size: 12px; }
+
+/* Inside the DHQ War Room */
+.fg-show { margin-top: 96px; padding-block: 24px 64px; border-top: 1px solid var(--border); }
+.fg-show-head { display: flex; align-items: baseline; justify-content: space-between; gap: 16px; padding-block: 32px 36px; flex-wrap: wrap; }
+.fg-show-head h2 { margin: 0; font: 700 30px/1 var(--display); text-transform: uppercase; letter-spacing: .02em; color: var(--fg-white); }
+.fg-show-head h2 span { color: var(--fg-gold); }
+.fg-show-sub { margin: 8px 0 0; font: 500 15px/1.4 'DM Sans', var(--sans); color: var(--fg-silver); }
+.fg-show-note { margin: 0; font: 400 13px/1.4 var(--mono); color: var(--text-3); }
+.fg-rail { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 36px; }
+.fg-tile { display: grid; gap: 22px; align-content: start; min-width: 0; }
+.fg-phone {
+  position: relative; width: 100%; border-radius: 30px; padding: 8px; background: #0E1015;
+  border: 1px solid var(--border-strong); box-shadow: 0 40px 80px -30px rgba(0,0,0,.8), 0 0 0 6px #0B0D11;
+}
+.fg-phone img { display: block; width: 100%; height: auto; border-radius: 23px; aspect-ratio: 520 / 700; object-fit: cover; object-position: top; }
+.fg-tile h3 { font: 700 22px/1.1 var(--display); text-transform: uppercase; letter-spacing: .03em; margin: 0 0 6px; color: var(--fg-white); }
+.fg-tag { font: 500 11px/1 var(--mono); letter-spacing: .14em; text-transform: uppercase; color: var(--forge); margin-bottom: 8px; display: block; }
+.fg-tile p { margin: 0; color: var(--text-2); font-size: 15px; line-height: 1.5; }
+
+/* Footer (the page's footer rules, plus room for the floating button) */
+
+.fg footer .fg-merch { display: inline-flex; align-items: center; gap: 7px; cursor: pointer; position: relative; }
+.fg footer .fg-merch.show-soon { color: var(--fg-gold, #d4af37); }
+.fg footer .fg-merch.show-soon .fg-merch-label { font-weight: 700; }
+.fg footer .fg-merch svg { width: 16px; height: 16px; fill: none; stroke: var(--fg-gold); stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
+
+/* "Ask your AI" (opens the sign-up sheet) */
+.fg-ask {
+  border: 1px solid rgba(212,175,55,.55); background: #1a1710; color: var(--fg-gold);
+  font: 700 15px 'DM Sans', var(--sans); letter-spacing: .04em; padding: 11px 20px; border-radius: 30px; cursor: pointer;
+}
+.fg-ask:hover { filter: brightness(1.12); }
+/* iPad portrait / phones: it floated over the tool list (launch QA 2026-11-17), so it steps aside
+   while the tools are on screen; the "Bring your own AI" banner opens the same sheet. */
+
+@media (prefers-reduced-motion: no-preference) {
+  .fg-phone { transition: transform .28s cubic-bezier(.25,.1,.25,1); }
+  .fg-tile:hover .fg-phone { transform: translateY(-4px); }
+}
+@media (max-width: 880px) {
+  .fg-lower { grid-template-columns: minmax(0, 1fr); }
+  .fg-gate { order: -1; }
+  .fg-rail { grid-template-columns: none; grid-auto-flow: column; grid-auto-columns: 78%; overflow-x: auto; scroll-snap-type: x mandatory; padding-bottom: 8px; }
+  .fg-tile { scroll-snap-align: start; }
+}
+@media (max-width: 600px) {
+  .fg-main { padding-top: 24px; }
+  .fg-gate { padding: 22px; }
+  .fg-show { margin-top: 64px; }
+}
+@media (max-width: 440px) { .fg form.go { flex-direction: column; } }
+
+/* Owner ask 2026-11-18: the War Room screens lighter and better spaced (they read too big and crowded). */
+.fg-show-head { padding-block: 28px 44px; }
+.fg-rail { grid-template-columns: repeat(3, minmax(0, 300px)); justify-content: space-between; gap: 48px; }
+.fg-tile { gap: 18px; }
+.fg-phone { max-width: 300px; border-radius: 24px; padding: 6px; box-shadow: 0 24px 50px -30px rgba(0,0,0,.75), 0 0 0 4px #0B0D11; }
+.fg-phone img { border-radius: 18px; }
+.fg-tile h3 { font-size: 18px; margin-bottom: 6px; }
+.fg-tile p { font-size: 14px; max-width: 30em; }
+@media (max-width: 880px) {
+  .fg-rail { grid-template-columns: none; grid-auto-columns: min(280px, 72%); justify-content: start; gap: 28px; }
+}
+/* League Wire: lives in the War Room; without a league the button points at the War Room box. */
+.fg-wire-note { margin: 0 0 14px; padding: 10px 12px; border: 1px solid rgba(212,175,55,.45); background: rgba(212,175,55,.1); color: var(--fg-white); border-radius: var(--r-sm); font: 500 14px/1.45 'DM Sans', var(--sans); }
+.fg-gate.fg-gate-flash { box-shadow: 0 0 0 2px rgba(212,175,55,.6), 0 0 40px rgba(212,175,55,.18); transition: box-shadow .3s; }
+
+/* Owner ask 2026-11-18: a returning Pro member sees "DYNASTY HQ · PRO" here, as in the War Room. */
+.fg-brand.is-pro span::after { content: " \00B7 PRO"; font-size: .72em; color: var(--fg-gold); letter-spacing: .08em; }
+
+/* Phone layout (owner ask 2026-11-18: "way too cluttered and boxy"). Sleeper-style list rows and the C2 phone
+   rules (16px main text, 13–14px secondary, 44px tap targets, one line per item). Desktop and iPad unchanged. */
+@media (max-width: 600px) {
+  .fg-header { padding-block: calc(8px + var(--sat)) 8px; gap: 10px; }
+  .fg-brand { gap: 8px; }
+  .fg-brand img { width: 30px; height: 30px; border-radius: var(--r-sm); box-shadow: none; }
+  .fg-brand span { font-size: 16px; letter-spacing: .08em; }
+  .fg .fg-signin { min-height: 36px; padding: 0 14px; font-size: 13px; font-weight: 600; border-radius: 999px; border-color: rgba(212,175,55,.55); color: var(--fg-gold); }
+  .fg-main { padding-top: 18px; }
+  .fg h1 { font-size: clamp(18px, 5.5vw, 24px); letter-spacing: 0; white-space: nowrap; }
+  .fg-row { gap: 8px; }
+  .fg-tagrow { margin-top: 6px; flex-direction: column; align-items: flex-start; gap: 6px; }
+  .fg-tagrow p { max-width: 100%; font-size: 13px; letter-spacing: .01em; text-transform: none; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .fg-eyebrow { font-size: 10px; letter-spacing: .1em; }
+  .fg-eyebrow::before { width: 6px; height: 6px; box-shadow: 0 0 0 3px rgba(47,191,136,.15); }
+  /* "Bring your own AI": one slim line */
+  .fg-announce { width: 100%; padding: 9px 12px; gap: 9px; border-radius: var(--r); box-shadow: none; }
+  .fg-announce-sub { display: none; }
+  .fg-announce-text { flex: 1; }
+  .fg-announce-title { font-size: 13px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .fg-announce-tag { padding: 3px 6px; font-size: 9px; }
+  .fg-lower { margin-top: 18px; gap: 16px; }
+  /* The War Room box: title, tabs, then the field and the button on one row */
+  .fg-gate { padding: 14px; border-radius: var(--r); box-shadow: none; }
+  .fg-kicker { display: none; }
+  .fg-gate h2 { margin: 0 0 4px; font-size: 18px; letter-spacing: .03em; white-space: nowrap; }
+  .fg-copy { margin: 0 0 10px; font-size: 0; line-height: 0; }
+  .fg-copy #ask { font-size: 13px; line-height: 1.4; color: var(--fg-silver); }
+  .fg .platform { display: grid; width: 100%; padding: 3px; margin-bottom: 8px; }
+  .fg .platform button { min-width: 0; height: 34px; padding: 0 6px; font-size: 13px; }
+  .fg form.go { flex-direction: row; gap: 8px; }
+  .fg .field input { height: 44px; padding-left: 38px; font-size: 16px; }
+  .fg .field svg { left: 13px; width: 16px; height: 16px; }
+  .fg button.cta { height: 44px; padding: 0 14px; font-size: 14px; letter-spacing: .05em; }
+  .fg-gate > p.fine:last-child { display: none; }
+  /* The tools: one list with hairlines, not six boxes */
+  .fg-entries { gap: 0; border: 1px solid var(--fg-line); border-radius: var(--r); overflow: hidden; background: #ffffff05; }
+  .fg-entry { min-height: 58px; padding: 10px 12px; gap: 12px; border: 0; border-bottom: 1px solid var(--fg-line); border-radius: 0; background: transparent; }
+  .fg-entry:last-child { border-bottom: 0; }
+  .fg-entry:hover { transform: none; box-shadow: none; }
+  .fg-entry-icon { width: 30px; height: 30px; font-size: 17px; border-radius: var(--r-xs); }
+  .fg-entry > span:nth-child(2) { gap: 1px; }
+  .fg-entry strong { font-size: 15px; }
+  .fg-entry > span:nth-child(2) > span { font-size: 13px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .fg-entry b { font-size: 16px; }
+  /* Inside the War Room: smaller screens */
+  .fg-show { margin-top: 32px; padding-block: 4px 28px; }
+  .fg-show-head { padding-block: 16px; }
+  .fg-show-head h2 { font-size: 19px; white-space: nowrap; }
+  .fg-show-sub { margin-top: 4px; font-size: 13px; }
+  .fg-show-note { display: none; }
+  .fg-rail { grid-auto-columns: min(210px, 60%); gap: 14px; }
+  .fg-tile { gap: 12px; }
+  .fg-phone { border-radius: 18px; padding: 4px; box-shadow: 0 0 0 3px #0B0D11; }
+  .fg-phone img { border-radius: 14px; }
+  .fg-tag { font-size: 10px; margin-bottom: 5px; }
+  .fg-tile h3 { font-size: 15px; }
+  .fg-tile p { font-size: 13px; }
+  .fg footer.fg-footer nav { gap: 6px 16px; font-size: 13px; }
+}
+@media (max-width: 600px) {
+  /* reading order: headline, tagline, "Supports…", then the AI banner */
+  .fg-welcome { display: flex; flex-direction: column; }
+  .fg-welcome > .fg-row { display: contents; }
+  .fg-welcome h1 { order: 1; }
+  .fg-tagrow p { order: 2; margin-top: 6px; }
+  .fg-tagrow .fg-eyebrow { order: 3; margin-top: 6px; }
+  .fg-announce { order: 4; margin-top: 14px; }
+  /* the field gets the room; the button stays its own size */
+  .fg .field { flex: 1 1 auto; min-width: 0; }
+  .fg button.cta { flex: none; width: auto; }
+  .fg-tile h3 { font-size: 14px; }
+}
+@media (max-width: 600px) {
+  .fg-copy { display: none; }
+  .fg-gate h2 { margin-bottom: 10px; }
+}
+@media (max-width: 600px) { .fg-entry strong { display: block; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; } }
+@media (max-width: 360px) { .fg button.cta { padding: 0 10px; font-size: 12.5px; } .fg-brand span { font-size: 14px; } .fg .fg-signin { padding: 0 11px; } }
+/* Owner ask 2026-11-18 (phone, round 2): the War Room screens one whole screen at a time, and tidy bottom links. */
+.fg-dots { display: none; }
+@media (max-width: 600px) {
+  .fg-rail { grid-auto-columns: 100%; gap: 0; scroll-snap-type: x mandatory; padding-bottom: 2px; scrollbar-width: none; }
+  .fg-rail::-webkit-scrollbar { display: none; }
+  .fg-tile { scroll-snap-align: center; justify-items: center; text-align: center; padding: 0 6px; }
+  .fg-phone { width: min(230px, 62vw); max-width: none; }
+  .fg-tile p { max-width: 32ch; margin: 0 auto; }
+  .fg-dots { display: flex; justify-content: center; gap: 2px; margin-top: 10px; }
+  .fg-dots button { width: 28px; height: 28px; padding: 0; border: 0; background: none; cursor: pointer; display: grid; place-items: center; }
+  .fg-dots button::before { content: ""; width: 7px; height: 7px; border-radius: 999px; background: rgba(255,255,255,.25); transition: width .2s, background .2s; }
+  .fg-dots button[aria-current="true"]::before { width: 18px; background: var(--fg-gold); }
+  .fg footer.fg-footer { display: block; text-align: center; padding-block: 18px calc(84px + var(--sab)); }
+  .fg footer.fg-footer nav { display: grid; grid-template-columns: repeat(4, auto); justify-content: center; gap: 0 16px; }
+  .fg footer.fg-footer nav a, .fg footer.fg-footer nav .foot-btn { display: inline-flex; align-items: center; justify-content: center; min-height: 36px; padding: 0; font-size: 12.5px; }
+  .fg footer.fg-footer nav .foot-btn[data-open-sheet] { order: 9; }
+  .fg footer .fg-merch svg { width: 13px; height: 13px; }
+  .fg footer.fg-footer small { display: block; margin-top: 10px; font-size: 11px; }
+}
+
+/* Owner ask 2026-11-18: a calmer bottom. Ask your AI centered in the footer (it no longer floats
+   over the page), one row of Discord / X / Merch / App Store, then small links and the copyright. */
+.fg footer.fg-footer { display: grid; grid-template-columns: minmax(0, 1fr); justify-content: center; justify-items: center; gap: 16px; text-align: center; padding-block: 36px calc(28px + var(--sab)); }
+.fg footer .fg-ask { position: static; display: inline-flex; align-items: center; gap: 8px; padding: 12px 26px; font-size: 15px; background: linear-gradient(180deg, rgba(212,175,55,.22), rgba(212,175,55,.08)), #1a1710; box-shadow: 0 0 0 1px rgba(212,175,55,.2), 0 6px 22px rgba(212,175,55,.16); }
+.fg footer .fg-ask i { font-style: normal; font-size: 14px; }
+.fg-social { display: flex; flex-wrap: wrap; justify-content: center; align-items: center; gap: 10px; }
+.fg-social .fg-ico { width: 42px; height: 42px; display: grid; place-items: center; border-radius: 50%; border: 1px solid var(--border-strong, rgba(255,255,255,.14)); background: rgba(255,255,255,.03); color: var(--fg-gold, #d4af37); }
+.fg-social .fg-ico svg { width: 18px; height: 18px; fill: currentColor; }
+.fg-social .fg-ico:hover, .fg-social .fg-pill:hover { border-color: rgba(212,175,55,.55); }
+.fg footer .fg-social .fg-pill { height: 42px; padding: 0 16px; border-radius: 999px; border: 1px solid var(--border-strong, rgba(255,255,255,.14)); background: rgba(255,255,255,.03); color: var(--text-2, #c9c4b8); font: 600 13.5px 'DM Sans', var(--sans); }
+.fg-appstore { height: 42px; display: inline-flex; align-items: center; gap: 7px; padding: 0 14px 0 11px; border-radius: 10px; border: 1px solid #a6a6a6; background: #000; color: #fff; text-decoration: none; text-align: left; }
+.fg-appstore svg { width: 20px; height: 20px; fill: #fff; flex: none; margin-top: -2px; }
+.fg-appstore span { display: grid; line-height: 1.05; }
+.fg-appstore small { font: 500 9.5px 'DM Sans', var(--sans); letter-spacing: .02em; }
+.fg-appstore b { font: 600 16px 'DM Sans', var(--sans); letter-spacing: -.01em; }
+.fg-appstore:hover { border-color: #fff; }
+.fg footer.fg-footer nav { display: flex; flex-wrap: wrap; justify-content: center; gap: 4px 18px; }
+.fg footer.fg-footer nav a, .fg footer.fg-footer nav .foot-btn { font-size: 13px; }
+.fg footer.fg-footer small { margin: 0; font-size: 11.5px; }
+@media (max-width: 600px) {
+  .fg footer.fg-footer { display: grid; gap: 14px; padding-block: 28px calc(22px + var(--sab)); }
+  .fg footer .fg-ask { padding: 11px 24px; font-size: 14px; }
+  /* owner ask 2026-11-18: App Store beside Merch, all four on one even row */
+  .fg-social { gap: 6px; flex-wrap: nowrap; }
+  .fg-social .fg-ico { width: 38px; }
+  .fg-social .fg-ico, .fg footer .fg-social .fg-pill, .fg-appstore { height: 38px !important; }
+  .fg-social .fg-ico svg { width: 16px; height: 16px; }
+  .fg footer .fg-social .fg-pill { padding: 0 10px; gap: 5px; white-space: nowrap; }
+  .fg-appstore { padding: 0 10px 0 8px; gap: 5px; border-radius: 9px; }
+  /* owner ask 2026-11-18: a bit smaller and quieter on phones (it overpowered the row) */
+  .fg-appstore { padding: 0 9px 0 7px; gap: 4px; border-color: rgba(255,255,255,.38); }
+  .fg-appstore svg { width: 14px !important; height: 14px !important; }
+  .fg-appstore small { font-size: 7.5px !important; }
+  .fg-appstore b { font-size: 12px !important; font-weight: 600; }
+  .fg-social > * { flex: none; width: auto; }
+  .fg-social .fg-ico { width: 38px; }
+  .fg-appstore small, .fg-appstore b { white-space: nowrap; }
+  .fg-appstore svg { width: 14px; height: 14px; }
+  .fg-appstore small { font-size: 7.5px; }
+  .fg-appstore b { font-size: 12px !important; font-weight: 600; }
+  .fg-social .fg-ico, .fg footer .fg-social .fg-pill, .fg-appstore { height: 40px; }
+  .fg-social .fg-ico { width: 40px; }
+  .fg footer .fg-social .fg-pill { padding: 0 12px; font-size: 12.5px; }
+  .fg footer .fg-social .fg-pill svg { width: 14px; height: 14px; }
+  .fg-appstore b { font-size: 14.5px; }
+  .fg footer.fg-footer nav { display: flex; gap: 0 14px; }
+  .fg footer.fg-footer nav a, .fg footer.fg-footer nav .foot-btn { min-height: 34px; font-size: 12.5px; }
+  .fg footer.fg-footer nav .foot-btn[data-open-sheet] { order: 0; }
+  .fg footer.fg-footer small { margin-top: 0; }
+}
+@media (max-width: 360px) { .fg-social .fg-ico { width: 36px; } .fg-social .fg-ico, .fg footer .fg-social .fg-pill, .fg-appstore { height: 36px !important; } .fg footer .fg-social .fg-pill { padding: 0 8px; font-size: 11.5px; } .fg-appstore b { font-size: 11.5px !important; } }
+
+/* ── Match the War Room app (owner ask 2026-11-18: "users shouldn't notice a difference in style").
+   The front page came from the website and kept its warmer gold (#E8B23A), mono labels and
+   uppercase headline buttons; the War Room (and the iPhone app, which is the War Room) uses the DHQ
+   gold #D4AF37, DM Sans, and a gold "DYNASTY HQ" wordmark. Values below are the War Room's own
+   (js/hub-v2.css .hv2-header / .hv2-brand / .hv2-wordmark / .hv2-account-controls). ── */
+:root { --forge: #D4AF37; --forge-tint: rgba(212,175,55,.12); }
+.fg-header { min-height: 68px; }
+.fg-brand img { width: 44px; height: 44px; border-radius: var(--r); box-shadow: 0 2px 12px rgba(212,175,55,.3); }
+.fg-brand span {
+  font: 700 1.1rem/1.1 'DM Sans', var(--sans); letter-spacing: .06em;
+  background: linear-gradient(135deg, #D4AF37 0%, #F5F2EA 50%, #D4AF37 100%); background-size: 200% auto;
+  -webkit-background-clip: text; background-clip: text; -webkit-text-fill-color: transparent; color: #D4AF37;
+  animation: fg-shimmer 3s linear infinite;
+}
+.fg-brand.is-pro span::after { -webkit-text-fill-color: var(--fg-gold); }
+@keyframes fg-shimmer { 0% { background-position: 0% center; } 100% { background-position: 200% center; } }
+@media (prefers-reduced-motion: reduce) { .fg-brand span { animation: none; } }
+.fg .fg-signin { min-height: 44px; display: inline-flex; align-items: center; padding: 0 16px; border-radius: 30px; border: 1px solid rgba(212,175,55,.55); background: #ffffff08; color: var(--fg-gold); font: 600 13px/1 'DM Sans', var(--sans); }
+.fg .fg-signin:hover { color: var(--fg-gold); border-color: var(--fg-gold); }
+/* the War Room box: app buttons, not the website's headline buttons */
+.fg button.cta { font: 700 15px/1 'DM Sans', var(--sans); text-transform: none; letter-spacing: 0; background: var(--fg-gold); color: #18160f; }
+.fg [id^="pick-"] { font: 600 14px/1 'DM Sans', var(--sans); text-transform: none; letter-spacing: 0; }
+.fg #league-key { font-family: 'DM Sans', var(--sans); }
+/* Phones: the hint ("Sleeper username") was cut off by a few pixels; a smaller hint fits. Typed text keeps its size. */
+@media (max-width: 600px) { .fg #league-key::placeholder { font-size: 12.5px; } }
+/* small labels: DM Sans like the app's eyebrows, not the website's mono */
+.fg .fg-eyebrow, .fg .fg-tag, .fg .fg-announce-tag { font-family: 'DM Sans', var(--sans); font-weight: 700; }
+.fg footer.fg-footer small { font-family: 'DM Sans', var(--sans); letter-spacing: .02em; }
+@media (max-width: 600px) {
+  .fg-header { min-height: 68px; padding-block: calc(10px + var(--sat)) 10px; gap: 12px; }
+  .fg-brand { gap: 9px; }
+  .fg-brand img { width: 34px; height: 34px; border-radius: var(--r); box-shadow: 0 2px 12px rgba(212,175,55,.3); }
+  .fg-brand span { font-size: 16px; letter-spacing: .025em; white-space: nowrap; }
+  .fg .fg-signin { min-height: 44px; padding: 0 14px; font-size: 13px; border-radius: 30px; }
+  .fg-tagrow p { font-size: 14px; }
+  .fg button.cta { font-size: 14.5px; }
+}
+.fg [id^="pick-"][aria-pressed="true"], .auth-platform button[aria-pressed="true"] { border-color: rgba(212,175,55,.45); }
+.announce:hover, .announce:focus-visible { background: linear-gradient(180deg, rgba(212,175,55,.18), rgba(212,175,55,.06)); }
+@media (max-width: 360px) { .fg-brand span { font-size: 14.5px; } .fg .fg-signin { padding: 0 11px; } }
+
+/* iPad (owner ask 2026-11-18): Ask your AI under the War Room box (the button is moved there by the
+   page script). Side by side: the tool list spans both rows so the button sits right under the box. */
+.fg-ask-slot { display: flex; justify-content: center; }
+.fg-ask-slot[hidden] { display: none; }
+.fg .fg-ask-slot .fg-ask { position: static; display: inline-flex; align-items: center; gap: 8px; padding: 12px 26px; font-size: 15px; background: linear-gradient(180deg, rgba(212,175,55,.22), rgba(212,175,55,.08)), #1a1710; box-shadow: 0 0 0 1px rgba(212,175,55,.2), 0 6px 22px rgba(212,175,55,.16); }
+.fg .fg-ask-slot .fg-ask i { font-style: normal; font-size: 14px; }
+@media (min-width: 881px) {
+  .fg-lower:has(> .fg-ask-slot:not([hidden])) { grid-template-rows: auto 1fr; row-gap: 22px; }
+  .fg-lower:has(> .fg-ask-slot:not([hidden])) > :first-child { grid-row: 1 / span 2; }
+  .fg-lower > .fg-ask-slot { grid-column: 2; grid-row: 2; align-self: start; }
+}
+@media (max-width: 880px) {
+  .fg-lower > .fg-ask-slot { order: -1; margin-top: -16px; }
+}
+
+/* Owner ask 2026-11-18: on desktop and iPad the bottom is a proper admin bar (logo and copyright on
+   the left, the links in the middle, Discord / X / Merch / App Store on the right), with Ask your AI
+   centered above it on desktop (on iPads it sits under the War Room box). Phones keep the stack. */
+.fg-foot-brand { display: none; }
+@media (min-width: 601px) {
+  .fg footer.fg-footer { grid-template-columns: auto minmax(0, 1fr) auto; grid-template-areas: "ask ask ask" "brand nav social" "copy nav social"; justify-items: stretch; align-items: center; gap: 4px 32px; text-align: left; padding-block: 32px calc(28px + var(--sab)); }
+  .fg footer .fg-ask { grid-area: ask; justify-self: center; margin-bottom: 26px; }
+  .fg-foot-brand { grid-area: brand; display: flex; align-items: center; gap: 10px; text-decoration: none; justify-self: start; }
+  .fg-foot-brand img { width: 28px; height: 28px; border-radius: var(--r-sm); box-shadow: 0 2px 10px rgba(212,175,55,.25); }
+  .fg-foot-brand span { font: 700 14px/1 'DM Sans', var(--sans); letter-spacing: .06em; color: var(--fg-gold); }
+  .fg footer.fg-footer nav { grid-area: nav; justify-self: center; justify-content: center; }
+  .fg footer .fg-social { grid-area: social; justify-self: end; }
+  .fg footer.fg-footer > small { grid-area: copy; justify-self: start; }
+}
+@media (min-width: 601px) and (max-width: 1023px) {
+  .fg footer.fg-footer { grid-template-columns: auto minmax(0, 1fr) auto; grid-template-areas: "ask ask ask" "brand . social" "nav nav copy"; row-gap: 14px; }
+  .fg footer.fg-footer nav { justify-self: start; justify-content: flex-start; gap: 4px 16px; }
+  .fg footer.fg-footer > small { justify-self: end; }
+}
+/* iPad (owner ask 2026-11-18: "there's a big space"): tighter gaps between the sections */
+@media (min-width: 601px) and (max-width: 1366px) and (pointer: coarse) {
+  .fg-lower { margin-top: 32px; }
+  .fg-show { margin-top: 40px; padding-bottom: 28px; }
+}
+
+/* Owner ask 2026-11-18: desktop and iPad side by side, Ask your AI centered between the War Room
+   box and the line above "Inside the DHQ War Room". The slot fills the space under the box (row 2);
+   the button is nudged down by half of what the section's top margin adds below that space. */
+.fg { --fg-show-mt: 96px; }
+@media (min-width: 601px) and (max-width: 1366px) and (pointer: coarse) { .fg { --fg-show-mt: 40px; } }
+@media (min-width: 881px) {
+  .fg-lower > .fg-ask-slot { align-self: stretch; align-items: center; }
+  .fg .fg-ask-slot .fg-ask { transform: translateY(calc((var(--fg-show-mt) - 22px) / 2)); }
+}
+</style>
 </head>
 <body>
 <div class="brandwash" aria-hidden="true"></div>
 
-<div class="wrap">
-  <header class="top">
-    <a class="brand" href="#top" aria-label="Dynasty HQ">
-      <img src="img/logo.png" alt="" width="36" height="36">
+<div class="wrap fg">
+  <!-- DHQ front page, Lab edition (owner design 2026-11-10). Swapped into the
+       built landing.html by scripts/lab-front-page.cjs during publish-lab.
+       Everything the page's scripts look up keeps its id: navSignin, ask,
+       .platform buttons (pick-*), go, league-key, league-key-label, ico-user,
+       ico-hash, btnGuest, key-hint, note, contactLink. Sign in / sign up open
+       the page's own auth sheet (data-open-sheet), so OAuth still returns to
+       landing.html. Player Valuations / Weekly Player Projections open projections.html (#values / #weekly), Trade Calculator opens trade.html, Start Sit Advice opens startsit.html, Commissioner Calculator opens commish.html (lab/); the other tool buttons are not wired yet. -->
+  <header class="fg-header">
+    <a class="fg-brand" href="#top" aria-label="Dynasty HQ">
+      <img src="img/logo.png" alt="" width="40" height="40">
       <span>DYNASTY HQ</span>
     </a>
-    <button class="signin nav-btn" id="navSignin" type="button" data-open-sheet="signin">Sign in</button>
+    <button class="fg-signin nav-btn" id="navSignin" type="button" data-open-sheet="signin">Sign in</button>
+    <script>/* Owner ask 2026-11-17: someone who has never had an account here sees "Join for Free" (opens
+       sign-up); a member who signed out on this device keeps "Sign in". Signed in: the page makes it "Open War Room". */
+    (function () {
+      var b = document.getElementById('navSignin'), st = '';
+      try { st = localStorage.getItem('dhq_identity_owner_v1') || ''; } catch (e) { /* first visit */ }
+      /* Owner ask 2026-11-18: "· PRO" beside the icon for a returning Pro member, as in the War Room.
+         The War Room saves the confirmed answer for the account (js/shared/pro-gate.js); it is shown
+         only for the account that last signed in on this device. */
+      try {
+        var mk = localStorage.getItem('dhq_pro_mark_v1') || '', br = document.querySelector('.fg-brand');
+        if (br && /^(account|legacy):/.test(st) && mk === st + '|1') { br.classList.add('is-pro'); br.setAttribute('aria-label', 'Dynasty HQ Pro'); }
+      } catch (e) { /* no mark */ }
+      if (!b || /^(account|legacy):/.test(st)) return;
+      b.textContent = 'Join for Free'; b.setAttribute('data-open-sheet', 'signup');
+    })();</script>
   </header>
 
-  <main id="top">
-    <section class="hero">
-      <!-- Owner ask 2026-10-10: the hero's top line sits level with the AI banner. -->
-      <div class="hero-top">
-        <span class="eyebrow">Built for Sleeper, MFL and ESPN leagues</span>
-        <a class="announce" href="#auth" data-open-sheet="signup"><span class="announce-tag">New</span><span class="announce-text"><span class="announce-title">Bring your own AI to the fight</span><span class="announce-sub">Your AI. Your league data. Your competitive edge.</span></span><span class="announce-go" aria-hidden="true">&rarr;</span></a>
+  <main id="top" class="fg-main">
+    <section class="fg-welcome">
+      <div class="fg-row">
+        <h1>Welcome to <span>DHQ Football</span></h1>
+        <a class="fg-announce" href="#auth" data-open-sheet="signup" data-ai-signup><span class="fg-announce-tag">New</span><span class="fg-announce-text"><span class="fg-announce-title">Bring your own AI to the fight</span><span class="fg-announce-sub">Your AI. Your league data. Your competitive edge.</span></span><span class="fg-announce-go" aria-hidden="true">&rarr;</span></a>
       </div>
-      <div>
-        <h1>Generic advice <em>stops here.</em></h1>
-        <p class="lede"><strong class="kicker">Stop playing by other people's rules.</strong> <span id="ask">Type your Sleeper name.</span> DHQ reads your league and shows you who to start, which trades your leaguemates will take, and where you really stand. <span class="win">Because Winning Matters 🏆</span></p>
+      <div class="fg-row fg-tagrow">
+        <p>Your one stop shop for all things fantasy football</p>
+        <span class="fg-eyebrow">Supports Sleeper, MFL and ESPN leagues</span>
+      </div>
+    </section>
+
+    <div class="fg-lower">
+      <section class="fg-entries" aria-label="Free tools">
+        <a class="fg-entry" href="projections.html#values"><span class="fg-entry-icon" aria-hidden="true">V</span><span><strong>Player Valuations</strong><span>Every player's DHQ dynasty value</span></span><b aria-hidden="true">&rarr;</b></a>
+        <a class="fg-entry" href="projections.html#weekly"><span class="fg-entry-icon" aria-hidden="true">W</span><span><strong>Weekly Player Projections</strong><span>Every player's DHQ projection this week</span></span><b aria-hidden="true">&rarr;</b></a>
+        <a class="fg-entry" href="trade.html"><span class="fg-entry-icon" aria-hidden="true">T</span><span><strong>Trade Calculator</strong><span>Grade any deal before you send it</span></span><b aria-hidden="true">&rarr;</b></a>
+        <a class="fg-entry" href="startsit.html"><span class="fg-entry-icon" aria-hidden="true">S</span><span><strong>Start Sit Advice</strong><span>Who to play this week, and why</span></span><b aria-hidden="true">&rarr;</b></a>
+        <a class="fg-entry" href="commish.html"><span class="fg-entry-icon" aria-hidden="true">C</span><span><strong>Commissioner Calculator</strong><span>Tools for running your league</span></span><b aria-hidden="true">&rarr;</b></a>
+        <a class="fg-entry" href="index.html" id="wireEntry"><span class="fg-entry-icon" aria-hidden="true">L</span><span><strong>League Wire</strong><span>Your league's own weekly newspaper</span></span><b aria-hidden="true">&rarr;</b></a>
+      </section>
+
+      <section class="fg-gate" aria-labelledby="gate-title">
+        <span class="fg-kicker">Your leagues</span>
+        <h2 id="gate-title">Enter the <span>DHQ War Room</span></h2>
+        <p class="fg-copy"><span id="ask">Type your Sleeper name.</span> DHQ reads your league in seconds: who to start, which trades your leaguemates will take, and where you really stand.</p>
         <div class="platform" role="group" aria-label="Where your league lives">
           <button type="button" id="pick-sleeper" data-platform="sleeper" aria-pressed="true">Sleeper</button>
           <button type="button" id="pick-mfl" data-platform="mfl" aria-pressed="false">MFL</button>
@@ -479,62 +919,144 @@
         <p class="fine" id="key-hint" hidden></p>
         <div class="note" id="note" role="alert" hidden></div>
         <p class="fine"><b>Free.</b> No account, no password. Dynasty, redraft, superflex and IDP.</p>
-        <p class="signup"><strong>Become a founding member.</strong> Everything in DHQ is free this season. Create a free account before March 1, 2027 and your first year of full DHQ is free when paid plans start. <a href="#auth" class="hero-secondary" id="signup-link" data-open-sheet="signup">Create free account&nbsp;&rarr;</a></p>
-        <p class="signup" style="border-top:0;padding-top:0;margin-top:12px"><strong>New: bring your own AI.</strong> Members ask about their league in plain English, right in the app, with their own ChatGPT, Claude or Gemini, powered by DHQ's numbers. No extra cost from us. <a href="#auth" class="hero-secondary" data-open-sheet="signup">Join free&nbsp;&rarr;</a></p>
-      </div>
+      </section>
+    </div>
 
-      <div class="hero-art">
-        <div class="phone"><img src="img/landing/briefing.jpg" width="780" height="1060" alt="DHQ home screen: an intelligence briefing for GoldJacket, ranked 2nd with a health score of 89, contender tier."></div>
+    <section class="fg-show" aria-labelledby="show-title">
+      <div class="fg-show-head">
+        <div>
+          <h2 id="show-title">Inside the <span>DHQ War Room</span></h2>
+          <p class="fg-show-sub">Load your league and all of this is yours. Free.</p>
+        </div>
+        <p class="fg-show-note">App screens · names changed · Week 3</p>
       </div>
-    </section>
-
-    <section class="show" aria-labelledby="show-title">
-      <div class="show-head">
-        <h2 id="show-title">What you get</h2>
-        <p>Real app screens · names changed · Week 3</p>
-      </div>
-      <div class="rail">
-        <article class="tile">
-          <div class="phone"><img src="img/landing/game-day.jpg" width="780" height="1282" loading="lazy" alt="Game Day: an Alex note, the optimizer confirming the lineup is already optimal at 89.3 projected points, and graded starters including Ja'Marr Chase and Puka Nacua."></div>
+      <div class="fg-rail">
+        <article class="fg-tile">
+          <div class="fg-phone"><img src="img/landing/all-leagues.jpg?v=20261118" width="975" height="1312" loading="lazy" alt="Your leagues: five Sleeper, ESPN and MFL leagues side by side, the last one opened ready to resume, an Ask your AI button at the top and The Wire, your league’s own weekly newspaper, underneath."></div>
           <div>
-            <span class="tag">Game Day</span>
-            <h3>Start the Right Players</h3>
-            <p>Sleeper's own projections for your scoring, a matchup grade on every starter, and the exact swaps that add points.</p>
+            <span class="fg-tag">My Leagues</span>
+            <h3>All your leagues in one place</h3>
+            <p>Sleeper, MFL and ESPN side by side. Dynasty, redraft, superflex or chopped, one tap to jump in.</p>
           </div>
         </article>
-        <article class="tile">
-          <div class="phone"><img src="img/landing/trade-center.jpg" width="780" height="1320" loading="lazy" alt="Trade Center finder rows: two B-grade offers to FourthAndLong for Jonathan Taylor and Bhayshul Tuten, with acceptance odds and value difference."></div>
+        <article class="fg-tile">
+          <div class="fg-phone"><img src="img/landing/game-day.jpg" width="780" height="1282" loading="lazy" alt="Game Day: an Alex note, the optimizer confirming the lineup is already optimal at 89.3 projected points, and graded starters including Ja'Marr Chase and Puka Nacua."></div>
           <div>
-            <span class="tag">Trade Center</span>
-            <h3>Trades Opponents will Take</h3>
+            <span class="fg-tag">Game Day</span>
+            <h3>Start the right players</h3>
+            <p>DHQ's projections for your scoring, a matchup grade on every starter, and the exact swaps that add points.</p>
+          </div>
+        </article>
+        <article class="fg-tile">
+          <div class="fg-phone"><img src="img/landing/trade-center.jpg" width="780" height="1320" loading="lazy" alt="Trade Center finder rows: two B-grade offers to FourthAndLong, with acceptance odds and value difference."></div>
+          <div>
+            <span class="fg-tag">Trade Center</span>
+            <h3>Trades opponents will take</h3>
             <p>Offers built around what you need and what each owner in your league tends to accept.</p>
-          </div>
-        </article>
-        <article class="tile">
-          <div class="phone"><img src="img/landing/power-rankings.jpg" width="780" height="1220" loading="lazy" alt="Power Rankings for an 18-team league, with GoldJacket highlighted at number 2."></div>
-          <div>
-            <span class="tag">Power Rankings</span>
-            <h3>Know where you stand</h3>
-            <p>Every team in your league ranked, with your spot highlighted. Updated every week.</p>
           </div>
         </article>
       </div>
     </section>
   </main>
 
-  <footer>
+  <footer class="fg-footer">
+    <!-- Owner ask 2026-11-18: Ask your AI sits here, centered, instead of floating over the page;
+         then Discord, X, Merch and the App Store, the same links the War Room app uses. -->
+    <a class="fg-foot-brand" href="#top" aria-label="Dynasty HQ, back to top"><img src="img/logo.png" alt="" width="28" height="28"><span>DYNASTY HQ</span></a>
+    <button class="fg-ask" type="button" data-open-sheet="signup" data-ai-signup><i aria-hidden="true">✦</i>Ask your AI</button>
+    <div class="fg-social">
+      <a class="fg-ico" href="https://discord.gg/3VFRJbWVnH" target="_blank" rel="noopener" aria-label="Join the Dynasty HQ Discord" title="Join the Discord"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20.3 4.4A19.8 19.8 0 0 0 15.4 3l-.2.4c1.8.5 2.6 1.1 3.5 1.9a16.2 16.2 0 0 0-13.4 0c.9-.8 1.9-1.5 3.5-1.9L8.6 3a19.8 19.8 0 0 0-4.9 1.4A20.3 20.3 0 0 0 .4 18.1a19.9 19.9 0 0 0 6 3l.5-.7a12.3 12.3 0 0 1-2.4-1.2l.6-.4a14.2 14.2 0 0 0 12.2 0l.6.4c-.8.5-1.6.9-2.4 1.2l.5.7a19.9 19.9 0 0 0 6-3A20.3 20.3 0 0 0 20.3 4.4zM8.7 15.3c-1 0-1.8-.9-1.8-2s.8-2 1.8-2 1.8.9 1.8 2-.8 2-1.8 2zm6.6 0c-1 0-1.8-.9-1.8-2s.8-2 1.8-2 1.8.9 1.8 2-.8 2-1.8 2z"/></svg></a>
+      <a class="fg-ico" href="https://x.com/DHQfootball" target="_blank" rel="noopener" aria-label="Follow @DHQfootball on X" title="Follow @DHQfootball"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M18.9 2H22l-6.8 7.8L23.3 22h-6.3l-4.9-6.4L6.5 22H3.4l7.3-8.3L1 2h6.5l4.5 5.9zM17.8 20.1h1.7L7.6 3.8H5.7z"/></svg></a>
+      <button class="foot-btn fg-merch fg-pill" type="button" id="merchBtn"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 2 3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4Z"/><path d="M3 6h18"/><path d="M16 10a4 4 0 0 1-8 0"/></svg><span class="fg-merch-label" id="merchLabel" aria-live="polite">Merch Store</span></button>
+      <!-- Phone app: the website shows an App Store badge here. This copy IS the app, so the badge is left out. -->
+    </div>
     <nav aria-label="Footer">
-      <button class="foot-btn" type="button" data-open-sheet="signin">Sign in</button>
-      <a href="https://discord.gg/3VFRJbWVnH" target="_blank" rel="noopener">Discord</a>
       <a href="our-vision.html">Our vision</a>
       <a href="legal/privacy-policy.html">Privacy</a>
       <a href="legal/terms-of-service.html">Terms</a>
       <a id="contactLink" href="#">Contact</a>
+      <button class="foot-btn" type="button" data-open-sheet="signin">Sign in</button>
       <script>/* the address is put together here so Cloudflare's email obfuscation has nothing to rewrite in the HTML */document.getElementById('contactLink').href = 'mailto:' + ['admin', 'c2football.com'].join('@');</script>
+      <script>/* iPad (owner ask 2026-11-18): Ask your AI sits right under the War Room box instead of in
+         the footer. The same button moves (there is only ever one), and goes back to the footer on
+         phones, desktops and when an iPad window is resized out of the range. */
+      (function () {
+        var ask = document.querySelector('.fg-footer .fg-ask'), gate = document.querySelector('.fg-gate');
+        if (!ask || !gate || !window.matchMedia) return;
+        var foot = ask.parentNode, after = ask.nextSibling, slot = document.createElement('div');
+        slot.className = 'fg-ask-slot'; slot.hidden = true; gate.insertAdjacentElement('afterend', slot);
+        var mq = window.matchMedia('(min-width: 881px), (min-width: 601px) and (max-width: 1366px) and (pointer: coarse)');   // desktop + iPad (owner ask 2026-11-18)
+        function place() {
+          if (mq.matches) { if (ask.parentNode !== slot) slot.appendChild(ask); slot.hidden = false; }
+          else { if (ask.parentNode !== foot) foot.insertBefore(ask, after); slot.hidden = true; }
+        }
+        place();
+        if (mq.addEventListener) mq.addEventListener('change', place); else if (mq.addListener) mq.addListener(place);
+      })();</script>
+      <script>/* League Wire (owner ask 2026-11-18): the league's own weekly newspaper. With a league, the
+         button opens the War Room and the Wire opens itself there (sessionStorage dhq_open_wire_v1,
+         15 minutes); without one it opens a sample edition (wire-sample.html), whose league box hands
+         back to this page's War Room box (?home&wirego=<platform>&v=<value>). */
+      (function () {
+        var a = document.getElementById('wireEntry'); if (!a) return;
+        a.addEventListener('click', function (e) {
+          var idn = window.OD && window.OD.identity, has = false;
+          try { has = !!(idn && idn.hasLeagueSource && idn.hasLeagueSource()); } catch (err) { has = false; }
+          if (has) { try { sessionStorage.setItem('dhq_open_wire_v1', JSON.stringify({ ts: Date.now() })); } catch (err) { /* no auto-open */ } return; }   // straight into the War Room
+          e.preventDefault();
+          location.href = 'wire-sample.html';
+        });
+        // Back from the sample with a league typed: run it through this page's War Room box.
+        var q = new URLSearchParams(location.search), plat = q.get('wirego'), v = q.get('v');
+        if (!plat || !v || !/^(sleeper|mfl|espn)$/.test(plat)) return;
+        try { q.delete('wirego'); q.delete('v'); history.replaceState(null, '', location.pathname + (q.toString() ? '?' + q.toString().replace(/=(&|$)/g, '$1') : '') + location.hash); } catch (err) { /* the address keeps it */ }
+        window.addEventListener('load', function () {
+          var pick = document.getElementById('pick-' + plat), input = document.getElementById('league-key'), form = document.getElementById('go');
+          if (!input || !form) return;
+          if (pick) pick.click();
+          input.value = v;
+          try { if (form.requestSubmit) form.requestSubmit(); else document.getElementById('btnGuest').click(); } catch (err) { /* they can tap See my league */ }
+        });
+      })();</script>
+      <script>/* Lab (owner ask 2026-11-18): this visitor has seen the new front page (the War Room's one-time
+         redirect here reads it). */
+      (function () { try { var o = window.OD && OD.identity && OD.identity.currentOwner(); if (!o) return; var seen = (localStorage.getItem('dhq_seen_front_v1') || '').split('|').filter(Boolean); if (seen.indexOf(o) < 0) { seen.push(o); localStorage.setItem('dhq_seen_front_v1', seen.join('|')); } } catch (e) { /* fine */ } })();</script>
+      <script>/* Phones (owner ask 2026-11-18): the War Room field's hint fits on one line ("Sleeper username"). */
+      (function () {
+        var i = document.getElementById('league-key'); if (!i || !window.matchMedia) return;
+        var mq = window.matchMedia('(max-width: 600px)');
+        function fit() { var p = i.getAttribute('placeholder') || ''; if (mq.matches && /^Your /.test(p)) i.setAttribute('placeholder', p.replace(/^Your /, '').replace(/^./, function (c) { return c.toUpperCase(); })); }
+        fit();
+        if (window.MutationObserver) new MutationObserver(fit).observe(i, { attributes: true, attributeFilter: ['placeholder'] });
+      })();</script>
+      <script>/* Phones (owner ask 2026-11-18): dots under the War Room screens, one whole screen per swipe. */
+      document.addEventListener('DOMContentLoaded', function () {
+        var rail = document.querySelector('.fg-rail'); if (!rail) return;
+        var tiles = [].slice.call(rail.querySelectorAll('.fg-tile')); if (tiles.length < 2) return;
+        var dots = document.createElement('div'); dots.className = 'fg-dots'; dots.setAttribute('role', 'tablist'); dots.setAttribute('aria-label', 'War Room screens');
+        tiles.forEach(function (t, i) {
+          var b = document.createElement('button'); b.type = 'button'; b.setAttribute('aria-label', 'Screen ' + (i + 1) + ' of ' + tiles.length);
+          b.addEventListener('click', function () { rail.scrollTo({ left: i * rail.clientWidth, behavior: 'smooth' }); });
+          dots.appendChild(b);
+        });
+        rail.parentNode.insertBefore(dots, rail.nextSibling);
+        function mark() { var n = Math.round(rail.scrollLeft / Math.max(1, rail.clientWidth)); [].forEach.call(dots.children, function (d, i) { d.setAttribute('aria-current', String(i === n)); }); }
+        rail.addEventListener('scroll', function () { window.requestAnimationFrame(mark); }, { passive: true });
+        mark();
+      });</script>
+      <script>/* Merch isn't open yet (owner ask 2026-11-17): a tap says so. */
+      (function () { var b = document.getElementById('merchBtn'), s = document.getElementById('merchLabel'), t; if (!b || !s) return;
+        b.addEventListener('click', function (e) { e.preventDefault(); s.textContent = 'Coming Soon!'; b.classList.add('show-soon'); clearTimeout(t); t = setTimeout(function () { b.classList.remove('show-soon'); s.textContent = 'Merch Store'; }, 2500); }); })();</script>
     </nav>
     <small>© 2026 C2 Football LLC</small>
   </footer>
+
 </div>
+<!-- Lab (owner ask 2026-11-17): the front page's own Ask your AI box. Members open it from
+     "Ask your AI" / "Bring your own AI" and ask about any player with their own AI (my-ai/). -->
+<script src="reconai-shared/trade-engine.js?v=e66d5282bb"></script>
+<script src="my-ai/ask.js?v=8998a82062"></script>
+<script src="my-ai/panel.js?v=ab6ea8882f"></script>
 
 <!-- Sign-up / sign-in sheet -->
 <div class="sheet" id="authSheet" hidden>
@@ -545,7 +1067,7 @@
       <a class="auth-back" id="authBack" href="index.html">&larr; Back to my leagues</a>
       <img class="auth-crest" src="img/dhq-crest.jpg" alt="" width="52" height="52">
       <h2 class="auth-title" id="authTitle">Create your account</h2>
-      <p class="auth-sub" id="authSub">Become a founding member. Your first year of full DHQ is free when paid plans start.</p>
+      <p class="auth-sub" id="authSub">Become a founding member. Your first year of full DHQ is free when paid plans start. Plus, bring your own AI (ChatGPT or Claude) to the fight.</p>
 
       <div class="alert" id="alertJoin"></div>
 
@@ -801,6 +1323,16 @@
     const LAB_SIGNUP = true;
     const PREFILL_KEY = 'dhq_connect_prefill';
     const JUST_JOINED_KEY = 'dhq_just_joined_v1'; // the leagues page greets a new member once
+    // Bring your own AI (owner ask 2026-11-17): the AI buttons (data-ai-signup)
+    // and ?signin=ai sign people up with an account only: email, Google or
+    // Apple, no league step. The next stop is the "Add your AI key" page.
+    // Kept in this tab's sessionStorage so it survives the Google / Apple trip.
+    const AI_SIGNUP_KEY = 'dhq_ai_signup_v1';
+    const AI_URL = 'landing.html?home&ai=1';
+    const AI_TITLE = 'Connect your own AI';
+    const AI_SUB = 'Sign up with DHQ to connect your own AI (ChatGPT or Claude) and put it to work on your leagues and your league data. Signing up is free, and no league is needed.';
+    function aiSignup() { try { return sessionStorage.getItem(AI_SIGNUP_KEY) === '1'; } catch { return false; } }
+    function setAiSignup(on) { try { if (on) sessionStorage.setItem(AI_SIGNUP_KEY, '1'); else sessionStorage.removeItem(AI_SIGNUP_KEY); } catch {} }
     const LAB_COPY = {
       sleeper: { placeholder: 'Your Sleeper username', mode: 'text', auto: 'username',
                  hint: 'Your <b>username</b> on Sleeper, not your email. All your Sleeper leagues come in.' },
@@ -851,12 +1383,19 @@
       const guest = signup ? labGuestLeague() : null;
       document.getElementById('authLinked').hidden = !guest;
       if (guest) document.getElementById('authLinkedName').textContent = guest;
+      const ai = signup && aiSignup();
       const league = document.getElementById('authLeague');
-      league.hidden = !signup || !!guest;
+      league.hidden = true; // account only for every sign-up (owner ruling 2026-11-17); the War Room adds a league
       document.getElementById('authStepAccount').hidden = league.hidden;
-      document.getElementById('sleeperHint').textContent = guest
-        ? 'Next: straight back to your leagues, signed in. Add your AI key there.'
-        : 'Next: your leagues, where you add your AI key with one tap.';
+      document.getElementById('sleeperHint').textContent = ai
+        ? (guest ? 'Next: add your AI key. Your leagues come with you.' : 'Next: add your AI key. No league needed.')
+        : guest
+          ? 'Next: straight back to your leagues, signed in. Add your AI key there.'
+          : 'Next: tap Open War Room (top right) to add your league.';
+      if (signup) {
+        document.getElementById('authTitle').textContent = ai ? AI_TITLE : 'Create your account';
+        document.getElementById('authSub').textContent = ai ? (guest ? AI_SUB.replace(', and no league is needed.', '.') : AI_SUB) : 'Become a founding member. Your first year of full DHQ is free when paid plans start. Plus, bring your own AI (ChatGPT or Claude) to the fight.';
+      }
     }
     // Whatever was already typed in the front-page box goes along.
     function labPrefillFromHero() {
@@ -873,6 +1412,7 @@
     // as the one-time note for the connect page.
     async function labLeagueStep() {
       if (!LAB_SIGNUP || authMode !== 'signup' || labGuestLeague()) return true;
+      labForgetPrefill(); return true; // account only for every sign-up (owner ruling 2026-11-17)
       const input = document.getElementById('authLeagueKey');
       let v = (input.value || '').trim();
       const p = labPlatform;
@@ -905,7 +1445,7 @@
     // Google / Apple: check the league first, then go to the provider (the
     // note survives the round trip in this tab's sessionStorage).
     function labNeedsLeagueFirst(run) {
-      if (!LAB_SIGNUP || authMode !== 'signup' || labGuestLeague() || labLeagueChecked) return false;
+      if (!LAB_SIGNUP || authMode !== 'signup' || labGuestLeague() || labLeagueChecked || true) return false; // account only: no league check first
       labLeagueStep().then(ok => {
         if (!ok) return;
         labLeagueChecked = true;
@@ -918,8 +1458,15 @@
     // greeted once on the leagues page.
     function labAfterAuth(dest, isNew) {
       if (!LAB_SIGNUP) return;
+      // They signed in on the front page, so the War Room's one-time "see the new front page" stop
+      // does not send them back here (index.html reads this once).
+      try { sessionStorage.setItem('dhq_from_front_v1', '1'); } catch {}
+      // AI sign-up that lands somewhere other than the AI key page (a guest
+      // whose leagues came along goes to their leagues): the app opens its
+      // "Add my AI key" box on arrival, one time (owner ask 2026-11-17).
+      if (aiSignup() && dest !== AI_URL) { try { sessionStorage.setItem('dhq_open_ai_key_v1', '1'); } catch {} setAiSignup(false); }
       if (dest !== CONNECT_URL) labForgetPrefill();
-      if (isNew) { try { sessionStorage.setItem(JUST_JOINED_KEY, '1'); } catch {} }
+      if (isNew) { try { sessionStorage.setItem(JUST_JOINED_KEY, '1'); sessionStorage.setItem('dhq_new_member_v1', '1'); } catch {} }
     }
     if (LAB_SIGNUP) {
       // A league error goes away as soon as the visitor fixes it.
@@ -966,7 +1513,7 @@
     document.addEventListener('click', (e) => {
       if (e.target.closest && e.target.closest('[data-close-sheet]')) closeAuthSheet();
       const opener = e.target.closest && e.target.closest('[data-open-sheet]');
-      if (opener) { e.preventDefault(); openAuthSheet(opener.getAttribute('data-open-sheet')); }
+      if (opener) { e.preventDefault(); setAiSignup(opener.hasAttribute('data-ai-signup')); openAuthSheet(opener.getAttribute('data-open-sheet')); }
     });
     document.addEventListener('keydown', (e) => { if (e.key === 'Escape') closeAuthSheet(); });
 
@@ -1014,6 +1561,24 @@
     // league source is bound, the connect page when not. Never on a stale
     // onboardingComplete another person left on this device.
     async function destAfterSignIn(session, opts) {
+      const hadGuest = !!labGuestLeague();   // read before the reconcile clears the guest flag
+      const ai = aiSignup() && !hadGuest;
+      const dest = await destAfterSignInBase(session, opts);
+      if (dest !== CONNECT_URL || hadGuest) return dest;
+      // No league yet: an account opens every feature (owner ruling 2026-11-17). Mark onboarding done
+      // on this owner's identity cache (just stamped by the reconcile above) so the War Room keeps them.
+      try {
+        const idn = window.OD?.identity;
+        if (!idn || !idn.cacheIsMine || idn.cacheIsMine()) {
+          const pf = JSON.parse(localStorage.getItem(PROFILE_KEY) || 'null') || {};
+          pf.onboardingComplete = true; localStorage.setItem(PROFILE_KEY, JSON.stringify(pf));
+        }
+      } catch {}
+      // Back to the front page (owner ruling 2026-11-17): "Open app" up top opens the War Room and its
+      // one-step league box; the front page's War Room box works too.
+      return ai ? AI_URL : 'landing.html?home';
+    }
+    async function destAfterSignInBase(session, opts) {
       try {
         const idn = window.OD?.identity;
         if (idn) {
@@ -1040,9 +1605,13 @@
     function toggleAuthMode() {
       authMode = authMode === 'signup' ? 'signin' : 'signup';
       const signup = authMode === 'signup';
-      document.getElementById('authTitle').textContent = signup ? 'Create your account' : 'Welcome back';
+      // "Welcome back" only for someone who had an account on this device and signed out
+      // (owner ask 2026-11-17); a first-timer who taps "Sign in" sees plain "Sign in".
+      let returning = false;
+      try { returning = /^(account|legacy):/.test(localStorage.getItem('dhq_identity_owner_v1') || ''); } catch {}
+      document.getElementById('authTitle').textContent = signup ? 'Create your account' : (returning ? 'Welcome back' : 'Sign in');
       document.getElementById('authSub').textContent = signup
-        ? 'Become a founding member. Your first year of full DHQ is free when paid plans start.'
+        ? 'Become a founding member. Your first year of full DHQ is free when paid plans start. Plus, bring your own AI (ChatGPT or Claude) to the fight.'
         : 'Sign in to your Dynasty HQ account.';
       document.getElementById('sleeperHint').parentElement.style.display = signup ? '' : 'none';
       document.getElementById('btnJoin').textContent = signup ? 'Create account \u2192' : 'Sign in \u2192';
@@ -1097,7 +1666,7 @@
         }
         storeSession(data);
         trackLandingEvent(signup ? 'signup_succeeded' : 'signin_succeeded', { accountId: data?.user?.id || null });
-        showAlert('success', signup ? (LAB_SIGNUP ? 'Account ready \u2014 taking you to your leagues\u2026' : 'Account ready \u2014 connect your leagues\u2026') : 'Welcome back\u2026');
+        showAlert('success', signup ? (LAB_SIGNUP ? (aiSignup() ? 'Account ready \u2014 next, your AI key\u2026' : 'Account ready \u2014 welcome to DHQ\u2026') : 'Account ready \u2014 connect your leagues\u2026') : 'Welcome back\u2026');
         // New accounts start at the connect-your-leagues page (a guest who
         // signs up keeps the leagues they connected); returning sign-ins go
         // wherever the account's own identity says.
@@ -1394,7 +1963,7 @@
             const staySession = JSON.parse(localStorage.getItem(SESSION_KEY) || 'null');
             const navBtn = document.getElementById('navSignin');
             if (STAY_HOME && staySession?.token && navBtn) {
-              navBtn.textContent = 'Open app';
+              navBtn.textContent = 'Open War Room';
               navBtn.removeAttribute('data-open-sheet'); // "Open app" opens the app, not the sign-in sheet
               navBtn.onclick = () => { window.location.href = nextAfterAuth(); };
             }
@@ -1466,6 +2035,14 @@
     (function signInRequested() {
       const q = new URLSearchParams(window.location.search);
       if (!(q.has('signin') || q.has('reauth')) || FRESH_OAUTH_RETURN || RESUME_OAUTH || LANDING_EDITOR_PREVIEW) return;
+      // A lapsed session (?reauth) lands on the normal front page, no sign-in box popping up (owner ask
+      // 2026-11-18); "Sign in" up top is there when they want it. The stored session is dead or revoked,
+      // so it goes, and the flag leaves the address so a reload stays plain.
+      if (q.has('reauth') && !q.has('signin')) {
+        try { localStorage.removeItem(SESSION_KEY); } catch {}
+        try { q.delete('reauth'); history.replaceState(null, '', location.pathname + (q.toString() ? '?' + q.toString() : '') + location.hash); } catch {}
+        return;
+      }
       // ?signin with a healthy session was routed into the app by the head;
       // ?reauth always gets the sheet (the stored session may be revoked).
       if (!q.has('reauth')) {
@@ -1475,7 +2052,10 @@
         } catch {}
       }
       // ?signin=new: a guest's "Create free account" opens on the sign-up side.
-      try { openAuthSheet(q.get('signin') === 'new' ? 'signup' : 'signin'); } catch {}
+      // ?signin=ai / ai-in: the AI key page's "Create free account" / "I have an account".
+      const sv = q.get('signin');
+      setAiSignup(sv === 'ai' || sv === 'ai-in');
+      try { openAuthSheet(sv === 'new' || sv === 'ai' ? 'signup' : 'signin'); } catch {}
       // &via=google|apple: the app's My Profile buttons go straight to that
       // provider, through this page's own handlers (same OAuth return, same
       // guest-league adoption). The flag is dropped from the URL first so a
@@ -1601,6 +2181,15 @@
             return;
           }
           if (liveOk && myHandle && String(myHandle).toLowerCase() === v.toLowerCase()) { window.location.href = 'index.html'; return; }
+          // A member with no league at all yet (owner ask 2026-11-17: signed up to use their own
+          // AI): the Sleeper name is THEIR first league. Connect it to the account on the connect
+          // page (it takes this note, links it and goes straight in); never sign them out.
+          if (liveOk && !myHandle && idnL.hasLeagueSource && !idnL.hasLeagueSource()) {
+            try { sessionStorage.setItem('dhq_connect_prefill', JSON.stringify({ platform: platform, value: v, ts: Date.now() })); } catch (err) {}
+            try { var pf = JSON.parse(localStorage.getItem('od_profile_v1') || 'null'); if (pf && pf.onboardingComplete) { delete pf.onboardingComplete; localStorage.setItem('od_profile_v1', JSON.stringify(pf)); } } catch (err) {}
+            window.location.href = 'connect-sleeper.html';
+            return;
+          }
           try { localStorage.removeItem('dhq_remembered_member_v1'); } catch (err) {}
           var outDone = null;
           try { if (typeof idnL.signOutClear === 'function') outDone = idnL.signOutClear({ supabase: (typeof getSbClient === 'function' ? getSbClient() : null) }); } catch (err) { outDone = null; }

@@ -1,0 +1,302 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Player Card · Dynasty HQ</title>
+<meta name="description" content="The Dynasty HQ player card: DHQ value, career stage, the Dynasty Read, stats, news, college, awards and league history, on live data.">
+<link rel="icon" href="icon-192.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&family=Rajdhani:wght@600;700&display=swap" rel="stylesheet">
+<!--
+  DHQ Player Card, Lab demo page (2026-11-15; module 2026-11-16).
+  A clickable, live-data mockup of the new player card for the owner to review.
+  Same look as lab/startsit.html and lab/projections.html (dark / gold, DM Sans,
+  Rajdhani, the --r-* radius tokens). The card itself is the drop-in module in
+  player-card/ (dhq-player-card.js + .css): DHQPlayerCard.open(pid, opts). This
+  page is only the demo around it: search, quick picks, the league toggle and
+  the #p=ID&from=values|weekly address (+ &sc=ppr|half|std&tep=0|1&qb=sf|1qb
+  &teams=N&idp=0|1: the page's league settings, so the card's points and DHQ
+  value match the list it was opened from). Gated on the Lab like every page
+  (the gate is injected at publish time).
+-->
+<link rel="stylesheet" href="player-card/dhq-player-card.css?v=20261118card3">
+<style>
+:root{
+  color-scheme:dark;
+  --page:#08080B; --off-black:#1B1B22; --panel:rgba(16,16,22,.96); --charcoal:#27262E;
+  --white:#F5F2EA; --silver:#BDB8AD; --soft:rgba(207,207,214,.88); --faint:rgba(189,184,173,.6);
+  --gold:#D4AF37; --good:#2ECC71; --warn:#F0A500; --bad:#E74C3C; --info:#5DADE2;
+  --line:rgba(212,175,55,.16); --line2:rgba(212,175,55,.25); --hair:rgba(255,255,255,.06);
+  --r-xs:5px; --r-sm:8px; --r:10px; --r-lg:14px;
+  --display:'Rajdhani','Arial Narrow',system-ui,sans-serif;
+  --body:'DM Sans',system-ui,-apple-system,'Segoe UI',sans-serif;
+  --mono:'IBM Plex Mono',ui-monospace,Menlo,monospace;
+  --sat:env(safe-area-inset-top,0px); --sab:env(safe-area-inset-bottom,0px);
+}
+*{box-sizing:border-box}
+html,body{background:var(--page)}
+body{margin:0;color:var(--white);font:14.5px/1.5 var(--body);-webkit-font-smoothing:antialiased;padding-inline:max(20px,env(safe-area-inset-left,0px)) max(20px,env(safe-area-inset-right,0px))}
+button,input,select{font:inherit;color:inherit}
+:focus-visible{outline:2px solid var(--gold);outline-offset:2px}
+a{color:var(--gold)}
+.brandwash{position:fixed;inset:0;z-index:0;pointer-events:none;background:url("img/logo.png") no-repeat center 16%/min(720px,86vw) auto;opacity:.07;mix-blend-mode:screen;filter:blur(4px);-webkit-mask-image:radial-gradient(125% 105% at 50% 20%,#000 26%,transparent 74%);mask-image:radial-gradient(125% 105% at 50% 20%,#000 26%,transparent 74%)}
+.wrap{position:relative;z-index:1;max-width:1100px;margin:0 auto}
+.top{display:flex;align-items:center;justify-content:space-between;gap:16px;padding-block:calc(12px + var(--sat)) 12px;box-shadow:0 0 0 100vmax var(--page),0 1px 0 100vmax #ffffff18;clip-path:inset(0 -100vmax -1px)}
+.brand{display:flex;align-items:center;gap:12px;text-decoration:none;color:var(--white)}
+.brand img{width:44px;height:44px;border-radius:var(--r);box-shadow:0 2px 12px rgba(212,175,55,.3)}
+.brand span{font:700 20px/1 var(--display);letter-spacing:.06em}
+.back{color:#98A1AD;text-decoration:none;font-size:14px;padding:10px 14px;border:1px solid #232932;border-radius:var(--r-sm)}
+.back:hover{color:var(--white);border-color:#333A45}
+.panel{margin:28px 0 0;border:1px solid var(--line);background:var(--panel);border-radius:var(--r-sm);padding:18px 20px 20px}
+.panel-head{display:flex;align-items:baseline;justify-content:space-between;gap:12px;flex-wrap:wrap;padding-bottom:12px;border-bottom:1px solid rgba(212,175,55,.12)}
+.panel-head h1{margin:0;color:var(--gold);font:700 19px/1.1 var(--display);letter-spacing:.1em;text-transform:uppercase}
+.panel-head em{color:var(--faint);font-size:13.5px}
+.source{margin:14px 0;color:var(--soft);font-size:14px}
+.source b{color:var(--gold);font-weight:600}
+.foot-note{margin:16px 0 40px;font-size:12px;line-height:1.6;color:var(--faint)}
+.loading{display:flex;align-items:center;gap:10px;color:var(--soft);font-size:13.5px;padding:12px 0}
+.loading::before{content:"";flex:none;width:13px;height:13px;border-radius:50%;border:2px solid var(--gold);border-right-color:transparent;animation:spin .8s linear infinite}
+@keyframes spin{to{transform:rotate(360deg)}}
+.err{color:#F1948A;font-size:14px}
+.face{width:32px;height:32px;border-radius:50%;flex:none;overflow:hidden;background:#15151b;box-shadow:0 0 0 1.5px var(--pc,var(--silver));display:inline-block;position:relative}
+.face img{display:block;width:100%;height:100%;object-fit:cover;object-position:center 15%}
+
+/* ── demo page: search, quick picks, league toggle ── */
+.tools{display:flex;flex-wrap:wrap;align-items:center;gap:12px 16px;margin:4px 0 16px}
+.find{position:relative;flex:1;min-width:240px}
+.find input{width:100%;background:var(--charcoal);border:1px solid var(--line2);color:var(--white);font:400 15px var(--body);padding:12px 14px 12px 40px;border-radius:var(--r-sm)}
+.find input:focus{outline:none;border-color:var(--gold);box-shadow:0 0 0 3px rgba(212,175,55,.12)}
+.find input::placeholder{color:rgba(255,255,255,.3)}
+.find input:disabled{opacity:.5}
+.find > svg{position:absolute;left:13px;top:50%;width:17px;height:17px;transform:translateY(-50%);stroke:var(--gold);fill:none;stroke-width:2;stroke-linecap:round;pointer-events:none}
+.menu{position:absolute;left:0;right:0;top:calc(100% + 6px);z-index:20;background:#1d1c23;border:1px solid rgba(212,175,55,.3);border-radius:var(--r-sm);box-shadow:0 18px 50px rgba(0,0,0,.55);max-height:min(420px,60vh);overflow-y:auto;padding:4px}
+.menu[hidden]{display:none}
+.opt{display:grid;grid-template-columns:34px minmax(0,1fr) auto;align-items:center;gap:10px;width:100%;padding:7px 10px;border:0;background:transparent;border-radius:var(--r-xs);text-align:left;cursor:pointer}
+.opt .face{width:34px;height:34px}
+.opt b{display:block;font-size:14px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.opt small{display:block;font-size:11.5px;color:var(--faint);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.opt em{font-style:normal;font:700 14px var(--body);color:var(--gold);font-variant-numeric:tabular-nums;text-align:right}
+.opt em small{font:600 9px var(--body);letter-spacing:.08em;color:var(--faint);text-transform:uppercase}
+.opt[aria-selected="true"],.opt:hover{background:rgba(212,175,55,.1)}
+.none{padding:14px 10px;font-size:13.5px;color:var(--faint)}
+.switch{display:inline-flex;align-items:center;gap:10px;cursor:pointer;font-size:13.5px;color:var(--soft);user-select:none;-webkit-user-select:none}
+.switch input{position:absolute;opacity:0;width:1px;height:1px}
+.switch i{position:relative;flex:none;width:42px;height:24px;border-radius:999px;background:var(--charcoal);border:1px solid var(--line2);transition:background .2s,border-color .2s}
+.switch i::after{content:"";position:absolute;top:3px;left:3px;width:16px;height:16px;border-radius:50%;background:var(--silver);transition:transform .2s,background .2s}
+.switch input:checked + i{background:rgba(212,175,55,.3);border-color:var(--gold)}
+.switch input:checked + i::after{transform:translateX(18px);background:var(--gold)}
+.switch input:focus-visible + i{outline:2px solid var(--gold);outline-offset:2px}
+.switch b{color:var(--white);font-weight:600}
+.picks-k{margin:4px 0 10px;font:600 10.5px var(--body);letter-spacing:.12em;text-transform:uppercase;color:var(--faint)}
+.picks{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px}
+.pick{display:flex;align-items:center;gap:12px;min-width:0;padding:10px 12px;border:1px solid var(--line);border-radius:var(--r);background:linear-gradient(180deg,rgba(39,38,46,.85),rgba(22,22,28,.92));cursor:pointer;text-align:left;transition:border-color .15s,transform .15s}
+.pick:hover{border-color:rgba(212,175,55,.55)}
+.pick:active{transform:scale(.99)}
+.pick:disabled{opacity:.5;cursor:wait}
+.pick .face{width:46px;height:46px}
+.pick span{display:grid;gap:1px;min-width:0}
+.pick b{font:700 17px/1.1 var(--display);letter-spacing:.03em;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.pick small{font-size:12px;color:var(--faint);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.pick em{margin-left:auto;flex:none;font-style:normal}
+.picks-k2{margin-top:18px}
+.picks-kd{grid-template-columns:repeat(4,minmax(0,1fr))}
+.picks-kd .pick{padding:8px 10px;gap:10px}
+.picks-kd .pick .face{width:38px;height:38px}
+.picks-kd .pick b{font-size:15.5px}
+
+
+/* ── tablet / phone ── */
+@media (max-width:900px){
+  .picks,.picks-kd{grid-template-columns:repeat(2,minmax(0,1fr))}
+}
+@media (max-width:640px){
+  body{padding-inline:max(16px,env(safe-area-inset-left,0px)) max(16px,env(safe-area-inset-right,0px))}
+  .picks{grid-template-columns:minmax(0,1fr)}
+  .picks-kd{grid-template-columns:minmax(0,1fr);gap:8px}
+  .picks-kd .pick .face{width:34px;height:34px}
+}
+@media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
+/* Match the War Room header (owner ask 2026-11-18): gold DM Sans wordmark, the app's logo size and
+   its "My Profile" pill shape for the back button (js/hub-v2.css .hv2-header). */
+.top{min-height:68px}
+.brand img{border-radius:var(--r,10px);box-shadow:0 2px 12px rgba(212,175,55,.3)}
+.brand span{font:700 1.1rem/1.1 var(--body,'DM Sans',system-ui,sans-serif);letter-spacing:.06em;background:linear-gradient(135deg,#D4AF37 0%,#F5F2EA 50%,#D4AF37 100%);background-size:200% auto;-webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent;color:#D4AF37;animation:dhq-shimmer 3s linear infinite}
+@keyframes dhq-shimmer{0%{background-position:0% center}100%{background-position:200% center}}
+@media (prefers-reduced-motion:reduce){.brand span{animation:none}}
+.back{display:inline-flex;align-items:center;min-height:44px;padding:0 16px;border:1px solid #ffffff18;border-radius:30px;background:#ffffff08;color:var(--white,#F5F2EA);font:500 13px var(--body,'DM Sans',system-ui,sans-serif)}
+.back:hover{border-color:rgba(212,175,55,.5);color:var(--white,#F5F2EA)}
+@media (max-width:600px){
+  .top{min-height:68px;padding-block:calc(10px + var(--sat,0px)) 10px}
+  .brand{gap:9px}.brand img{width:34px;height:34px;border-radius:var(--r,10px);box-shadow:0 2px 12px rgba(212,175,55,.3)}
+  .brand span{font-size:16px;letter-spacing:.025em;white-space:nowrap}
+  .back{min-height:44px;padding:0 14px;font-size:13px;border-radius:30px}
+}
+</style>
+</head>
+<body>
+<div class="brandwash" aria-hidden="true"></div>
+<div class="wrap">
+  <header class="top">
+    <a class="brand" href="landing.html?home" aria-label="Dynasty HQ front page"><img src="img/logo.png" alt="" width="44" height="44"><span>DYNASTY HQ</span></a>
+    <a class="back" href="landing.html?home">&larr; Front page</a>
+  </header>
+
+  <section class="panel" aria-labelledby="pg-title">
+    <div class="panel-head"><h1 id="pg-title">Player Card</h1><em>Every NFL player · live data</em></div>
+    <p class="source">The new player card. Search for anyone, or tap a player below to open his card. Every number is <b>DHQ’s</b>.</p>
+
+    <div class="tools">
+      <div class="find" id="find">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>
+        <input id="q" type="search" placeholder="Type a player’s name…" autocomplete="off" spellcheck="false" disabled
+          role="combobox" aria-expanded="false" aria-controls="menu" aria-autocomplete="list" aria-label="Find a player">
+        <div class="menu" id="menu" role="listbox" aria-label="Players" hidden></div>
+      </div>
+      <label class="switch"><input type="checkbox" id="lgToggle"><i aria-hidden="true"></i><span>Show <b>“In my league”</b> (demo: Psycho League)</span></label>
+    </div>
+
+    <div class="picks-k">Try one</div>
+    <div class="picks" id="picks"><div class="loading">Loading players and DHQ values… (the first visit takes a few seconds)</div></div>
+    <div class="picks-k picks-k2" id="picksKdK" hidden>Kickers &amp; defenders</div>
+    <div class="picks picks-kd" id="picksKd" hidden></div>
+  </section>
+
+  <p class="foot-note" id="foot">DHQ values come from the Dynasty HQ engine (refreshed every two hours); this week’s projection is DHQ’s weekly projection for the current NFL week, the same number as Weekly Projections and Start Sit. Player details, stats and news come from Sleeper; college stats and awards from ESPN. DHQ values are saved once a day from Nov 16, 2026 (the value trend); highlight clips come from the NFL’s YouTube channel.</p>
+</div>
+
+<script src="player-card/dhq-player-card.js?v=20261118card3"></script>
+<script>
+(function () {
+  'use strict';
+  // ═══════════════════ DEMO PAGE around the player card module ══════════════
+  // The card: player-card/dhq-player-card.js (window.DHQPlayerCard). This page:
+  // search, quick picks, the "In my league" toggle and the #p=ID address
+  // (from=values|weekly: × goes back to projections.html).
+  var PC = window.DHQPlayerCard;
+  // The card finds DHQ's weekly lock files itself: beside the page on the Lab, on the Lab's address everywhere else.
+  var PREFS = 'dhq_card_prefs_v1';
+  var QUICK = [
+    { id: '3198', note: 'Veteran star' }, { id: '9488', note: 'Elite receiver' }, { id: '4984', note: 'Superflex QB' },
+    { id: '8130', note: 'Tight end' }, { id: '13346', note: '2026 rookie' }, { id: '12501', note: 'Young breakout' }
+  ];
+  // second row: a kicker and one defender per IDP group (DHQ's DL / LB / DB)
+  var QUICK_KD = [{ id: '6650', note: 'Kicker' }, { id: '10892', note: 'Pass rusher' }, { id: '5041', note: 'Linebacker' }, { id: '8339', note: 'Safety' }];
+  var POS_COLOR = { QB: '#ff6b6b', RB: '#4ecdc4', WR: '#45b7d1', TE: '#f7dc6f', K: '#bb8fce', DL: '#f0a35e', LB: '#e58fb8', DB: '#8fb3ff' };
+  // "DE · DL" for a defender whose real position differs from his group
+  function posLabel(p) { return p.rpos && p.rpos !== p.pos ? p.rpos + ' · ' + p.pos : p.pos; }
+  var $ = function (id) { return document.getElementById(id); };
+  var esc = function (s) { return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]; }); };
+  var fmt = function (n) { return Math.round(n).toLocaleString('en-US'); };
+  function store(k, v) { try { localStorage.setItem(k, JSON.stringify(v)); } catch (e) { /* full or blocked: run without */ } }
+  function load(k) { try { return JSON.parse(localStorage.getItem(k) || 'null'); } catch (e) { return null; } }
+  function nick(teamName) { var n = String(teamName).split(' '); return n[n.length - 1]; }
+
+  var BY = {}, SEARCH = [];
+  function face(pid, col) { return '<span class="face" style="--pc:' + col + '"><img src="https://sleepercdn.com/content/nfl/players/thumb/' + encodeURIComponent(pid) + '.jpg" alt="" loading="lazy" decoding="async" onerror="this.remove()"></span>'; }
+  function prefs() { return load(PREFS) || {}; }
+  function savePref(on) { var p = prefs(); p.league = !!on; store(PREFS, p); if (on) PC.preload({ league: true }).catch(function () { /* the card shows its own error */ }); }
+  function setLeaguePref(on) { savePref(on); PC.setLeague(on); }
+
+  // Opened from another Lab page (#p=ID&from=...): × goes back there.
+  var FROM = (/[#&]from=(values|weekly)/.exec(location.hash) || [])[1] || null, CUR = null;
+  // The league settings of the page it came from: &sc=ppr|half|std &tep=0|0.5 (points a TE catch adds) &qb=sf|1qb
+  // &teams=N &idp=0|1. Missing ones come from that page's saved settings (Player Values / Weekly
+  // Projections / Start Sit share them: dhq_tc_league_v1) and its defaults. Opened on its own (no
+  // from=, no sc=): the card's defaults (Half-PPR, the demo league's own values).
+  var SET = (function () {
+    var h = {}, m, re = /[#&](sc|tep|qb|teams|idp)=([\w.]+)/g;
+    while ((m = re.exec(location.hash))) h[m[1]] = m[2];
+    if (!FROM && !h.sc) return null;
+    var saved = load('dhq_tc_league_v1') || {}, d = { scoring: 'ppr', qb: 'sf', tep: '0', teams: '12', idp: '0' }; // projections.html's defaults
+    var g = function (k, hk) { return h[hk || k] != null ? h[hk || k] : saved[k] != null ? String(saved[k]) : d[k]; };
+    var s = { scoring: g('scoring', 'sc'), qb: g('qb') === '1qb' ? '1qb' : 'sf', tep: /^(0?\.5|1|on|true)$/i.test(g('tep')) ? '0.5' : '0', teams: String(parseInt(g('teams'), 10) || 16), idp: g('idp') === '1' ? '1' : '0' };
+    if (!PC.scoringSettings(s.scoring)) return null;
+    return s;
+  })();
+  function setHash() { return SET ? '&sc=' + SET.scoring + '&tep=' + SET.tep + '&qb=' + SET.qb + '&teams=' + SET.teams + '&idp=' + SET.idp : ''; }
+  function cardOpts() {
+    return SET ? { scoringSettings: PC.scoringSettings(SET.scoring, SET.tep), valueSettings: { scoring: SET.scoring, qb: SET.qb, tep: SET.tep, teams: SET.teams } } : {};
+  }
+  function onCardClose() {
+    CUR = null;
+    if (FROM) {   // opened from Player Values / Weekly Projections: go back there
+      var back = 'projections.html#' + (FROM === 'weekly' ? 'weekly' : 'values'); FROM = null;
+      if (document.referrer && document.referrer.indexOf(location.host + '/projections') >= 0 && history.length > 1) history.back(); else location.href = back;
+      return;
+    }
+    try { history.replaceState(null, '', location.pathname + location.search); } catch (e) { /* ignore */ }
+  }
+  function openP(pid) {
+    CUR = pid;
+    try { history.replaceState(null, '', '#p=' + pid + (FROM ? '&from=' + FROM : '') + setHash()); } catch (e) { /* file:// */ }
+    return PC.open(pid, Object.assign(cardOpts(), {
+      league: $('lgToggle').checked, onClose: onCardClose,
+      onLeagueChange: function (on) { $('lgToggle').checked = on; savePref(on); } // the card's "Show the demo league" button
+    }));
+  }
+  $('lgToggle').checked = !!prefs().league;
+  $('lgToggle').addEventListener('change', function () { setLeaguePref(this.checked); });
+
+  function renderPicks() {
+    $('picks').innerHTML = QUICK.filter(function (q) { return BY[q.id]; }).map(function (q) {
+      var p = BY[q.id];
+      return '<button class="pick" type="button" data-pid="' + q.id + '">' + face(q.id, POS_COLOR[p.pos]) + '<span><b>' + esc(p.name) + '</b><small>' + p.pos + ' · ' + esc(nick(p.teamName)) + ' · ' + q.note + '</small></span></button>';
+    }).join('');
+    var kd = QUICK_KD.filter(function (q) { return BY[q.id]; });
+    $('picksKd').innerHTML = kd.map(function (q) {
+      var p = BY[q.id];
+      return '<button class="pick" type="button" data-pid="' + q.id + '">' + face(q.id, POS_COLOR[p.pos]) + '<span><b>' + esc(p.name) + '</b><small>' + esc(posLabel(p)) + ' · ' + esc(nick(p.teamName)) + '</small></span></button>';
+    }).join('');
+    $('picksKd').hidden = $('picksKdK').hidden = !kd.length;
+  }
+  $('picks').addEventListener('click', function (e) { var b = e.target.closest('[data-pid]'); if (b) openP(b.getAttribute('data-pid')); });
+  $('picksKd').addEventListener('click', function (e) { var b = e.target.closest('[data-pid]'); if (b) openP(b.getAttribute('data-pid')); });
+
+  // search
+  var q = $('q'), menu = $('menu'), hits = [], sel = -1;
+  function norm(s) { return String(s).toLowerCase().replace(/[^a-z0-9 ]/g, ''); }
+  function doSearch() {
+    var t = norm(q.value).trim();
+    if (!t) { closeMenu(); return; }
+    var words = t.split(/\s+/);
+    hits = SEARCH.filter(function (p) { return words.every(function (w) { return p.key.indexOf(w) >= 0; }); }).sort(function (a, b) {
+      var as = a.key.indexOf(t) === 0 ? 1 : 0, bs = b.key.indexOf(t) === 0 ? 1 : 0; return bs - as || b.v - a.v;
+    }).slice(0, 8);
+    sel = hits.length ? 0 : -1;
+    menu.innerHTML = hits.length ? hits.map(function (p, i) {
+      return '<button class="opt" role="option" type="button" id="o' + i + '" aria-selected="' + (i === sel) + '" data-pid="' + p.id + '">' + face(p.id, POS_COLOR[p.pos]) + '<span><b>' + esc(p.name) + '</b><small>' + esc(posLabel(p)) + ' · ' + esc(p.team ? p.teamName : 'Free agent') + '</small></span><em>' + (p.v ? fmt(p.v) : '—') + '<small> DHQ</small></em></button>';
+    }).join('') : '<div class="none">No player matches “' + esc(q.value) + '”.</div>';
+    menu.hidden = false; q.setAttribute('aria-expanded', 'true'); q.setAttribute('aria-activedescendant', sel >= 0 ? 'o' + sel : '');
+  }
+  function closeMenu() { menu.hidden = true; q.setAttribute('aria-expanded', 'false'); }
+  q.addEventListener('input', doSearch);
+  q.addEventListener('focus', function () { if (q.value) doSearch(); });
+  q.addEventListener('keydown', function (e) {
+    if (menu.hidden || !hits.length) return;
+    if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
+      e.preventDefault(); sel = (sel + (e.key === 'ArrowDown' ? 1 : -1) + hits.length) % hits.length;
+      menu.querySelectorAll('.opt').forEach(function (o, i) { o.setAttribute('aria-selected', i === sel); if (i === sel) o.scrollIntoView({ block: 'nearest' }); });
+      q.setAttribute('aria-activedescendant', 'o' + sel);
+    } else if (e.key === 'Enter' && sel >= 0) { e.preventDefault(); var id = hits[sel].id; closeMenu(); q.blur(); openP(id); }
+    else if (e.key === 'Escape') closeMenu();
+  });
+  menu.addEventListener('click', function (e) { var b = e.target.closest('[data-pid]'); if (b) { closeMenu(); openP(b.getAttribute('data-pid')); } });
+  document.addEventListener('click', function (e) { if (!$('find').contains(e.target)) closeMenu(); });
+
+  window.addEventListener('hashchange', function () { var m = /^#p=(\w+)/.exec(location.hash); if (m && BY[m[1]] && CUR !== m[1]) openP(m[1]); });
+  // boot: a #p= address opens the card at once (it shows its own loading state)
+  var m0 = /^#p=(\w+)/.exec(location.hash);
+  if (m0) openP(m0[1]).then(function (ok) { if (!ok && CUR === m0[1]) { FROM = null; PC.close(); } }); // unknown player: just show the page
+  PC.preload(Object.assign(cardOpts(), { league: $('lgToggle').checked })).then(function (ix) {
+    SEARCH = ix.players.map(function (p) { BY[p.id] = p; return { id: p.id, name: p.name, pos: p.pos, rpos: p.rpos, team: p.team, teamName: p.teamName, v: p.value, key: norm(p.name) }; });
+    q.disabled = false;
+    renderPicks();
+  }).catch(function (e) {
+    $('picks').innerHTML = '<p class="err">Couldn’t load DHQ’s data right now (' + esc(e && e.message) + '). Check the connection and refresh.</p>';
+  });
+})();
+</script>
+</body>
+</html>

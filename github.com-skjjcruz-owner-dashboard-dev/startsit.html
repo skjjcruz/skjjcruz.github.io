@@ -1,0 +1,1149 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Start Sit Advice · Dynasty HQ</title>
+<meta name="description" content="Put any players side by side and DHQ tells you who to start this week, with DHQ's projection and the full formula behind it. Free, no sign-up.">
+<link rel="icon" href="icon-192.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&family=Rajdhani:wght@600;700&display=swap" rel="stylesheet">
+<!--
+  DHQ Start Sit Advice, Lab edition (owner design 2026-11-13).
+  Headshots across the top, one column under each player with every weekly
+  projection metric as bullets. The call is the WEEKLY PROJECTION only:
+  highest DHQ projection this week (in the visitor's scoring) gets the
+  START, a gold box around his headshot and his score at the top of his
+  column. DHQ Value sits by the photo for reference and never decides.
+  Same data as lab/projections.html (copied from it so the numbers always
+  match): the week's lock file and its formula file, the scoreboard
+  relay (opponent, home / away, byes), Sleeper's stats (last week, season)
+  and the engine server's DHQ values. Published to the Lab as startsit.html
+  by scripts/publish-lab.cjs and gated like every page.
+-->
+<style>
+/* Look: the projections page's Trade Builder panel, plus the start / sit board. */
+:root{
+  color-scheme:dark;
+  --page:#08080B; --off-black:#1B1B22; --panel:rgba(16,16,22,.96); --charcoal:#27262E;
+  --white:#F5F2EA; --silver:#BDB8AD; --soft:rgba(207,207,214,.88); --faint:rgba(189,184,173,.6);
+  --gold:#D4AF37; --good:#2ECC71; --warn:#F0A500; --bad:#E74C3C; --info:#5DADE2;
+  --send:#5dade2; --get:#e74c3c;
+  --line:rgba(212,175,55,.16); --line2:rgba(212,175,55,.25); --hair:rgba(255,255,255,.06);
+  --r-xs:5px; --r-sm:8px; --r:10px; --r-lg:14px;
+  --display:'Rajdhani','Arial Narrow',system-ui,sans-serif;
+  --body:'DM Sans',system-ui,-apple-system,'Segoe UI',sans-serif;
+  --mono:'IBM Plex Mono',ui-monospace,Menlo,monospace;
+  --sat:env(safe-area-inset-top,0px); --sab:env(safe-area-inset-bottom,0px);
+}
+*{box-sizing:border-box}
+html,body{background:var(--page)}
+body{margin:0;color:var(--white);font:14.5px/1.5 var(--body);-webkit-font-smoothing:antialiased;padding-inline:max(20px,env(safe-area-inset-left,0px)) max(20px,env(safe-area-inset-right,0px))}
+button,input,select{font:inherit;color:inherit}
+:focus-visible{outline:2px solid var(--gold);outline-offset:2px}
+.brandwash{position:fixed;inset:0;z-index:0;pointer-events:none;background:url("img/logo.png") no-repeat center 16%/min(720px,86vw) auto;opacity:.07;mix-blend-mode:screen;filter:blur(4px);-webkit-mask-image:radial-gradient(125% 105% at 50% 20%,#000 26%,transparent 74%);mask-image:radial-gradient(125% 105% at 50% 20%,#000 26%,transparent 74%)}
+.wrap{position:relative;z-index:1;max-width:1200px;margin:0 auto}
+
+.top{display:flex;align-items:center;justify-content:space-between;gap:16px;padding-block:calc(12px + var(--sat)) 12px;box-shadow:0 0 0 100vmax var(--page),0 1px 0 100vmax #ffffff18;clip-path:inset(0 -100vmax -1px)}
+.brand{display:flex;align-items:center;gap:12px;text-decoration:none;color:var(--white)}
+.brand img{width:44px;height:44px;border-radius:var(--r);box-shadow:0 2px 12px rgba(212,175,55,.3)}
+.brand span{font:700 20px/1 var(--display);letter-spacing:.06em}
+.back{color:#98A1AD;text-decoration:none;font-size:14px;padding:10px 14px;border:1px solid #232932;border-radius:var(--r-sm)}
+.back:hover{color:var(--white);border-color:#333A45}
+
+/* the panel */
+.panel{margin:28px 0 0;border:1px solid var(--line);background:var(--panel);border-radius:var(--r-sm);padding:18px 20px 20px}
+.panel-head{display:flex;align-items:baseline;justify-content:space-between;gap:12px;flex-wrap:wrap;padding-bottom:12px;border-bottom:1px solid rgba(212,175,55,.12)}
+.panel-head h1,.panel-head h2{margin:0;color:var(--gold);font:700 19px/1.1 var(--display);letter-spacing:.1em;text-transform:uppercase}
+.panel-head em{color:var(--faint);font-size:13.5px}
+.source{margin:14px 0;color:var(--soft);font-size:14px}
+.source b{color:var(--gold);font-weight:600}
+.source .est{color:var(--faint)}
+
+.sel{background:var(--charcoal);border:1px solid var(--line2);color:var(--white);font:500 13.5px var(--body);padding:9px 10px;border-radius:var(--r-xs);cursor:pointer;width:100%}
+.sel:focus{outline:none;border-color:var(--gold)}
+.league{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:10px;margin-bottom:16px}
+.fld{display:flex;flex-direction:column;gap:5px;min-width:0}
+.fld > span{font-size:10.5px;color:var(--faint);text-transform:uppercase;letter-spacing:.08em}
+.foot-note{margin:16px 0 40px;font-size:12px;line-height:1.6;color:var(--faint)}
+.loading{display:flex;align-items:center;gap:10px;color:var(--soft);font-size:13.5px;padding:12px}
+.loading::before{content:"";width:13px;height:13px;border-radius:50%;border:2px solid var(--gold);border-right-color:transparent;animation:spin .8s linear infinite}
+@keyframes spin{to{transform:rotate(360deg)}}
+.err{color:#F1948A;font-size:14px}
+.toast{position:fixed;left:50%;bottom:calc(24px + var(--sab));transform:translate(-50%,20px);opacity:0;pointer-events:none;z-index:50;background:var(--off-black);border:1px solid var(--line2);padding:10px 16px;border-radius:var(--r-sm);font-size:14px;transition:opacity .2s,transform .2s;max-width:calc(100vw - 32px)}
+.toast.on{opacity:1;transform:translate(-50%,0)}
+.wrap{max-width:1240px}
+.face{width:32px;height:32px;border-radius:50%;flex:none;overflow:hidden;background:#15151b;box-shadow:0 0 0 1.5px var(--pc,var(--silver));display:inline-block;position:relative}
+.face img{display:block;width:100%;height:100%;object-fit:cover;object-position:center 15%}
+
+/* ── the add-player menu ── */
+.ss-tools{display:flex;flex-wrap:wrap;align-items:flex-start;gap:10px 12px;margin:4px 0 16px}
+.ss-tools > .ss-count{line-height:46px}
+.ss-find{position:relative;flex:1;min-width:240px}
+.ss-find input{width:100%;background:var(--charcoal);border:1px solid var(--line2);color:var(--white);font:400 15px var(--body);padding:12px 14px 12px 40px;border-radius:var(--r-sm)}
+.ss-find input:focus{outline:none;border-color:var(--gold);box-shadow:0 0 0 3px rgba(212,175,55,.12)}
+.ss-find input::placeholder{color:rgba(255,255,255,.3)}
+.ss-find input:disabled{opacity:.5;cursor:not-allowed}
+.ss-find > svg{position:absolute;left:13px;top:23px;width:17px;height:17px;transform:translateY(-50%);stroke:var(--gold);fill:none;stroke-width:2;stroke-linecap:round;pointer-events:none}
+.ss-pos{display:flex;flex-wrap:wrap;align-items:center;gap:4px;margin-top:8px}
+.ss-pos-k{font:600 10.5px var(--body);letter-spacing:.1em;text-transform:uppercase;color:var(--faint);margin-right:4px}
+.ss-pos button{border:1px solid var(--line2);background:var(--charcoal);color:var(--silver);font:600 12.5px var(--body);letter-spacing:.04em;padding:6px 11px;border-radius:var(--r-xs);cursor:pointer}
+.ss-pos button:hover{color:var(--white);border-color:rgba(212,175,55,.45)}
+.ss-pos button[aria-pressed="true"]{background:rgba(212,175,55,.16);color:var(--gold);border-color:rgba(212,175,55,.55)}
+.ss-pos button:disabled{opacity:.4;cursor:not-allowed}
+.ss-menu{position:absolute;left:0;right:0;top:calc(100% + 6px);z-index:20;background:#1d1c23;border:1px solid rgba(212,175,55,.3);border-radius:var(--r-sm);box-shadow:0 18px 50px rgba(0,0,0,.55);max-height:min(420px,60vh);overflow-y:auto;padding:4px}
+.ss-menu[hidden]{display:none}
+.ss-mbar{display:flex;align-items:center;justify-content:space-between;gap:8px}
+.ss-mbar .ss-mhead{flex:1;min-width:0}
+.ss-mdone{flex:none;min-height:36px;padding:0 14px;margin:4px;border:1px solid rgba(212,175,55,.45);background:rgba(212,175,55,.1);color:var(--gold);border-radius:var(--r-xs);font:700 13px var(--body);cursor:pointer}
+.ss-mhead{padding:8px 10px 6px;font:600 10.5px var(--body);letter-spacing:.1em;text-transform:uppercase;color:var(--faint)}
+.ss-menu{touch-action:pan-y}
+.ss-opt{display:grid;grid-template-columns:34px minmax(0,1fr) auto;align-items:center;gap:10px;width:100%;padding:7px 10px;border:0;background:transparent;border-radius:var(--r-xs);text-align:left;cursor:pointer}
+.ss-opt .face{width:34px;height:34px}
+.ss-opt b{display:block;font-size:14px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.ss-opt small{display:block;font-size:11.5px;color:var(--faint);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.ss-opt em{font-style:normal;font:700 14px var(--body);color:var(--gold);font-variant-numeric:tabular-nums;text-align:right}
+.ss-opt em small{font:600 9px var(--body);letter-spacing:.08em;color:var(--faint);text-transform:uppercase}
+.ss-opt[aria-selected="true"],.ss-opt:hover{background:rgba(212,175,55,.1)}
+.ss-opt.on{opacity:.35;pointer-events:none}
+.ss-none{padding:14px 10px;font-size:13.5px;color:var(--faint)}
+.ss-btn{background:transparent;border:1px solid var(--line2);color:var(--silver);font:600 13px var(--body);padding:11px 14px;border-radius:var(--r-sm);cursor:pointer;white-space:nowrap}
+.ss-btn:hover{color:var(--white);border-color:rgba(212,175,55,.45)}
+.ss-btn[hidden]{display:none}
+.ss-count{font-size:12px;color:var(--faint);white-space:nowrap}
+
+/* ── the call ── */
+.ss-call{display:flex;align-items:center;gap:16px;margin:0 0 16px;padding:14px 18px;border:1px solid rgba(212,175,55,.45);border-radius:var(--r);background:linear-gradient(100deg,rgba(212,175,55,.16),rgba(212,175,55,.03) 70%);box-shadow:0 10px 34px rgba(0,0,0,.3)}
+.ss-call[hidden]{display:none}
+.ss-call .face{width:54px;height:54px;box-shadow:0 0 0 2px var(--gold),0 0 18px rgba(212,175,55,.35)}
+.ss-call-txt{display:grid;gap:3px;min-width:0}
+.ss-call-k{font:700 11px var(--body);letter-spacing:.16em;text-transform:uppercase;color:var(--gold)}
+.ss-call-h{font:700 26px/1.05 var(--display);letter-spacing:.04em;text-transform:uppercase;color:var(--white)}
+.ss-call-h span{color:var(--gold)}
+.ss-call-s{font-size:13.5px;color:var(--soft)}
+.ss-call-s b{color:var(--white);font-weight:600}
+.ss-call-c{font-size:12.5px;color:var(--faint)}
+.ss-call-c b{color:#7DDCA3;font-weight:600} .ss-call-c i{font-style:normal;color:#F1948A;font-weight:600}
+.ss-call.even{border-color:var(--line2);background:var(--charcoal)}
+.ss-call.even .ss-call-k{color:var(--silver)}
+
+/* ── the board: one column per player ── */
+/* centered on the page (owner 2026-11-13): columns up to 400px wide, the group in the middle */
+.ss-board{display:grid;grid-template-columns:repeat(var(--n,2),minmax(0,400px));justify-content:center;gap:14px;position:relative;align-items:start}
+.ss-col{position:relative;display:flex;flex-direction:column;min-width:0;border:1px solid var(--line);border-radius:var(--r);background:linear-gradient(180deg,rgba(39,38,46,.85),rgba(22,22,28,.92));overflow:hidden}
+.ss-col.win{border-color:rgba(212,175,55,.7);box-shadow:0 0 0 1px rgba(212,175,55,.25),0 18px 50px rgba(212,175,55,.12)}
+.ss-x{position:absolute;top:8px;right:8px;z-index:2;width:28px;height:28px;display:grid;place-items:center;border:1px solid rgba(255,255,255,.1);border-radius:50%;background:rgba(0,0,0,.35);color:var(--faint);cursor:pointer;font-size:15px;line-height:1}
+.ss-x:hover{color:var(--white);border-color:rgba(231,76,60,.6)}
+
+/* the score at the top of the column */
+.ss-titlebox{display:flex;align-items:center;gap:12px;flex-wrap:wrap}
+.ss-wk{display:inline-flex;align-items:center;padding:4px 11px;border:1px solid rgba(212,175,55,.5);border-radius:999px;background:rgba(212,175,55,.12);color:var(--gold);font:700 13px/1 var(--display);letter-spacing:.1em;text-transform:uppercase;white-space:nowrap}
+.ss-game{padding:9px 38px 9px 12px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;text-align:center;font:600 12px/1.35 var(--body);letter-spacing:.04em;color:var(--soft);border-bottom:1px solid var(--hair);background:rgba(255,255,255,.025)}
+.ss-game b{color:var(--white);font-weight:700}
+@media (max-width:640px){.ss-game{padding:8px 34px 8px 10px;font-size:11.5px;white-space:normal}.ss-game .wk{display:block;font:700 10.5px var(--body);letter-spacing:.1em;text-transform:uppercase;color:var(--gold)}.ss-game .sep{display:none}.ss-game .kt{display:block}}
+.win .ss-game{background:rgba(212,175,55,.1);border-bottom-color:rgba(212,175,55,.3)}
+.ss-top{display:flex;align-items:center;justify-content:center;gap:10px;min-height:56px;padding:10px 40px;border-bottom:1px solid var(--hair);background:rgba(255,255,255,.02)}
+.ss-tag{font:700 11.5px var(--body);letter-spacing:.16em;text-transform:uppercase;padding:5px 9px;border-radius:var(--r-xs);background:rgba(255,255,255,.06);color:var(--silver)}
+.ss-score{font:700 30px/1 var(--display);color:var(--white);font-variant-numeric:tabular-nums}
+.ss-score small{font:600 11px var(--body);letter-spacing:.08em;color:var(--faint);margin-left:3px}
+.ss-gap{font-size:12px;color:var(--faint);font-variant-numeric:tabular-nums}
+.win .ss-top{background:linear-gradient(180deg,rgba(212,175,55,.24),rgba(212,175,55,.08));border-bottom-color:rgba(212,175,55,.35)}
+.win .ss-tag{background:var(--gold);color:#17140a}
+.win .ss-score{color:var(--gold)}
+.ss-top.none .ss-score{font-size:20px;color:var(--faint)}
+
+/* headshot (gold box on the START) and the DHQ Value chip beside it */
+.ss-head{display:flex;flex-direction:column;align-items:center;gap:10px;padding:18px 14px 12px;text-align:center}
+.ss-shot{position:relative;display:flex;align-items:flex-end;justify-content:center;gap:10px}
+.ss-frame{position:relative;width:128px;height:128px;border-radius:var(--r-lg);overflow:hidden;background:radial-gradient(120% 90% at 50% 10%,#2d2c35,#141419);box-shadow:inset 0 0 0 2px var(--pc,var(--silver));flex:none}
+.ss-frame img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;object-position:center 12%}
+.ss-frame .ini{position:absolute;inset:0;display:grid;place-items:center;font:700 34px var(--display);color:rgba(255,255,255,.25)}
+.win .ss-frame{box-shadow:inset 0 0 0 3px var(--gold),0 0 0 4px rgba(212,175,55,.18),0 0 34px rgba(212,175,55,.35)}
+.ss-crown{position:absolute;top:-9px;left:50%;transform:translateX(-50%);z-index:1;padding:3px 9px;border-radius:999px;background:var(--gold);color:#17140a;font:700 9.5px var(--body);letter-spacing:.14em;text-transform:uppercase;box-shadow:0 4px 14px rgba(0,0,0,.4);white-space:nowrap}
+.ss-val{display:grid;gap:1px;padding:7px 9px;border:1px solid var(--line2);border-radius:var(--r-sm);background:rgba(0,0,0,.25);text-align:left;min-width:66px}
+.ss-val span{font:600 8.5px var(--body);letter-spacing:.12em;text-transform:uppercase;color:var(--faint)}
+.ss-val b{font:700 17px/1.1 var(--display);color:var(--white);font-variant-numeric:tabular-nums}
+.ss-frame[data-card],.ss-name[data-card]{cursor:pointer}
+.ss-name[data-card]:hover{color:var(--gold)}
+.ss-card{margin-top:8px;border:1px solid rgba(212,175,55,.45);background:rgba(212,175,55,.08);color:var(--gold);font:600 12.5px var(--body);padding:6px 12px;border-radius:999px;cursor:pointer}
+.ss-card:hover{background:rgba(212,175,55,.16)}
+.ss-name{font:700 22px/1.1 var(--display);letter-spacing:.03em;color:var(--white);max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.ss-sub{font-size:12.5px;color:var(--faint)}
+.ss-sub b{font-weight:700}
+.ss-flag{display:inline-block;margin-top:2px;padding:3px 8px;border-radius:var(--r-xs);font:700 10.5px var(--body);letter-spacing:.08em;text-transform:uppercase}
+.ss-flag.bad{background:rgba(231,76,60,.16);color:#F1948A}
+.ss-flag.warn{background:rgba(240,165,0,.14);color:var(--warn)}
+.ss-flag.info{background:rgba(93,173,226,.14);color:var(--info)}
+
+/* the bullets */
+.ss-sec{padding:4px 16px 14px}
+.ss-sec h3{margin:10px 0 6px;font:600 10.5px var(--body);letter-spacing:.12em;text-transform:uppercase;color:var(--gold)}
+.ss-list{list-style:none;margin:0;padding:0;display:grid}
+.ss-list li{position:relative;display:flex;align-items:baseline;gap:8px;padding:6px 0 6px 14px;border-bottom:1px solid var(--hair);font-size:13px;min-height:33px}
+.ss-list li::before{content:"";position:absolute;left:0;top:13px;width:5px;height:5px;border-radius:50%;background:rgba(212,175,55,.55)}
+.ss-list li:last-child{border-bottom:0}
+.ss-list .k{color:var(--soft);flex:none}
+.ss-list .dots{flex:1;min-width:8px;border-bottom:1px dotted rgba(255,255,255,.12);transform:translateY(-3px)}
+.ss-list .v{color:var(--white);font-weight:600;text-align:right;font-variant-numeric:tabular-nums;min-width:0}
+.ss-list .v.lead{color:#7DDCA3;white-space:nowrap}
+.ss-list .v.lead::after{content:" \25B2";font-size:8px;vertical-align:2px}
+.ss-list .v.dim{color:var(--faint);font-weight:500}
+.ss-list .v.dhq{color:var(--gold);font-size:15px}
+.ss-list .v.bye{color:var(--warn)}
+.ss-list li.wide{display:block;align-content:start}
+.ss-list li.wide .k{display:block}
+.ss-list li.wide .v{display:block;text-align:left;margin-top:2px;font-weight:500;color:var(--white);line-height:1.4}
+.ss-reads li{display:block;padding-left:18px}
+.ss-reads li::before{display:none}
+.ss-reads .ar{position:absolute;left:0;top:7px;font-size:10px}
+.ss-reads .up .ar{color:#7DDCA3} .ss-reads .dn .ar{color:#F1948A}
+.ss-reads b{font-weight:600;color:var(--white)}
+.ss-reads .pc{font-weight:700;margin-left:4px;font-variant-numeric:tabular-nums}
+.ss-reads .up .pc{color:#7DDCA3} .ss-reads .dn .pc{color:#F1948A}
+.ss-reads small{display:block;color:var(--faint);font-size:12px;line-height:1.4;margin-top:1px}
+
+/* an open slot: click to add */
+.fx{list-style:none;margin:0;padding:0;display:grid;grid-template-columns:minmax(0,1fr);gap:0}
+.ss-sec{min-width:0}
+.fx > li{position:relative;padding:8px 0;border-bottom:1px solid var(--hair);font-size:12.5px}
+.fx > li:last-child{border-bottom:0}
+.fx-row{display:flex;align-items:baseline;gap:6px}
+.fx-k{color:var(--white);font-weight:600;min-width:0}
+.fx-w{flex:none;font:600 9.5px var(--mono);color:var(--faint);border:1px solid var(--hair);border-radius:var(--r-xs);padding:1px 4px;letter-spacing:.02em}
+.fx-p{margin-left:auto;flex:none;font-weight:700;font-variant-numeric:tabular-nums;color:var(--soft)}
+.fx-v{margin-left:auto;flex:none;font:700 17px/1 var(--display);color:var(--white);font-variant-numeric:tabular-nums}
+.fx small{display:block;margin-top:3px;color:var(--faint);font-size:11.5px;line-height:1.4}
+.fx .fx-x{color:var(--soft)}
+.fx-f.up .fx-p,.fx-p.pu{color:#7DDCA3} .fx-f.dn .fx-p,.fx-p.pd{color:#F1948A}
+.fx-f.out .fx-p{color:#F1948A} .fx-f.nod .fx-p,.fx-f.flat .fx-p{color:var(--faint);font-weight:600}
+.fx-f.nod .fx-k{color:var(--faint)}
+.fx-bar{position:relative;height:3px;margin:5px 0 1px;background:rgba(255,255,255,.05);border-radius:2px}
+.fx-bar::after{content:"";position:absolute;left:50%;top:-2px;width:1px;height:7px;background:rgba(255,255,255,.18)}
+.fx-bar i{position:absolute;top:0;height:100%;border-radius:2px;background:var(--faint)}
+.fx-f.up .fx-bar i{background:#7DDCA3} .fx-f.dn .fx-bar i{background:#F1948A}
+.fx-s{background:rgba(255,255,255,.025);margin:0 -8px;padding:8px!important;border-radius:var(--r-xs)}
+.fx-base{margin-top:2px!important}
+.fx-eq{margin-top:3px;font-size:12px;color:var(--soft);font-variant-numeric:tabular-nums}
+.fx-eq b{color:var(--white)}
+.fx-line{display:flex;flex-wrap:wrap;gap:3px 5px;margin-top:6px}
+.fx-line span{font-size:11px;color:var(--soft);background:rgba(0,0,0,.25);border:1px solid var(--hair);border-radius:var(--r-xs);padding:2px 5px;white-space:nowrap}
+.fx-line b{color:var(--white);font-weight:600}
+.fx-fin{background:rgba(212,175,55,.08)!important;border:1px solid rgba(212,175,55,.25)!important}
+.fx-fin .fx-k{color:var(--gold)} .fx-fin .fx-v{color:var(--gold)}
+.win .fx-fin{background:rgba(212,175,55,.16)!important}
+.ss-slot{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:12px;min-height:420px;border:1.5px dashed rgba(212,175,55,.3);border-radius:var(--r);background:rgba(255,255,255,.015);color:var(--faint);cursor:pointer;font:600 14px var(--body);transition:border-color .15s,background .15s,color .15s}
+.ss-slot:hover{border-color:rgba(212,175,55,.6);background:rgba(212,175,55,.04);color:var(--white)}
+.ss-slot i{display:grid;place-items:center;width:84px;height:84px;border-radius:var(--r-lg);border:1.5px dashed rgba(212,175,55,.4);font:300 40px/1 var(--body);font-style:normal;color:var(--gold)}
+.ss-board.c3 .ss-vs,.ss-board.c4 .ss-vs{display:none}
+.ss-vs{position:absolute;top:160px;left:50%;z-index:3;transform:translate(-50%,-50%);width:42px;height:42px;display:grid;place-items:center;border-radius:50%;background:#121217;border:1px solid rgba(212,175,55,.45);font:700 14px var(--display);letter-spacing:.06em;color:var(--gold);box-shadow:0 6px 20px rgba(0,0,0,.5);pointer-events:none}
+
+/* empty state */
+.ss-empty{display:grid;gap:14px;justify-items:center;text-align:center;padding:10px 0 6px}
+.ss-empty p{margin:0;color:var(--soft);font-size:14px;max-width:560px}
+.ss-ex{display:flex;flex-wrap:wrap;justify-content:center;gap:8px}
+.ss-ex button{display:inline-flex;align-items:center;gap:6px;background:var(--charcoal);border:1px solid var(--line2);color:var(--white);font:500 13px var(--body);padding:8px 12px;border-radius:999px;cursor:pointer}
+.ss-ex button:hover{border-color:var(--gold)}
+.ss-ex button span{color:var(--faint);font-size:11px}
+
+.ss-how{margin:16px 0 0;font-size:12px;line-height:1.6;color:var(--faint)}
+.ss-how b{color:var(--soft);font-weight:600}
+
+@media (max-width:1100px){
+  .ss-board.c3,.ss-board.c4{grid-template-columns:repeat(2,minmax(0,400px))}
+  .ss-board.p2.c3 .ss-slot.extra{display:none}
+  .ss-board.p2.c3{grid-template-columns:repeat(2,minmax(0,1fr))}
+  .ss-board.p2 .ss-vs{display:grid}
+}
+@media (min-width:761px) and (max-width:1100px){
+  /* three players on a tablet: the third sits centered under the first two */
+  .ss-board.c3 > .ss-col:nth-child(3){grid-column:1 / -1;justify-self:center;width:calc(50% - 7px)}
+}
+@media (max-width:900px){
+  .league{grid-template-columns:repeat(3,minmax(0,1fr))}
+}
+@media (max-width:760px){
+  .ss-slot.extra{display:none}
+  .ss-board.p2{grid-template-columns:repeat(2,minmax(0,1fr))}
+  .ss-board.many{justify-content:flex-start;display:flex;overflow-x:auto;scroll-snap-type:x mandatory;padding-bottom:8px;gap:10px}
+  .ss-board.many > *{flex:0 0 78%;scroll-snap-align:start}
+  .ss-call{padding:12px 14px;gap:12px}
+  .ss-call .face{width:44px;height:44px}
+  .ss-call-h{font-size:21px}
+}
+@media (max-width:560px){
+  .league{grid-template-columns:repeat(3,minmax(0,1fr));gap:8px}
+  .ss-board:not(.many){gap:8px}
+  .ss-board:not(.many) .ss-top{flex-direction:column;gap:3px;min-height:72px;padding:8px 30px}
+  .ss-board:not(.many) .ss-score{font-size:24px}
+  .ss-board:not(.many) .ss-frame{width:88px;height:88px}
+  .ss-board:not(.many) .ss-shot{flex-direction:column;align-items:center;gap:8px}
+  .ss-board:not(.many) .ss-val{text-align:center;padding:5px 8px}
+  .ss-board:not(.many) .ss-val b{font-size:15px}
+  .ss-board:not(.many) .ss-name{font-size:17px;white-space:normal}
+  .ss-board:not(.many) .ss-sec{padding:2px 10px 10px}
+  .ss-board:not(.many) .ss-list li{font-size:12px;gap:4px;padding-left:10px}
+  .ss-board:not(.many) .ss-list li::before{width:4px;height:4px}
+  .ss-board:not(.many) .ss-list .dots{display:none}
+  .ss-board:not(.many) .ss-list .v{margin-left:auto}
+  .ss-board:not(.many) .ss-reads li{padding-left:14px}
+  .ss-slot{min-height:300px}
+  .ss-vs{top:150px;width:30px;height:30px;font-size:11px}
+  .ss-tools .ss-btn{flex:1}
+  .ss-board:not(.many) .fx-row{flex-wrap:wrap;row-gap:2px}
+  .ss-board:not(.many) .fx-f .fx-k,.ss-board:not(.many) .fx-s .fx-k{flex-basis:100%}
+  .ss-board:not(.many) .fx-v{margin-left:0}
+  .ss-board:not(.many) .fx > li{font-size:12px}
+  .ss-board:not(.many) .fx small{font-size:11px}
+  .ss-board:not(.many) .fx-line span{white-space:normal}
+}
+@media (max-width:480px){
+  /* "Browse All QB RB WR TE K" on one line (K was wrapping to its own row) */
+  .ss-pos{flex-wrap:nowrap;gap:3px}
+  .ss-pos-k{margin-right:1px;letter-spacing:.06em}
+  .ss-pos button{flex:1 1 0;min-width:0;padding:6px 0;text-align:center}
+  .ss-pos.idp{flex-wrap:wrap}
+  .ss-pos.idp button{flex:0 0 auto;padding:6px 10px}
+}
+@media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
+@media (max-width:600px){
+  /* Phones (owner ask 2026-11-18): the Lab tools' shared phone layout: slim top bar, no box around the page,
+     one-line title, settings as one scrolling row of small pills (same as Player Values). */
+  body{padding-inline:max(12px,env(safe-area-inset-left,0px)) max(12px,env(safe-area-inset-right,0px))}
+  .top{padding-block:calc(8px + var(--sat)) 8px}
+  .brand{gap:8px}.brand img{width:30px;height:30px;box-shadow:none;border-radius:var(--r-sm)}.brand span{font-size:15px}
+  .back{padding:7px 12px;font-size:13px;border-radius:999px}
+  .panel{margin-top:4px;padding:10px 0 0;border:0;background:transparent}
+  .panel-head{padding-bottom:0;border-bottom:0;flex-wrap:nowrap}
+  .panel-head h1{font-size:17px;white-space:nowrap}
+  .panel-head em{display:none}
+  .source{display:none}
+  .league{display:flex;flex-wrap:nowrap;overflow-x:auto;gap:6px;margin:10px -12px 8px;padding:0 12px 2px;scrollbar-width:none;-webkit-overflow-scrolling:touch}
+  .league::-webkit-scrollbar{display:none}
+  .fld{flex:none;flex-direction:row;align-items:center;gap:0;height:34px;padding:0 0 0 12px;border:1px solid var(--line2);border-radius:999px;background:var(--charcoal)}
+  .fld > span{font-size:11px;letter-spacing:0;text-transform:none;white-space:nowrap}
+  .fld .sel{width:auto;height:32px;padding:0 10px 0 6px;border:0;background:transparent;font:600 13px var(--body)}
+}
+@media (max-width:600px){
+  /* Start Sit on phones: title and week on one line, the add-player box and position pills, then the board. */
+  .ss-titlebox{display:flex;align-items:center;gap:8px;flex-wrap:nowrap}
+  .ss-wk{font-size:11px;padding:3px 8px}
+  .ss-tools{margin:0 0 10px;gap:8px}
+  .ss-find{min-width:0;flex:1 1 100%}
+  .ss-find input{font-size:16px;padding-top:11px;padding-bottom:11px}
+  .ss-pos{flex-wrap:nowrap;overflow-x:auto;scrollbar-width:none;margin-top:8px}
+  .ss-pos::-webkit-scrollbar{display:none}
+  .ss-pos-k{display:none}
+  .ss-pos button{flex:1 0 auto;min-height:32px;border-radius:999px}
+  .ss-empty{gap:10px;padding-top:2px}
+  .ss-empty p{display:none}
+  .ss-ex{flex-wrap:nowrap;overflow-x:auto;justify-content:flex-start;width:calc(100% + 24px);margin:0 -12px;padding:0 12px 4px;scrollbar-width:none}
+  .ss-ex::-webkit-scrollbar{display:none}
+  .ss-ex button{flex:none}
+  .ss-slot{min-height:180px;gap:8px}
+  .ss-slot i{width:56px;height:56px;font-size:28px}
+}
+/* the fold (owner ask 2026-11-18): closed shows only the heading with its toggle */
+.ss-more:not(.open) > :not(.fx-h){display:none}
+.fx-h{margin:10px 0 6px}
+.fx-tog{display:flex;align-items:center;justify-content:space-between;gap:10px;width:100%;min-height:32px;padding:0;border:0;background:none;cursor:pointer;font:inherit;letter-spacing:inherit;text-transform:inherit;color:inherit;text-align:left}
+.fx-tog i{flex:none;width:24px;height:24px;border-radius:50%;border:1px solid rgba(212,175,55,.45);display:grid;place-items:center;transition:transform .2s,background .2s}
+.fx-tog i::before{content:"";width:6px;height:6px;border-right:1.5px solid var(--gold);border-bottom:1.5px solid var(--gold);transform:translateY(-1px) rotate(45deg)}
+.fx-tog:hover i{background:rgba(212,175,55,.12)}
+.ss-more.open .fx-tog i{transform:rotate(180deg)}
+/* Match the War Room header (owner ask 2026-11-18): gold DM Sans wordmark, the app's logo size and
+   its "My Profile" pill shape for the back button (js/hub-v2.css .hv2-header). */
+.top{min-height:68px}
+.brand img{border-radius:var(--r,10px);box-shadow:0 2px 12px rgba(212,175,55,.3)}
+.brand span{font:700 1.1rem/1.1 var(--body,'DM Sans',system-ui,sans-serif);letter-spacing:.06em;background:linear-gradient(135deg,#D4AF37 0%,#F5F2EA 50%,#D4AF37 100%);background-size:200% auto;-webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent;color:#D4AF37;animation:dhq-shimmer 3s linear infinite}
+@keyframes dhq-shimmer{0%{background-position:0% center}100%{background-position:200% center}}
+@media (prefers-reduced-motion:reduce){.brand span{animation:none}}
+.back{display:inline-flex;align-items:center;min-height:44px;padding:0 16px;border:1px solid #ffffff18;border-radius:30px;background:#ffffff08;color:var(--white,#F5F2EA);font:500 13px var(--body,'DM Sans',system-ui,sans-serif)}
+.back:hover{border-color:rgba(212,175,55,.5);color:var(--white,#F5F2EA)}
+@media (max-width:600px){
+  .top{min-height:68px;padding-block:calc(10px + var(--sat,0px)) 10px}
+  .brand{gap:9px}.brand img{width:34px;height:34px;border-radius:var(--r,10px);box-shadow:0 2px 12px rgba(212,175,55,.3)}
+  .brand span{font-size:16px;letter-spacing:.025em;white-space:nowrap}
+  .back{min-height:44px;padding:0 14px;font-size:13px;border-radius:30px}
+}
+</style>
+<link rel="stylesheet" href="player-card/dhq-player-card.css?v=20261118card3">
+<script src="player-card/dhq-player-card.js?v=20261118card3" defer></script>
+</head>
+<body>
+<div class="brandwash" aria-hidden="true"></div>
+<div class="wrap">
+  <header class="top">
+    <a class="brand" href="landing.html?home" aria-label="Dynasty HQ front page"><img src="img/logo.png" alt="" width="44" height="44"><span>DYNASTY HQ</span></a>
+    <a class="back" href="landing.html?home">&larr; Front page</a>
+  </header>
+
+  <section class="panel" aria-labelledby="ss-title">
+    <div class="panel-head"><div class="ss-titlebox"><h1 id="ss-title">Start Sit Advice</h1><span class="ss-wk" id="ssWeek" hidden></span></div><em id="weekLabel">This week's games. No league or sign-up needed.</em></div>
+    <p class="source" id="sourceLine">Add the players you are deciding between. The highest <b>DHQ projection</b> this week gets the start.</p>
+
+    <div class="league" id="leagueRow" role="group" aria-label="Your league">
+      <label class="fld"><span>Scoring</span><select class="sel" data-key="scoring"><option value="ppr">PPR</option><option value="half">Half-PPR</option><option value="std">Standard</option></select></label>
+      <label class="fld"><span>TE premium</span><select class="sel" data-key="tep"><option value="0">Off</option><option value="1">On</option></select></label>
+      <label class="fld"><span>Defenders (IDP)</span><select class="sel" data-key="idp"><option value="0">Off</option><option value="1">On</option></select></label>
+    </div>
+
+    <div class="ss-tools">
+      <div class="ss-find" id="find">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>
+        <input id="q" type="search" placeholder="Add a player: type a name or team…" autocomplete="off" spellcheck="false"
+          role="combobox" aria-expanded="false" aria-controls="menu" aria-autocomplete="list" aria-label="Add a player">
+        <div class="ss-pos" id="posSeg" role="group" aria-label="Browse players by position"></div>
+        <div class="ss-menu" id="menu" role="listbox" aria-label="Players" hidden></div>
+      </div>
+      <span class="ss-count" id="count"></span>
+      <button class="ss-btn" id="share" type="button" hidden>Copy link</button>
+      <button class="ss-btn" id="clear" type="button" hidden>Clear</button>
+    </div>
+
+    <div class="ss-call" id="call" role="status" aria-live="polite" hidden></div>
+    <div id="board"><div class="loading">Loading DHQ projections…</div></div>
+
+    <p class="ss-how" id="how"></p>
+  </section>
+
+  <p class="foot-note" id="footNote"></p>
+</div>
+<div class="toast" id="toast" role="status"></div>
+
+<script>
+(function () {
+  // ── Source league: the engine server's finished values ───────────────────
+  // The Psycho League (Sleeper): 16 teams, Superflex, Half-PPR, IDP. Owner
+  // ruling 2026-11-10: its values as-is; the toggles refine them.
+  var SOURCE = { id: '1312100327931019264', teams: 16, qb: 'sf', scoring: 'half', tep: '0' };
+  var VALUES_URL = 'https://hovnqztlbsgsywrbidbh.supabase.co/functions/v1/dhq-league?league=' + SOURCE.id;
+  var PLAYERS_URL = 'https://api.sleeper.app/v1/players/nfl';
+  var VALUES_KEY = 'dhq_tc_values_v1', PLAYERS_KEY = 'dhq_tc_players_v1', PREF_KEY = 'dhq_tc_league_v1', STATS_KEY = 'dhq_tc_stats_v2';   // v2: the rows lab/projections.html keeps (+ defenders' IDP stats)
+  // This season's actual points and games (Sleeper season stats, the same feed the app reads; actual results, not projections).
+  var SEASON = 2026, STATS_URL = 'https://api.sleeper.app/v1/stats/nfl/regular/' + SEASON, STATS_TTL = 6 * 3600e3;
+  var STATS = {};
+  // Defenders (launch QA 2026-11-17, as lab/projections.html): Sleeper's pts_* leave IDP stats out, so a
+  // DL / LB / DB is scored from his raw IDP stats with the default league's IDP rules (its idp_* keys and
+  // defensive bonuses), cached a day; his projection is the lock's copy for that league (the same rules).
+  var LEAGUE_URL = 'https://api.sleeper.app/v1/league/' + SOURCE.id, IDPR_KEY = 'dhq_tc_idp_rules_v1';
+  var IDPR = { idp_tkl_solo: 0.5, idp_tkl_ast: 0.25, idp_tkl_loss: 2, idp_sack: 5, idp_sack_yd: 0.1, idp_qb_hit: 1.25, idp_int: 5, idp_int_ret_yd: 0.1, idp_pass_def: 5, idp_pass_def_3p: 1, idp_ff: 3, idp_fum_rec: 3, idp_fum_ret_yd: 0.1, idp_def_td: 6, idp_safe: 2, idp_blk_kick: 3 }; // the league's rules on 2026-11-17, used if Sleeper cannot be reached
+  var idprLoading = null;
+  function isDefKey(k) { return /^idp_/.test(k) || /^bonus_(tkl|sack|def)_/.test(k); }
+  function defLine(l) { var o = {}; Object.keys(l || {}).forEach(function (k) { if (isDefKey(k) && l[k]) o[k] = l[k]; }); return o; }
+  function loadIdpRules() {
+    if (idprLoading) return idprLoading;
+    var c = load(IDPR_KEY);
+    if (c && c.rules && Date.now() - c.ts < 86400e3) { IDPR = c.rules; return (idprLoading = Promise.resolve(IDPR)); }
+    return (idprLoading = getJSON(LEAGUE_URL).then(function (lg) {
+      var r = defLine(lg && lg.scoring_settings);
+      if (Object.keys(r).length) { IDPR = r; store(IDPR_KEY, { ts: Date.now(), rules: r }); }
+      return IDPR;
+    }).catch(function () { if (c && c.rules) IDPR = c.rules; return IDPR; }));
+  }
+  function idpPts(line) { var t = 0; for (var k in IDPR) if (line && line[k]) t += line[k] * IDPR[k]; return t; }
+  // This week's bye teams: the app's scoreboard relay (ESPN's slate, nfl-scoreboard) for the current NFL week.
+  var STATE_URL = 'https://api.sleeper.app/v1/state/nfl', SCOREBOARD_URL = 'https://sxshiqyxhhifvtfqawbq.supabase.co/functions/v1/nfl-scoreboard', BYE_KEY = 'dhq_tc_bye_v1';
+  var BYE = {}, ESPN_TEAM = { WSH: 'WAS', JAC: 'JAX', LA: 'LAR' };
+  function loadByes() {
+    var c = load(BYE_KEY);
+    if (c && Date.now() - c.ts < 3 * 3600e3) { BYE = c.teams || {}; return Promise.resolve(); }
+    return getJSON(STATE_URL).then(function (st) {
+      if (!st || st.season_type !== 'regular' || !st.week) return {};
+      return getJSON(SCOREBOARD_URL + '?week=' + st.week + '&seasontype=2').then(function (sb) {
+        var out = {}; ((sb.week && sb.week.teamsOnBye) || []).forEach(function (t) { var a = String(t.abbreviation || '').toUpperCase(); out[ESPN_TEAM[a] || a] = st.week; });
+        return out;
+      });
+    }).then(function (teams) { BYE = teams || {}; store(BYE_KEY, { ts: Date.now(), teams: BYE }); }).catch(function () { BYE = (c && c.teams) || {}; });
+  }
+  function onBye(team) { return !!BYE[String(team || '').toUpperCase()]; }
+  var VALUES_TTL = 3 * 3600e3, PLAYERS_TTL = 3 * 86400e3;
+  var IDP = { DL: 1, LB: 1, DB: 1, DE: 1, DT: 1, CB: 1, S: 1, ILB: 1, OLB: 1 };
+  var MAX = 10000;
+  var $ = function (id) { return document.getElementById(id); };
+  var esc = function (s) { return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]; }); };
+  var fmt = function (n) { return Math.round(n).toLocaleString('en-US'); };
+  function store(k, v) { try { localStorage.setItem(k, JSON.stringify(v)); } catch (e) { /* full or blocked: run without */ } }
+  function load(k) { try { return JSON.parse(localStorage.getItem(k) || 'null'); } catch (e) { return null; } }
+  var tt; function toast(m) { var t = $('toast'); t.textContent = m; t.classList.add('on'); clearTimeout(tt); tt = setTimeout(function () { t.classList.remove('on'); }, 2400); }
+
+  // ── State ────────────────────────────────────────────────────────────────
+  var S = { scoring: 'ppr', qb: 'sf', tep: '0', teams: '12', idp: '0' };
+  Object.assign(S, load(PREF_KEY) || {});
+  var DATA = null;      // { builtAt, week, values:{pid:[value, age, projMedian, ppg]}, picks:{overall:value} }
+  var PLAYERS = null;   // { pid: [name, pos, team] }
+  var SEARCH = [];      // [{ id, name, pos, team, base }]
+  // ── Refinements (owner 2026-11-10): estimated, on top of the server values ─
+  // Position factors from the source league's format to the visitor's. They
+  // never touch picks' order and never exceed the 10,000 scale.
+  function factor(pos, base) {
+    var f = 1;
+    var sc = { ppr: { RB: 1.03, WR: 1.06, TE: 1.06 }, half: {}, std: { RB: 0.98, WR: 0.93, TE: 0.93 } };
+    f *= (sc[S.scoring][pos] || 1);
+    if (S.qb === '1qb' && pos === 'QB') f *= 0.42 + 0.22 * Math.min(1, base / 8000);
+    if (S.tep === '1' && pos === 'TE') f *= 1.15;
+    return f;
+  }
+  function teamsCurve(v) {
+    // Fewer teams: depth is easier to find, so lesser players are worth less.
+    var k = 1 + (SOURCE.teams - Number(S.teams)) * 0.025;
+    return MAX * Math.pow(Math.max(0, v) / MAX, k);
+  }
+  function isEstimated() { return S.scoring !== SOURCE.scoring || S.qb !== SOURCE.qb || S.tep !== SOURCE.tep || Number(S.teams) !== SOURCE.teams; }
+  function playerValue(pid) {
+    var r = DATA && DATA.values[pid]; if (!r) return 0;
+    var pos = (PLAYERS && PLAYERS[pid] && PLAYERS[pid][1]) || '';
+    var v = r[0] * factor(pos, r[0]);
+    return Math.round(Math.min(MAX - 1, teamsCurve(v)));
+  }
+  // ── Data loading (finished numbers only; nothing is computed here) ───────
+  function slimValues(d) {
+    var out = { builtAt: d.built_at, week: d.dhq_proj && d.dhq_proj.week, values: {}, picks: {} };
+    var ps = (d.intel && d.intel.playerScores) || {}, pm = (d.intel && d.intel.playerMeta) || {}, pj = (d.dhq_proj && d.dhq_proj.players) || {};
+    Object.keys(ps).forEach(function (pid) {
+      var v = ps[pid]; if (!(v > 0)) return;
+      var m = pm[pid] || {}, j = pj[pid] || {};
+      out.values[pid] = [v, m.age || null, (j.no_line || j.median == null) ? null : Math.round(j.median * 10) / 10, m.ppg != null ? m.ppg : null];
+    });
+    var pv = (d.intel && d.intel.dhqPickValues) || {};
+    Object.keys(pv).forEach(function (n) { if (pv[n] && pv[n].value > 0) out.picks[n] = pv[n].value; });
+    return out;
+  }
+  function slimPlayers(all, keep) {
+    var out = {};
+    Object.keys(keep).forEach(function (pid) {
+      var p = all[pid]; if (!p) return;
+      var name = p.full_name || ((p.first_name || '') + ' ' + (p.last_name || '')).trim();
+      var pos = p.position || (p.fantasy_positions && p.fantasy_positions[0]) || '';
+      if (pos === 'DE' || pos === 'DT') pos = 'DL'; else if (pos === 'CB' || pos === 'S') pos = 'DB'; else if (pos === 'ILB' || pos === 'OLB') pos = 'LB';
+      out[pid] = [name, pos, p.team || 'FA'];
+    });
+    return out;
+  }
+  function getJSON(url) { return fetch(url, { cache: 'no-cache' }).then(function (r) { if (!r.ok) throw new Error(r.status); return r.json(); }); }
+  function loadData() {
+    var cv = load(VALUES_KEY), cp = load(PLAYERS_KEY), now = Date.now();
+    var vP = (cv && now - cv.ts < VALUES_TTL) ? Promise.resolve(cv.data)
+      : getJSON(VALUES_URL).then(function (d) { var s = slimValues(d); store(VALUES_KEY, { ts: now, data: s }); return s; })
+        .catch(function (e) { if (cv) return cv.data; throw e; });
+    return vP.then(function (vals) {
+      DATA = vals;
+      var have = cp && now - cp.ts < PLAYERS_TTL && Object.keys(vals.values).every(function (pid) { return cp.data[pid]; });
+      if (have) return cp.data;
+      return getJSON(PLAYERS_URL).then(function (all) { var s = slimPlayers(all, vals.values); store(PLAYERS_KEY, { ts: now, data: s }); return s; })
+        .catch(function (e) { if (cp) return cp.data; throw e; });
+    }).then(function (pl) {
+      PLAYERS = pl;
+      var cs = load(STATS_KEY);
+      var sP = (cs && Date.now() - cs.ts < STATS_TTL) ? Promise.resolve(cs.data)
+        : getJSON(STATS_URL).then(function (all) {
+            // [PPR, Half, Std, games, catches, defenders' raw IDP stats]
+            var out = {}; Object.keys(DATA.values).forEach(function (pid) { var r = all[pid]; if (r && r.gp > 0) out[pid] = [r.pts_ppr || 0, r.pts_half_ppr || 0, r.pts_std || 0, r.gp, r.rec || 0, IDP[(PLAYERS[pid] || [])[1]] ? defLine(r) : 0]; });
+            store(STATS_KEY, { ts: Date.now(), data: out }); return out;
+          }).catch(function () { return cs ? cs.data : {}; });
+      return Promise.all([sP, loadByes(), loadIdpRules()]).then(function (res) { STATS = res[0] || {}; return pl; });
+    }).then(function (pl) {
+      // Only players on an NFL roster today (owner 2026-11-11): free agents stay out of the lists.
+      SEARCH = Object.keys(DATA.values).filter(function (pid) { return PLAYERS[pid] && PLAYERS[pid][2] && PLAYERS[pid][2] !== 'FA'; }).map(function (pid) {
+        var p = PLAYERS[pid]; return { id: pid, name: p[0], pos: p[1], team: p[2], key: p[0].toLowerCase().replace(/[^a-z0-9 ]/g, '') };
+      });
+    });
+  }
+
+
+  var POS_COLOR = { QB: '#ff6b6b', RB: '#4ecdc4', WR: '#45b7d1', TE: '#f7dc6f', K: '#bb8fce', DL: '#e67e22', LB: '#F0A500', DB: '#5DADE2', PICK: '#D4AF37' };
+  function face(pid, col) { return '<span class="face" style="--pc:' + col + '"><img src="https://sleepercdn.com/content/nfl/players/thumb/' + encodeURIComponent(pid) + '.jpg" alt="" loading="lazy" decoding="async" onerror="this.remove()"></span>'; }
+  // Season points in the visitor's scoring (TE premium: +0.5 a catch for tight ends), games, per game.
+  function season(pid, pos) {
+    var r = STATS[pid]; if (!r) return null;
+    var pts = r[{ ppr: 0, half: 1, std: 2 }[S.scoring]] + (S.tep === '1' && pos === 'TE' ? 0.5 * r[4] : 0) + (IDP[pos] ? idpPts(r[5]) : 0);
+    return { pts: pts, gp: r[3], ppg: r[3] ? pts / r[3] : 0 };
+  }
+  // ── League settings (shared with the Trade Calculator and projections) ───
+  function syncSel() { document.querySelectorAll('.league .sel').forEach(function (sel) { sel.value = S[sel.dataset.key]; }); }
+  document.querySelectorAll('.league .sel').forEach(function (sel) {
+    sel.addEventListener('change', function () {
+      S[sel.dataset.key] = sel.value; store(PREF_KEY, S);
+      if (S.idp === '0') PICKS = PICKS.filter(function (pid) { return !IDP[posOf(pid)]; });
+      saveState(); render(); if (!$('menu').hidden) drawMenu();
+    });
+  });
+
+  // ── Weekly projections: the Lab's weekly lock file (same origin) ─────────
+  // DHQ's and Sleeper's Half-PPR projections (the file's own numbers) plus
+  // ESPN's and CBS's projected stat lines, scored here with the same Half-PPR
+  // rules. Sleeper shown beside DHQ by owner ask 2026-11-11 (this page only).
+  // Week tabs (owner ask 2026-11-11): every week of the season has its own
+  // lock file, so a user can step back and see how each site's projection
+  // compared with what the player actually scored. ESPN / CBS were first saved
+  // in Week 9; earlier weeks show dashes there.
+  var CUR = null, WEEKS = {}, curLoading = null;
+  function scoreLine(line, rules) { var t = 0; if (!line) return null; for (var k in rules) if (line[k]) t += line[k] * rules[k]; return Math.round(t * 100) / 100; }
+  function teamKey(t) { var a = String(t || '').toUpperCase(); return ESPN_TEAM[a] || a; }
+  function loadCurrent() {
+    if (!curLoading) curLoading = getJSON(STATE_URL).then(function (st) { CUR = { week: st && st.week, season: (st && st.season) || SEASON }; return CUR; }).catch(function () { CUR = { failed: true }; return CUR; });
+    return curLoading;
+  }
+  // Byes and opponents (with home / away) for one week from the scoreboard relay.
+  function slate(week) {
+    var out = { opp: {}, away: {}, bye: {} };
+    return getJSON(SCOREBOARD_URL + '?week=' + week + '&seasontype=2').then(function (sb) {
+      ((sb.week && sb.week.teamsOnBye) || []).forEach(function (t) { out.bye[teamKey(t.abbreviation)] = 1; });
+      (sb.events || []).forEach(function (e) {
+        var cs = (e.competitions && e.competitions[0] && e.competitions[0].competitors) || [];
+        if (cs.length !== 2) return;
+        var t = cs.map(function (c) { return teamKey(c.team && c.team.abbreviation); });
+        out.opp[t[0]] = t[1]; out.opp[t[1]] = t[0];
+        if (cs[0].homeAway === 'away') out.away[t[0]] = 1; if (cs[1].homeAway === 'away') out.away[t[1]] = 1;
+      });
+      out.ok = true; return out;
+    }).catch(function () { return out; });
+  }
+  // What each player actually scored in one week: Sleeper's weekly stats for
+  // players who played, scored with the lock's Half-PPR rules, exactly as
+  // Mission Control's score sheets grade them (so the two always agree).
+  // Defenders' results also carry .d: the same line with the league's IDP rules (lab/projections.html).
+  function actuals(week, rules) {
+    var res = {}, off = {};
+    Object.keys(rules).forEach(function (k) { if (!isDefKey(k)) off[k] = rules[k]; });
+    return Promise.all([getJSON(STATS_URL + '/' + week), loadIdpRules()]).then(function (x) {
+      var s = x[0];
+      Object.keys(s || {}).forEach(function (pid) {
+        var l = s[pid]; if (!(l && l.gp >= 1)) return;
+        res[pid] = { h: scoreLine(l, rules), r: l.rec || 0 };
+        if (Object.keys(defLine(l)).length) res[pid].d = { h: Math.round((scoreLine(l, off) + idpPts(l)) * 100) / 100, r: l.rec || 0 };
+      });
+      return res;
+    }).catch(function () { return res; });
+  }
+  // A week's DHQ / Sleeper projection and a result for a player: defenders take the league copy (IDP rules).
+  function weekProj(W, k, pid, pos) { return IDP[pos] && W.lg && W.lg[k][pid] ? W.lg[k][pid] : W[k][pid]; }
+  function weekRes(res, pid, pos) { var o = res && res[pid]; return o && IDP[pos] && o.d ? o.d : o; }
+  function loadWeek(n) {
+    if (WEEKS[n]) return WEEKS[n].then ? WEEKS[n] : Promise.resolve(WEEKS[n]);
+    var yr = (CUR && CUR.season) || SEASON, isCur = CUR && n === CUR.week;
+    WEEKS[n] = getJSON((/(^|\.)dhq-lab\.pages\.dev$/.test(location.hostname) ? 'data/locks/' : 'https://dhq-lab.pages.dev/data/locks/') + yr + '-w' + n + '.json').then(function (d) {
+      var half = (d.scorings && d.scorings.half) || {}, rules = half.scoring || {}, hp = half.players || {}, pf = d.platforms || {};
+      var w = { week: n, cur: isCur, built: d.built, rebuilt: !!d.reconstructed, info: d.players || {}, kick: d.kickoffs || {}, dhq: {}, slp: {}, espn: {}, cbs: {}, hasSites: !!(pf.espn || pf.cbs) };
+      // Every number is kept as { h: Half-PPR points, r: receptions }, so the
+      // scoring and TE-premium switches re-score it exactly (see pts()). DHQ's
+      // and Sleeper's receptions come from the lock's own full-PPR copy of the
+      // same projections (a league whose rules match Half-PPR but for rec = 1):
+      // r = 2 x (PPR - Half). Kickers and defenders score no receptions.
+      var pprSet = null;
+      Object.keys(d.scorings || {}).forEach(function (k) {
+        var sc = d.scorings[k].scoring || {}; if (pprSet || sc.rec !== 1 || sc.bonus_rec_te) return;
+        if (OFF_RULES.every(function (x) { return (sc[x] || 0) === (rules[x] || 0); })) pprSet = d.scorings[k].players || {};
+      });
+      Object.keys(hp).forEach(function (pid) {
+        var r = hp[pid], q = pprSet && pprSet[pid], pos = (w.info[pid] || {}).pos, catches = REC_POS[pos];
+        if (r && r[0] != null) w.dhq[pid] = { h: r[0], r: catches && q && q[0] != null ? Math.max(0, 2 * (q[0] - r[0])) : 0 };
+        if (r && r[1] != null) w.slp[pid] = { h: r[1], r: catches && q && q[1] != null ? Math.max(0, 2 * (q[1] - r[1])) : 0 };
+      });
+      w.exact = !!pprSet; w.rules = rules;
+      // the lock's copy scored with the source league's own rules: defenders' projections (no catches)
+      var lgSet = d.scorings && d.scorings['league_' + SOURCE.id];
+      if (lgSet && lgSet.players) {
+        w.lg = { dhq: {}, slp: {} };
+        Object.keys(lgSet.players).forEach(function (pid) {
+          var r = lgSet.players[pid]; if (!r || !IDP[(w.info[pid] || {}).pos]) return;
+          if (r[0] != null) w.lg.dhq[pid] = { h: r[0], r: 0 };
+          if (r[1] != null) w.lg.slp[pid] = { h: r[1], r: 0 };
+        });
+      }
+      ['espn', 'cbs'].forEach(function (k) { var src = pf[k] || {}; Object.keys(src).forEach(function (pid) { if (pid !== 'fetched' && src[pid] && Object.keys(src[pid]).length) w[k][pid] = { h: scoreLine(src[pid], rules), r: src[pid].rec || 0 }; }); });
+      // The last column: this week shows LAST week's score; a past week shows that week's own result.
+      var resWeek = isCur ? n - 1 : n;
+      // the whole formula behind each projection (scripts/build-projections-lock.mjs writes it beside the lock)
+      var fx = getJSON((/(^|\.)dhq-lab\.pages\.dev$/.test(location.hostname) ? 'data/locks/' : 'https://dhq-lab.pages.dev/data/locks/') + yr + '-w' + n + '-formula.json').then(function (x) { return (x && x.players) || {}; }).catch(function () { return {}; });
+      return Promise.all([slate(n), resWeek >= 1 ? actuals(resWeek, rules) : {}, isCur && resWeek >= 1 ? slate(resWeek) : null, fx]).then(function (x) {
+        w.slate = x[0]; w.res = x[1]; w.resBye = isCur ? (x[2] ? x[2].bye : {}) : x[0].bye; w.formula = x[3];
+        // the lock file's own matchups fill any gap in the scoreboard's
+        Object.keys(w.info).forEach(function (pid) { var i = w.info[pid]; if (i && i.team && i.opp && !w.slate.opp[teamKey(i.team)]) w.slate.opp[teamKey(i.team)] = teamKey(i.opp); });
+        return (WEEKS[n] = w);
+      });
+    }).catch(function () { return (WEEKS[n] = { failed: true, week: n }); });
+    return WEEKS[n];
+  }
+  // The rules that must match Half-PPR for the lock's PPR copy to be usable.
+  var OFF_RULES = ['pass_yd', 'pass_td', 'pass_int', 'pass_2pt', 'rush_yd', 'rush_td', 'rush_2pt', 'rec_yd', 'rec_td', 'rec_2pt', 'fum_lost'];
+  var REC_POS = { RB: 1, WR: 1, TE: 1, QB: 1 };
+  var REC_PTS = { ppr: 1, half: 0.5, std: 0 };
+  // One projection or result in the page's scoring: Half-PPR points, moved by
+  // the reception value, plus the TE premium (+0.5 a catch) when it is on.
+  function pts(o, pos) {
+    if (o == null) return null;
+    return o.h + (REC_PTS[S.scoring] - 0.5) * o.r + (S.tep === '1' && pos === 'TE' ? 0.5 * o.r : 0);
+  }
+  function scoringName() { return { ppr: 'PPR', half: 'Half-PPR', std: 'Standard' }[S.scoring] + (S.tep === '1' ? ' with TE premium' : ''); }
+  // ── Start / Sit (owner design 2026-11-13) ───────────────────────────────
+  // The call is the weekly projection only: the highest DHQ projection this
+  // week, in the visitor's scoring, gets the START. DHQ Value is shown by
+  // the photo for reference and never decides. Within 0.05 pts is too close
+  // to call. A player on a bye, ruled out or without a projection cannot win.
+  var PICK_KEY = 'dhq_ss_players_v1', MAX_PICKS = 4;
+  var PICKS = [], W = null;
+  function posOf(pid) { return (PLAYERS && PLAYERS[pid] && PLAYERS[pid][1]) || ''; }
+  function nameOf(pid) { return (PLAYERS && PLAYERS[pid] && PLAYERS[pid][0]) || 'Player ' + pid; }
+  function last(name) { var p = String(name).split(' '); return p.length > 1 && /^(Jr\.?|Sr\.?|II|III|IV|V)$/.test(p[p.length - 1]) ? p[p.length - 2] : p[p.length - 1]; }
+  function hashPicks() { var m = /^#p=([A-Za-z0-9,]+)$/.exec(location.hash); return m ? uniq(m[1].split(',')) : null; }
+  function uniq(a) { var seen = {}; return (a || []).filter(function (x) { x = String(x); if (!x || seen[x]) return false; seen[x] = 1; return true; }); }
+  function saveState() {
+    store(PICK_KEY, PICKS);
+    var h = PICKS.length ? '#p=' + PICKS.join(',') : '';
+    if (location.hash !== h) try { history.replaceState(null, '', location.pathname + location.search + h); } catch (e) { /* file:// */ }
+  }
+  function valid(pid) { return !!(PLAYERS && PLAYERS[pid] && DATA && DATA.values[pid]) && (S.idp === '1' || !IDP[posOf(pid)]); }
+
+  // DHQ's reasons, from the lock's "why" line: factor headings look like
+  // "Role & opportunity +5.9%: QB1 on the depth chart · 99% of snaps".
+  // The engine's internal model step ("DHQ WR model …") gives the expected
+  // workload instead; "Baseline" is the raw starting point and is skipped.
+  // The line is cut at about 300 characters, so a cut-off last part is dropped.
+  var FACTOR = /^([A-Z][A-Za-z &\/()-]*?) ([+-]?\d+(?:\.\d+)?)%: (.*)$/;
+  function parseWhy(s) {
+    s = String(s || ''); var segs = s.split(' · '), cut = s.length >= 280, out = { reads: [], line: null, matchup: null }, cur = null;
+    segs.forEach(function (g, i) {
+      var tail = cut && i === segs.length - 1, m = FACTOR.exec(g);
+      if (m) {
+        cur = null;
+        if (/^DHQ /.test(m[1])) {
+          var t = /^Typical game [\d.]+(?:, (?:shown|average) [\d.]+(?: \([^)]*\))?)?: (.*)$/.exec(m[3]);
+          if (t && !tail) out.line = t[1].split(', ').filter(function (x) { return x && !/team total|snaps|^Typical/.test(x); }).join(' · ');
+          return;
+        }
+        if (Math.abs(+m[2]) < 0.05) return;
+        cur = { k: m[1], p: +m[2], d: tail ? '' : m[3], more: 0 };
+        out.reads.push(cur);
+        if (m[1] === 'Opponent vs position' && !tail) out.matchup = m[3];
+        return;
+      }
+      if (/^Baseline: /.test(g)) { cur = null; return; }
+      // a factor's further details ("99% of snaps"); a cut-off last part is dropped
+      if (cur && !tail && cur.more < 2) { cur.d += (cur.d ? ' \u00b7 ' : '') + g; cur.more++; }
+    });
+    out.reads.sort(function (a, b) { return Math.abs(b.p) - Math.abs(a.p); });
+    return out;
+  }
+
+  // Everything one column shows, in the page's scoring.
+  function facts(pid) {
+    var pl = PLAYERS[pid] || ['Player ' + pid, '', ''], pos = pl[1], info = (W && W.info[pid]) || {}, tm = teamKey(info.team || pl[2]);
+    var bye = W && W.slate && W.slate.ok ? !!W.slate.bye[tm] : onBye(tm);
+    var r = (DATA && DATA.values[pid]) || [], z = season(pid, pos), inj = info.inj || null;
+    var out = /^(Out|IR|PUP|NA|Suspended)$/i.test(inj || '');
+    var f = { id: pid, name: pl[0], pos: pos, team: tm, age: r[1] || null, value: playerValue(pid), bye: bye, inj: inj, out: out,
+      dhq: bye || !W ? null : pts(weekProj(W, 'dhq', pid, pos), pos), slp: bye || !W ? null : pts(weekProj(W, 'slp', pid, pos), pos),
+      espn: bye || !W ? null : pts(W.espn[pid], pos), cbs: bye || !W ? null : pts(W.cbs[pid], pos),
+      last: W && W.res[pid] && pos !== 'DEF' ? pts(weekRes(W.res, pid, pos), pos) : null, lastBye: !!(W && W.resBye && W.resBye[tm]),
+      season: z, opp: W && W.slate ? W.slate.opp[tm] || teamKey(info.opp) || null : null, away: !!(W && W.slate && W.slate.away[tm]),
+      kick: W && W.kick ? W.kick[tm] || null : null, imp: info.imp, spr: info.spr, why: parseWhy(info.why) };
+    f.can = !f.bye && !f.out && f.dhq != null && f.dhq > 0;
+    return f;
+  }
+  function kickText(iso) {
+    if (!iso) return '';
+    var d = new Date(iso); if (isNaN(d)) return '';
+    return d.toLocaleString([], { weekday: 'short', hour: 'numeric', minute: '2-digit' });
+  }
+  function started(iso) { var d = iso && new Date(iso); return !!(d && !isNaN(d) && d.getTime() <= Date.now()); }
+  function n1(x) { return x == null ? null : x.toFixed(1); }
+  function spreadText(s) { if (s == null || isNaN(s)) return null; s = +s; return s < 0 ? 'Favored by ' + Math.abs(s) : s > 0 ? 'Underdog by ' + s : 'Pick ’em'; }
+
+  // The call: highest DHQ projection among the players who can play.
+  function decide(F) {
+    var live = F.filter(function (f) { return f.can; }).sort(function (a, b) { return b.dhq - a.dhq; });
+    if (!live.length) return { win: null, even: false, live: live };
+    var even = live.length > 1 && live[0].dhq - live[1].dhq < 0.05;
+    return { win: even ? null : live[0], even: even, live: live };
+  }
+  // DHQ only on this page (owner ruling 2026-11-13: no other sites' projections).
+
+  function drawCall(F, call) {
+    var box = $('call');
+    if (F.length < 2) { box.hidden = true; return; }
+    box.hidden = false; box.classList.toggle('even', !call.win);
+    if (!call.win) {
+      box.innerHTML = '<div class="ss-call-txt"><span class="ss-call-k">' + (call.even ? 'Too close to call' : 'No start yet') + '</span><span class="ss-call-h">'
+        + (call.even ? esc(call.live[0].name) + ' <span>=</span> ' + esc(call.live[1].name) : 'Nobody here is projected to play') + '</span><span class="ss-call-s">'
+        + (call.even ? 'DHQ projects ' + esc(last(call.live[0].name)) + ' for <b>' + n1(call.live[0].dhq) + '</b> and ' + esc(last(call.live[1].name)) + ' for <b>' + n1(call.live[1].dhq) + '</b>. Go with your gut, or add another player.' : 'Every player here is on a bye, ruled out or has no projection this week.') + '</span></div>';
+      return;
+    }
+    var w = call.win, next = call.live[1];
+    var s = 'DHQ projects <b>' + n1(w.dhq) + ' pts</b>' + (next ? ', <b>' + (w.dhq - next.dhq).toFixed(1) + ' more</b> than ' + esc(next.name) + ' (' + n1(next.dhq) + ')' : '') + '.';
+    box.innerHTML = face(w.id, 'var(--gold)') + '<div class="ss-call-txt"><span class="ss-call-k">DHQ says start</span><span class="ss-call-h">' + esc(w.name) + ' <span>' + n1(w.dhq) + '</span></span>'
+      + '<span class="ss-call-s">' + s + '</span></div>';
+  }
+
+  // One bullet: label ··· value. lead marks the best of that metric on the board.
+  function li(k, v, cls) { return '<li data-al="' + esc(k) + '"><span class="k">' + k + '</span><span class="dots"></span><span class="v' + (cls ? ' ' + cls : '') + '">' + v + '</span></li>'; }
+  function best(F, key, all) {
+    var have = F.filter(function (f) { return f[key] != null && (all || (!f.bye && !f.out)); }); if (have.length < 2) return null;
+    var top = Math.max.apply(null, have.map(function (f) { return f[key]; }));
+    return have.filter(function (f) { return f[key] === top; }).length === 1 ? top : null;
+  }
+  // ── The formula, step by step ────────────────────────────────────────────
+  // Straight from DHQ's weekly engine (the -formula.json file): starting
+  // point (DHQ baseline and its stat line) x the eleven weighted factors =
+  // "all factors"; the DHQ position model takes that to the projection.
+  // Stored in Half-PPR; shown in the visitor's scoring: the baseline moves by
+  // its catches like every other number here, the factor multipliers do not
+  // depend on scoring, and the model step is whatever is left to land exactly
+  // on the projection shown at the top of the column.
+  var STAT = { pass_att: ['att', 1], pass_cmp: ['cmp', 1], pass_yd: ['pass yds', 0], pass_td: ['pass TD', 1], pass_int: ['INT', 1], rush_att: ['rushes', 1], rush_yd: ['rush yds', 0], rush_td: ['rush TD', 2],
+    rec_tgt: ['targets', 1], rec: ['catches', 1], rec_yd: ['rec yds', 0], rec_td: ['rec TD', 2], fum_lost: ['fumbles lost', 2], idp_tkl: ['tackles', 1], idp_tkl_solo: ['solo', 1], idp_tkl_ast: ['assists', 1],
+    idp_sack: ['sacks', 2], idp_int: ['INT', 2], idp_pass_def: ['pass defended', 2], idp_ff: ['forced fum', 2], idp_tkl_loss: ['TFL', 2], idp_qb_hit: ['QB hits', 2], idp_fum_rec: ['fum rec', 2],
+    xpm: ['XP made', 1], fgm: ['FG made', 1], fga: ['FG att', 1] };
+  var SKIP_STAT = { idp_tkl: 1, pass_cmp: 1 };
+  function statLine(line) {
+    return Object.keys(line || {}).filter(function (k) { return !SKIP_STAT[k] && line[k]; }).map(function (k) {
+      var m = STAT[k] || [k.replace(/_/g, ' '), 1], v = +line[k];
+      return '<span><b>' + v.toFixed(m[1]) + '</b> ' + esc(m[0]) + '</span>';
+    }).join('');
+  }
+  // DHQ only (owner 2026-11-13): the engine's notes mention Sleeper's projected
+  // volume as a reference ("27.6 projected attempts, Sleeper 31.0"); not shown here.
+  function noSites(t) { return String(t || '').replace(/,?\s*(Sleeper|ESPN|CBS)\s+[\d.]+/g, ''); }
+  function sgn(x, dp) { return (x > 0 ? '+' : x < 0 ? '\u2212' : '') + Math.abs(x).toFixed(dp == null ? 1 : dp); }
+  // Owner ask 2026-11-18: "How DHQ built this projection" (and DHQ's read under it) fold away behind a
+  // toggle on the heading, closed by default. One tap opens or closes every column at once so the rows
+  // stay lined up; the choice is remembered on this device.
+  var FX_KEY = 'dhq_ss_fx_open_v1', FX_OPEN = false;
+  try { FX_OPEN = localStorage.getItem(FX_KEY) === '1'; } catch (e) { FX_OPEN = false; }
+  function fxMore(h) { return h ? '<div class="ss-more' + (FX_OPEN ? ' open' : '') + '">' + h + '</div>' : ''; }
+  function fxToggle(scope) {
+    FX_OPEN = !FX_OPEN; try { localStorage.setItem(FX_KEY, FX_OPEN ? '1' : '0'); } catch (e) { /* this visit only */ }
+    [].forEach.call(scope.querySelectorAll('.ss-more'), function (el) { el.classList.toggle('open', FX_OPEN); });
+    [].forEach.call(scope.querySelectorAll('[data-fxtog]'), function (b) { b.setAttribute('aria-expanded', String(FX_OPEN)); });
+  }
+  function formula(f, X) {
+    if (!X) return '';
+    var pos = f.pos, rec = (X.line && X.line.rec) || 0, base = pts({ h: X.b[0], r: rec }, pos), afterF = base * X.m, after = afterF * (X.q || 1);
+    // where the position model starts, in this scoring (the engine stores it in Half-PPR)
+    var halfAfter = X.b[0] * X.m * (X.q || 1), from = X.md && halfAfter > 0 ? X.md.from * (after / halfAfter) : after;
+    var other = X.md && Math.abs(X.md.from - halfAfter) > 0.06;
+    var fin = f.dhq != null ? f.dhq : pts({ h: X.pts[0], r: rec }, pos), k = X.pts[0] ? fin / X.pts[0] : 1;
+    var lo = X.pts[1] != null ? X.pts[1] * k : null, hi = X.pts[2] != null ? X.pts[2] * k : null;
+    var modelPct = (X.md ? from : after) ? (fin / (X.md ? from : after) - 1) * 100 : 0;
+    var qStep = X.q ? '<li class="fx-s" data-al="fx-q"><div class="fx-row"><span class="fx-k">Questionable</span><span class="fx-p pd">\u00d7' + X.q.toFixed(2) + '</span></div>'
+      + '<div class="fx-eq">' + afterF.toFixed(1) + ' \u00d7 ' + X.q.toFixed(2) + ' = <b>' + after.toFixed(1) + '</b></div><small>Questionable players sit out about one game in five, so DHQ trims his whole line by 8%.</small></li>' : '';
+    var oStep = other ? '<li class="fx-s" data-al="fx-other"><div class="fx-row"><span class="fx-k">Other adjustments</span><span class="fx-p ' + (from >= after ? 'pu' : 'pd') + '">' + sgn((from / after - 1) * 100) + '%</span></div>'
+      + '<div class="fx-eq">' + after.toFixed(1) + ' \u2192 <b>' + from.toFixed(1) + '</b></div></li>' : '';
+    var rows = (X.f || []).map(function (r) {
+      // [key, label, weight, multiplier, impact %, note, ruled out, has data]
+      var pct = r[4], cls = r[6] ? 'out' : !r[7] ? 'nod' : pct > 0.05 ? 'up' : pct < -0.05 ? 'dn' : 'flat';
+      var w = Math.min(50, Math.abs(pct) * 5);
+      return '<li class="fx-f ' + cls + '" data-al="fx-' + esc(r[0]) + '"><div class="fx-row"><span class="fx-k">' + esc(r[1]) + '</span><span class="fx-w" title="Weight in the formula (the eleven add up to 100)">wt ' + r[2] + '</span>'
+        + '<span class="fx-p">' + (r[6] ? 'OUT' : !r[7] ? 'no data' : sgn(pct) + '%') + '</span></div>'
+        + '<div class="fx-bar" aria-hidden="true"><i style="' + (pct >= 0 ? 'left:50%' : 'right:50%') + ';width:' + w.toFixed(1) + '%"></i></div>'
+        + (r[5] ? '<small>' + esc(noSites(r[5])) + '</small>' : '') + '</li>';
+    }).join('');
+    var extra = (X.x || []).map(function (e) { return '<small class="fx-x">' + esc(e[0]) + ' ' + sgn(e[1]) + '%' + (e[2] ? ': ' + esc(noSites(e[2])) : '') + '</small>'; }).join('');
+    var model = X.md
+      ? '<li class="fx-s" data-al="fx-model"><div class="fx-row"><span class="fx-k">' + esc(X.md.l) + '</span><span class="fx-p ' + (modelPct >= 0 ? 'pu' : 'pd') + '">' + sgn(modelPct) + '%</span></div>'
+        + '<div class="fx-eq">' + from.toFixed(1) + ' \u2192 <b>' + fin.toFixed(1) + '</b></div>' + (X.md.n ? '<small>' + esc(noSites(X.md.n)) + '</small>' : '') + extra + '</li>'
+      : Math.abs(fin - after) > 0.05 ? '<li class="fx-s" data-al="fx-model"><div class="fx-row"><span class="fx-k">Final adjustments</span><span class="fx-p">' + sgn(modelPct) + '%</span></div><div class="fx-eq">' + after.toFixed(1) + ' \u2192 <b>' + fin.toFixed(1) + '</b></div>' + extra + '</li>' : '';
+    return '<h3 class="fx-h"><button type="button" class="fx-tog" data-fxtog aria-expanded="' + FX_OPEN + '"><span>How DHQ built this projection</span><i aria-hidden="true"></i></button></h3><ol class="fx">'
+      + '<li class="fx-s fx-base" data-al="fx-base"><div class="fx-row"><span class="fx-k">Starting point</span><span class="fx-v">' + base.toFixed(1) + '</span></div>'
+      + (X.bw ? '<small>' + esc(noSites(X.bw)) + '</small>' : '') + '<div class="fx-line">' + statLine(X.line) + '</div></li>'
+      + rows
+      + '<li class="fx-s" data-al="fx-all"><div class="fx-row"><span class="fx-k">All ' + (X.f || []).length + ' factors</span><span class="fx-p ' + (X.m >= 1 ? 'pu' : 'pd') + '">\u00d7' + X.m.toFixed(3) + '</span></div>'
+      + '<div class="fx-eq">' + base.toFixed(1) + ' \u00d7 ' + X.m.toFixed(3) + ' = <b>' + afterF.toFixed(1) + '</b></div></li>'
+      + qStep + oStep + model
+      + '<li class="fx-s fx-fin" data-al="fx-fin"><div class="fx-row"><span class="fx-k">DHQ projection</span><span class="fx-v">' + fin.toFixed(1) + '</span></div>'
+      + (lo != null && hi != null ? '<small>Range ' + lo.toFixed(1) + ' to ' + hi.toFixed(1) + ' (floor to ceiling)</small>' : '') + '</li>'
+      + '</ol>';
+  }
+
+  function column(f, call, F, leads) {
+    var X = !f.bye && W && W.formula ? W.formula[f.id] || null : null;
+    var col = POS_COLOR[f.pos] || 'var(--silver)', win = call.win && call.win.id === f.id, d = '–';
+    var top = f.bye ? '<span class="ss-tag">Sit</span><span class="ss-score">BYE</span>'
+      : f.out ? '<span class="ss-tag">Sit</span><span class="ss-score">' + esc(f.inj) + '</span>'
+      : f.dhq == null ? '<span class="ss-tag">Sit</span><span class="ss-score">–</span>'
+      : '<span class="ss-tag">' + (win ? 'Start' : call.even && call.live.slice(0, 2).indexOf(f) >= 0 ? 'Even' : 'Sit') + '</span><span class="ss-score">' + n1(f.dhq) + '<small>PTS</small></span>'
+        + (call.win && !win ? '<span class="ss-gap">' + (f.dhq - call.win.dhq).toFixed(1) + '</span>' : '');
+    var img = '<img src="https://sleepercdn.com/content/nfl/players/' + encodeURIComponent(f.id) + '.jpg" alt="" decoding="async" onerror="this.remove()">';
+    var flag = f.bye ? '<span class="ss-flag warn">On a bye this week</span>'
+      : f.inj ? '<span class="ss-flag ' + (f.out ? 'bad' : 'warn') + '">' + esc(f.inj) + '</span>'
+      : started(f.kick) ? '<span class="ss-flag info">Game started</span>' : '';
+    var gameLine = '<div class="ss-game">' + (CUR && CUR.week ? '<span class="wk">NFL Week ' + CUR.week + '</span><span class="sep"> · </span>' : '')
+      + '<span class="gm">' + (f.bye ? '<b>BYE</b>' : f.opp ? '<b>' + (f.away ? '@ ' : 'vs ') + esc(f.opp) + '</b>' + (f.kick ? '<span class="sep"> · </span><span class="kt" data-full="' + esc(kickText(f.kick)) + '" data-short="' + esc(kickText(f.kick).replace(/\s*([AP])M$/i, function (m, x) { return x.toLowerCase(); })) + '">' + esc(kickText(f.kick)) + '</span>' : '') : '<b>No game found</b>') + '</span></div>';
+    var matchup = f.bye ? '<span class="v bye">BYE</span>' : f.opp ? (f.away ? '@' : 'vs ') + esc(f.opp) + (f.kick ? ' · ' + esc(kickText(f.kick)) : '') : d;
+    var z = f.season, vegas = [f.imp != null ? 'Team total ' + f.imp : null, spreadText(f.spr)].filter(Boolean).join(' · ');
+    var L = function (key, x) { return x == null ? 'dim' : leads[key] != null && x === leads[key] ? 'lead' : ''; };
+    var rows = li('DHQ projection', f.bye ? 'BYE' : f.dhq != null ? n1(f.dhq) : d, f.bye ? 'bye' : 'dhq')
+      + li('Last week', f.last != null ? n1(f.last) : f.lastBye ? 'BYE' : 'Did not play', f.last != null ? L('last', f.last) : 'dim')
+      + li('Points per game', z && z.gp ? z.ppg.toFixed(1) : d, z && z.gp ? L('ppg', z.ppg) : 'dim')
+      + li('Season', z && z.gp ? z.pts.toFixed(1) + ' pts · ' + z.gp + ' GP' : d, z && z.gp ? '' : 'dim')
+      + li('Matchup', matchup, '')
+      + '<li class="wide" data-al="vegas"><span class="k">Vegas</span><span class="v' + (vegas ? '' : ' dim') + '">' + (f.bye ? 'BYE' : vegas ? esc(vegas) : d) + '</span></li>'
+      + (X ? '' : '<li class="wide"><span class="k">Defense vs ' + esc(f.pos) + '</span><span class="v' + (f.why.matchup ? '' : ' dim') + '">' + (f.bye ? 'BYE' : f.why.matchup ? esc(f.why.matchup) : d) + '</span></li>'
+      + '<li class="wide"><span class="k">DHQ expects</span><span class="v' + (f.why.line ? '' : ' dim') + '">' + (f.bye ? 'BYE' : f.why.line ? esc(f.why.line) : d) + '</span></li>');
+    var reads = f.bye || X ? [] : f.why.reads.slice(0, 4);
+    return '<article class="ss-col' + (win ? ' win' : '') + '" style="--pc:' + col + '" aria-label="' + esc(f.name) + (win ? ', start' : '') + '">'
+      + '<button class="ss-x" type="button" data-rm="' + esc(f.id) + '" aria-label="Remove ' + esc(f.name) + '">×</button>'
+      + gameLine
+      + '<div class="ss-top' + (f.dhq == null || f.bye || f.out ? ' none' : '') + '">' + top + '</div>'
+      + '<div class="ss-head"><div class="ss-shot"><div class="ss-frame" data-card="' + esc(f.id) + '" title="Open ' + esc(f.name) + '’s player card"><span class="ini">' + esc(f.name.split(' ').map(function (w) { return w[0]; }).join('').slice(0, 2)) + '</span>' + img + '</div>'
+      + '<div class="ss-val" title="DHQ dynasty value. For reference only: the start / sit call is this week’s projection."><span>DHQ Value</span><b>' + (f.value ? fmt(f.value) : d) + '</b></div>'
+      + (win ? '<span class="ss-crown">DHQ start</span>' : '') + '</div>'
+      + '<div class="ss-name" data-card="' + esc(f.id) + '" title="Open ' + esc(f.name) + '’s player card">' + esc(f.name) + '</div>'
+      + '<div class="ss-sub"><b style="color:' + col + '">' + esc(f.pos) + '</b> · ' + esc(f.team) + (f.age ? ' · age ' + f.age : '') + '</div>' + flag
+      + '<button type="button" class="ss-card" data-card="' + esc(f.id) + '">Player card ›</button></div>'
+      + '<div class="ss-sec"><h3>This week</h3><ul class="ss-list">' + rows + '</ul>' + fxMore(formula(f, X)
+      + (reads.length ? '<h3>DHQ’s read</h3><ul class="ss-list ss-reads">' + reads.map(function (x) {
+          return '<li class="' + (x.p > 0 ? 'up' : 'dn') + '"><span class="ar">' + (x.p > 0 ? '▲' : '▼') + '</span><b>' + esc(x.k) + '</b><span class="pc">' + (x.p > 0 ? '+' : '') + x.p + '%</span>' + (x.d ? '<small>' + esc(noSites(x.d)) + '</small>' : '') + '</li>';
+        }).join('') + '</ul>' : ''))
+      + '</div></article>';
+  }
+  function slot(i, extra) { return '<button class="ss-slot' + (extra ? ' extra' : '') + '" type="button" data-slot="' + i + '"><i aria-hidden="true">+</i>' + (i === 0 ? 'Add a player' : 'Add a player to compare') + '</button>'; }
+
+  // Ready-made matchups for an empty board: neighbours in DHQ's weekly
+  // ranking at a position, which is exactly the close call people ask about.
+  function examples() {
+    if (!W || W.failed) return [];
+    var spots = [['WR', 11], ['RB', 9], ['QB', 9], ['TE', 5]];
+    return spots.map(function (sp) {
+      var list = SEARCH.filter(function (p) { return p.pos === sp[0]; }).map(function (p) { return { p: p, x: pts(weekProj(W, 'dhq', p.id, p.pos), p.pos) }; })
+        .filter(function (r) { return r.x != null && r.x > 0 && !(W.slate.ok && W.slate.bye[teamKey(p2t(r.p))]); }).sort(function (a, b) { return b.x - a.x; });
+      var a = list[sp[1] - 1], b = list[sp[1]];
+      return a && b ? { ids: [a.p.id, b.p.id], label: last(a.p.name) + ' or ' + last(b.p.name), pos: sp[0] } : null;
+    }).filter(Boolean);
+  }
+  function p2t(p) { var i = W && W.info[p.id]; return (i && i.team) || p.team; }
+
+  function render() {
+    syncSel();
+    var hp = W && !W.failed;
+    if (CUR && CUR.week) { $('ssWeek').textContent = 'NFL Week ' + CUR.week; $('ssWeek').hidden = false; $('weekLabel').textContent = 'Each player\u2019s Week ' + CUR.week + ' game. No league or sign-up needed.'; }
+    $('sourceLine').innerHTML = 'Add the players you are deciding between. The highest <b>DHQ projection</b> this week gets the start. All points in ' + scoringName() + '.';
+    footNote();
+    if (!DATA || !W) return;
+    if (W.failed) { $('board').innerHTML = '<p class="err">This week’s projections could not be loaded right now. Refresh the page to try again.</p>'; $('call').hidden = true; return; }
+    var before = PICKS.join(',');
+    PICKS = uniq(PICKS).filter(valid).slice(0, MAX_PICKS);
+    if (PICKS.join(',') !== before || (location.hash || '') !== (PICKS.length ? '#p=' + PICKS.join(',') : '')) saveState();
+    var F = PICKS.map(facts), call = decide(F), n = F.length;
+    var leads = {}; leads.last = best(F, 'last', true);
+    leads.ppg = best(F.map(function (f) { return { ppg: f.season && f.season.gp ? f.season.ppg : null }; }), 'ppg', true);
+    drawCall(F, call);
+    $('q').disabled = n >= MAX_PICKS;
+    drawPos();
+    var narrow = window.matchMedia && window.matchMedia('(max-width:480px)').matches;   // phones: short enough not to cut off
+    $('q').placeholder = n >= MAX_PICKS ? (narrow ? 'Four is the most: remove one' : 'Four players is the most. Remove one to add another.') : n ? (narrow ? 'Add another: name or team' : 'Add another player: name or team…') : (narrow ? 'Add a player: name or team' : 'Add a player: type a name or team…');
+    $('count').textContent = n ? n + ' of ' + MAX_PICKS + ' players' : '';
+    $('share').hidden = $('clear').hidden = !n;
+    var cells = F.map(function (f) { return column(f, call, F, leads); });
+    // an open slot to click; once two players are up it is a desktop extra (phones use the search box)
+    // open slots only until there are two players; after that the search box adds more
+    if (n === 0) cells.push(slot(0), slot(1));
+    if (n === 1) cells.push(slot(1));
+    var cols = cells.length, two = n === 2 || (n < 2 && cols === 2);
+    var board = '<div class="ss-board c' + cols + ' p' + Math.max(n, 2) + (n > 2 ? ' many' : '') + '" style="--n:' + cols + '">' + cells.join('') + (two ? '<span class="ss-vs" aria-hidden="true">VS</span>' : '') + '</div>';
+    if (!n) {
+      var ex = examples();
+      board = '<div class="ss-empty"><p>Pick two to four players you are choosing between this week. DHQ puts them side by side, shows the full formula behind each projection, and the highest DHQ projection gets the start.</p>'
+        + (ex.length ? '<div class="ss-ex">' + ex.map(function (e, i) { return '<button type="button" data-ex="' + i + '">' + esc(e.label) + ' <span>' + esc(e.pos) + '</span></button>'; }).join('') + '</div>' : '') + '</div>' + board;
+      $('board').dataset.ex = JSON.stringify(ex.map(function (e) { return e.ids; }));
+    }
+    $('board').innerHTML = board;
+    equalize();
+    $('how').innerHTML = n ? '<b>How the call is made.</b> The START is the highest DHQ projection this week in your scoring; within 0.05 pts is too close to call. A player on a bye or ruled out cannot be the start. DHQ Value (by the photo) is his long-term dynasty value and is there for reference only. Green ▲ marks the best of that number on this board. How DHQ built this projection is DHQ’s weekly formula for each player, step by step: his starting point and projected stat line, the eleven weighted factors (wt is how much each counts; the eleven add up to 100) with how much each moved him, all factors combined, then DHQ’s position model, which lands on the projection at the top.' : '';
+  }
+
+  // Where the numbers come from, in the settings the page is showing (DHQ Value: the league size and
+  // QB format saved on Player Valuations, this page's scoring and TE premium).
+  function footNote() {
+    if (!W || W.failed) return;
+    var built = W.built ? new Date(W.built) : null, fmtS = S.teams + '-team ' + (S.qb === '1qb' ? '1QB' : 'Superflex') + ' ' + scoringName();
+    $('footNote').innerHTML = '<b>Where the numbers come from.</b> DHQ projection: DHQ’s engine, the same number as the app’s Lineup screen'
+      + (built ? ', updated ' + built.toLocaleString([], { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' }) : '')
+      + '. Last week and season: actual results from Sleeper’s stats. Vegas: the team’s implied points and point spread. DHQ Value: DHQ’s dynasty value for a ' + esc(fmtS) + ' league'
+      + (isEstimated() ? ' (DHQ’s 16-team Superflex Half-PPR values, adjusted for these settings: an estimate; league size and QB format are set on the Player Valuations page)' : ' (league size and QB format are set on the Player Valuations page)') + '.';
+  }
+  // Line the columns up: the score band, the photo block and every bullet sit
+  // at the same height across the board, whatever wraps (long names on phones).
+  // Keep "NFL Week N · @ OPP · Sun 8:20 PM" on one line in narrow columns (four across on an iPad):
+  // shrink the text a little, then shorten the time ("Sun 8:20p"), then "Wk N". Phones use two lines.
+  function fitGames() {
+    var wide = window.innerWidth > 640;
+    [].slice.call(document.querySelectorAll('.ss-game')).forEach(function (g) {
+      var kt = g.querySelector('.kt'), wk = g.querySelector('.wk');
+      g.style.fontSize = ''; if (kt) kt.textContent = kt.getAttribute('data-full'); if (wk && wk.getAttribute('data-full')) wk.textContent = wk.getAttribute('data-full');
+      if (!wide) return;
+      var over = function () { return g.scrollWidth > g.clientWidth + 1; };
+      [11.5, 11, 10.5].some(function (px) { if (!over()) return true; g.style.fontSize = px + 'px'; return false; });
+      if (over() && kt) kt.textContent = kt.getAttribute('data-short');
+      if (over() && wk) { wk.setAttribute('data-full', wk.textContent); wk.textContent = wk.textContent.replace(/^NFL Week/, 'Wk'); }
+    });
+  }
+  function equalize() {
+    fitGames();
+    var cols = [].slice.call(document.querySelectorAll('.ss-col'));
+    var groups = [cols.map(function (c) { return c.querySelector('.ss-game'); }), cols.map(function (c) { return c.querySelector('.ss-top'); }), cols.map(function (c) { return c.querySelector('.ss-head'); })];
+    var keys = {};
+    cols.forEach(function (c) { c.querySelectorAll('[data-al]').forEach(function (el) { (keys[el.dataset.al] = keys[el.dataset.al] || []).push(el); }); });
+    Object.keys(keys).forEach(function (k) { if (keys[k].length > 1) groups.push(keys[k]); });
+    groups.forEach(function (g) { g.forEach(function (el) { if (el) el.style.minHeight = ''; }); });
+    if (cols.length < 2) return;
+    groups.forEach(function (g) {
+      var h = Math.max.apply(null, g.map(function (el) { return el ? el.getBoundingClientRect().height : 0; }));
+      g.forEach(function (el) { if (el) el.style.minHeight = Math.ceil(h) + 'px'; });
+    });
+  }
+  var eqT; window.addEventListener('resize', function () { clearTimeout(eqT); eqT = setTimeout(equalize, 120); });
+  if (document.fonts && document.fonts.ready) document.fonts.ready.then(equalize);
+
+  // ── The add-player menu ──────────────────────────────────────────────────
+  // pos: the position button pressed (null = none: suggestions follow the last player added)
+  var M = { list: [], at: -1, pos: null };
+  // Touch screens (owner report 2026-11-18, iPad: "adding the players is difficult"): the list opens
+  // without putting the cursor in the search box (that popped the keyboard up over the list and the
+  // list jumped when it went away), stays open while you pick, and a tap adds.
+  var TOUCH = !!(window.matchMedia && window.matchMedia('(pointer: coarse)').matches);
+  function focusBox() { if (!TOUCH) $('q').focus(); }
+  // Position buttons (owner ask 2026-11-13): browse a whole position, best
+  // DHQ projection first, for anyone who can't spell the name.
+  function drawPos() {
+    var list = ['ALL', 'QB', 'RB', 'WR', 'TE', 'K'].concat(S.idp === '1' ? ['DL', 'LB', 'DB'] : []);
+    if (M.pos && list.indexOf(M.pos) < 0) M.pos = null;
+    var off = PICKS.length >= MAX_PICKS;
+    $('posSeg').classList.toggle('idp', list.length > 6);
+    $('posSeg').innerHTML = '<span class="ss-pos-k">Browse</span>' + list.map(function (p) {
+      return '<button type="button" data-pos="' + p + '" aria-pressed="' + (M.pos === p) + '"' + (off ? ' disabled' : '') + '>' + (p === 'ALL' ? 'All' : p) + '</button>';
+    }).join('');
+  }
+  function projOf(p) { return W && !W.failed ? pts(weekProj(W, 'dhq', p.id, p.pos), p.pos) : null; }
+  function drawMenu() {
+    var q = $('q').value.toLowerCase().replace(/[^a-z0-9 ]/g, '').trim(), pool = SEARCH.filter(function (p) { return S.idp === '1' || !IDP[p.pos]; });
+    var head, cap = 8, bp = M.pos && M.pos !== 'ALL' ? M.pos : null;
+    if (bp) pool = pool.filter(function (p) { return p.pos === bp; });
+    if (q) {
+      pool = pool.filter(function (p) { return p.key.indexOf(q) === 0 || p.key.indexOf(' ' + q) > -1 || p.team.toLowerCase() === q; });
+      head = pool.length ? (bp ? bp + 's' : 'Players') + ' matching "' + esc($('q').value.trim()) + '"' : '';
+      cap = M.pos ? 400 : 20;
+    } else if (M.pos) {
+      head = bp ? 'Every ' + bp + ', best DHQ projection first \u00b7 ' + pool.length + ' players' : 'Top 150 by DHQ projection \u00b7 pick a position to see everyone';
+      cap = bp ? 400 : 150;
+    } else {
+      var pos = PICKS.length ? posOf(PICKS[PICKS.length - 1]) : null;
+      if (pos) pool = pool.filter(function (p) { return p.pos === pos; });
+      head = pos ? 'Top projected ' + pos + 's this week' : 'Top projected this week';
+    }
+    M.list = pool.map(function (p) { var i2 = W && W.info[p.id], tm = teamKey((i2 && i2.team) || p.team), bye = !!(W && W.slate && W.slate.ok && W.slate.bye[tm]); return { p: p, x: bye ? null : projOf(p), bye: bye, v: playerValue(p.id) }; })
+      .sort(function (a, b) { return (b.x == null ? -1 : b.x) - (a.x == null ? -1 : a.x) || b.v - a.v || a.p.name.localeCompare(b.p.name); }).slice(0, cap);
+    M.at = firstOpen(0, 1);
+    var html = '<div class="ss-mbar" role="presentation">' + (head ? '<div class="ss-mhead">' + head + '</div>' : '<div class="ss-mhead"></div>') + '<button type="button" class="ss-mdone" data-done>Done</button></div>';
+    html += M.list.length ? M.list.map(function (r, i) {
+      var p = r.p, i2 = W && W.info[p.id], tm = teamKey((i2 && i2.team) || p.team), on = PICKS.indexOf(p.id) >= 0;
+      var opp = W && W.slate && !r.bye && W.slate.opp[tm] ? (W.slate.away[tm] ? '@' : 'vs ') + W.slate.opp[tm] : '';   // a bye shows once, on the right
+      return '<button type="button" class="ss-opt' + (on ? ' on' : '') + '" role="option" tabindex="-1" id="opt' + i + '" data-id="' + esc(p.id) + '" aria-selected="' + (i === M.at) + '"' + (on ? ' aria-disabled="true"' : '') + '>'
+        + face(p.id, POS_COLOR[p.pos] || 'var(--silver)') + '<span><b>' + esc(p.name) + (on ? ' (added)' : '') + '</b><small>' + esc(p.pos + ' · ' + tm + (opp ? ' · ' + opp : '')) + '</small></span>'
+        + '<em>' + (r.bye ? '<small>Bye</small>' : (r.x != null ? r.x.toFixed(1) : '–') + '<small> DHQ</small>') + '</em></button>';
+    }).join('') : '<div class="ss-none" role="presentation">No player matches "' + esc($('q').value.trim()) + '".</div>';
+    $('menu').innerHTML = html; $('menu').hidden = false; $('q').setAttribute('aria-expanded', 'true');
+    $('q').setAttribute('aria-activedescendant', M.at >= 0 ? 'opt' + M.at : '');
+  }
+  function closeMenu() { $('menu').hidden = true; $('q').setAttribute('aria-expanded', 'false'); $('q').removeAttribute('aria-activedescendant'); }
+  function mark() {
+    document.querySelectorAll('#menu .ss-opt').forEach(function (b, i) { b.setAttribute('aria-selected', String(i === M.at)); if (i === M.at && b.scrollIntoView) b.scrollIntoView({ block: 'nearest' }); });
+    $('q').setAttribute('aria-activedescendant', M.at >= 0 ? 'opt' + M.at : '');
+  }
+  // The next row that is not already on the board, from i going dir (+1 / -1).
+  function firstOpen(i, dir) {
+    for (; i >= 0 && i < M.list.length; i += dir) if (PICKS.indexOf(M.list[i].p.id) < 0) return i;
+    return -1;
+  }
+  function add(pid) {
+    if (!pid || PICKS.indexOf(pid) >= 0 || PICKS.length >= MAX_PICKS || !valid(pid)) return;
+    PICKS.push(pid); saveState(); $('q').value = ''; render();
+    if (TOUCH) { if (PICKS.length >= 2 || PICKS.length >= MAX_PICKS) closeMenu(); else drawMenu(); return; }   // touch: no keyboard; the list stays for the second pick
+    if (PICKS.length < MAX_PICKS) { drawMenu(); $('q').focus(); } else { closeMenu(); $('share').focus(); }   // the box is disabled at four
+  }
+  $('q').addEventListener('input', drawMenu);
+  $('posSeg').addEventListener('mousedown', function (e) { if (e.target.closest('[data-pos]')) e.preventDefault(); });   // keep focus in the box
+  $('posSeg').addEventListener('click', function (e) {
+    var b = e.target.closest('[data-pos]'); if (!b || b.disabled) return;
+    M.pos = M.pos === b.dataset.pos ? null : b.dataset.pos;   // tap again to clear
+    drawPos();
+    if (!DATA || !W) return;
+    if (M.pos) { $('menu').scrollTop = 0; drawMenu(); focusBox(); } else closeMenu();
+  });
+  $('q').addEventListener('focus', function () { if (DATA && W) drawMenu(); });
+  $('q').addEventListener('keydown', function (e) {
+    // a closed menu: arrows and Enter only open it (Enter never adds a player you did not see)
+    if ($('menu').hidden && (e.key === 'ArrowDown' || e.key === 'ArrowUp' || e.key === 'Enter')) { e.preventDefault(); drawMenu(); return; }
+    if (e.key === 'ArrowDown') { e.preventDefault(); var dn = firstOpen(M.at + 1, 1); if (dn >= 0) { M.at = dn; mark(); } }
+    else if (e.key === 'ArrowUp') { e.preventDefault(); var up = firstOpen(M.at - 1, -1); if (up >= 0) { M.at = up; mark(); } }
+    else if (e.key === 'Enter') { e.preventDefault(); var r = M.list[M.at]; if (r && PICKS.indexOf(r.p.id) < 0) add(r.p.id); }
+    else if (e.key === 'Escape') { e.preventDefault(); closeMenu(); }   // preventDefault: the search box would clear itself and reopen the menu
+    else if (e.key === 'Tab') closeMenu();
+  });
+  // focus leaving the box (Tab, a click elsewhere) closes the menu
+  // Touch (iPad / phone): add on finger-up instead of waiting for the browser's late "click". iPad
+  // Safari takes the cursor out of the search box before it delivers the click, which closed the
+  // list under the finger and swallowed the tap (owner report 2026-11-17: "have to click a player
+  // multiple times"). A finger that moves (scrolling the list) adds nothing.
+  var touchAdd = 0, touchAt = 0, tp = null, upX = 0, upY = 0;
+  function touchStart(e) { if (e.pointerType !== 'mouse') touchAt = Date.now(); }
+  $('menu').addEventListener('pointerdown', function (e) {
+    touchStart(e); if (e.pointerType === 'mouse') return;
+    var b = e.target.closest('.ss-opt'); tp = b ? { id: b.dataset.id, x: e.clientX, y: e.clientY, pid: e.pointerId } : null;
+  });
+  $('menu').addEventListener('pointermove', function (e) { if (tp && e.pointerId === tp.pid && (Math.abs(e.clientX - tp.x) > 10 || Math.abs(e.clientY - tp.y) > 10)) tp = null; });
+  $('menu').addEventListener('pointercancel', function () { tp = null; });
+  $('menu').addEventListener('pointerup', function (e) { if (!tp || e.pointerId !== tp.pid) return; var id = tp.id; tp = null; touchAdd = Date.now(); upX = e.clientX; upY = e.clientY; add(id); });
+  $('posSeg').addEventListener('pointerdown', touchStart);
+  // The browser's own "click" arrives after the finger-up add. When that add closed the list, the click
+  // lands on whatever is now under the finger (a board button) and undid the pick (owner report
+  // 2026-11-18). Swallow that one late click, wherever it lands.
+  document.addEventListener('click', function (e) { if (Date.now() - touchAdd < 700 && Math.abs(e.clientX - upX) < 24 && Math.abs(e.clientY - upY) < 24) { e.preventDefault(); e.stopPropagation(); } }, true);
+  $('find').addEventListener('focusout', function () {
+    if (TOUCH) return;   // touch: the list closes with Done, a tap outside, or the second pick
+    setTimeout(function () { if (Date.now() - touchAt < 1000) return; if (!$('find').contains(document.activeElement)) closeMenu(); }, 0);   // a finger on the list keeps it open
+  });
+  $('menu').addEventListener('mousedown', function (e) { e.preventDefault(); });   // keep focus in the box
+  $('menu').addEventListener('click', function (e) { if (e.target.closest('[data-done]')) { closeMenu(); return; } if (Date.now() - touchAdd < 800) return; var b = e.target.closest('.ss-opt'); if (b) add(b.dataset.id); });   // touch already added it
+  document.addEventListener('click', function (e) { if (!e.target.isConnected || e.target.closest('#find') || e.target.closest('[data-slot]')) return; closeMenu(); });
+
+  // ── The board's buttons ──────────────────────────────────────────────────
+  $('board').addEventListener('click', function (e) {
+    var rm = e.target.closest('[data-rm]'), sl = e.target.closest('[data-slot]'), ex = e.target.closest('[data-ex]'), pc = e.target.closest('[data-card]');
+    if (pc && window.DHQPlayerCard) { DHQPlayerCard.open(pc.dataset.card, cardOpts()); return; }
+    if (e.target.closest('[data-fxtog]')) { fxToggle($('board')); equalize(); return; }
+    if (rm) { PICKS = PICKS.filter(function (p) { return p !== rm.dataset.rm; }); saveState(); render(); return; }
+    if (sl) { focusBox(); drawMenu(); try { (TOUCH ? $('menu') : $('find')).scrollIntoView({ block: TOUCH ? 'center' : 'nearest', behavior: 'smooth' }); } catch (x) { /* old browsers */ } return; }
+    if (ex) { var all = JSON.parse($('board').dataset.ex || '[]'); PICKS = (all[+ex.dataset.ex] || []).slice(); saveState(); render(); }
+  });
+  $('clear').addEventListener('click', function () { PICKS = []; saveState(); render(); focusBox(); });
+  $('share').addEventListener('click', function () {
+    var url = location.origin + location.pathname + location.search + (PICKS.length ? '#p=' + PICKS.join(',') : '');
+    var done = function () { toast('Link copied. Anyone with it sees this matchup.'); };
+    if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(url).then(done, function () { toast(url); }); else toast(url);
+  });
+  // The player card in this page's settings: the same scoring (so his projection is this column's number)
+  // and the same DHQ Value as by the photo (projections.html's adjustment, done by the card's valueSettings).
+  function cardOpts() {
+    var PC = window.DHQPlayerCard;
+    return { leagueId: SOURCE.id, scoringSettings: PC.scoringSettings ? PC.scoringSettings(S.scoring, S.tep === '1' ? 0.5 : 0) : null,
+      valueSettings: { scoring: S.scoring, qb: S.qb, tep: S.tep, teams: S.teams } };
+  }
+  function idpFor(list) { if (PLAYERS && list.some(function (pid) { return IDP[posOf(pid)]; }) && S.idp !== '1') { S.idp = '1'; store(PREF_KEY, S); } }
+  window.addEventListener('hashchange', function () { var h = hashPicks() || []; PICKS = h.slice(0, MAX_PICKS); idpFor(PICKS); render(); });
+
+  // ── Boot ─────────────────────────────────────────────────────────────────
+  PICKS = uniq(hashPicks() || load(PICK_KEY) || []).slice(0, MAX_PICKS);
+  syncSel(); render();
+  loadData().then(function () {
+    return loadCurrent().then(function () { return CUR && CUR.week ? loadWeek(CUR.week) : { failed: true }; });
+  }).then(function (w) {
+    W = w;
+    idpFor(PICKS);
+    W && !W.failed && setTimeout(saveState, 0);   // the board you last opened (a shared link included) is the one you come back to
+    render();
+  }).catch(function () { $('board').innerHTML = '<p class="err">DHQ data could not be loaded right now. Check your connection and refresh the page.</p>'; });
+})();
+</script>
+</body>
+</html>

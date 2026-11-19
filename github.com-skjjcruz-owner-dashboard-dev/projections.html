@@ -1,0 +1,968 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Player Valuation &amp; Weekly Projections · Dynasty HQ</title>
+<meta name="description" content="DHQ dynasty value, season stats and this week's DHQ projection for every NFL player. Free, no sign-up.">
+<link rel="icon" href="icon-192.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&family=Rajdhani:wght@600;700&display=swap" rel="stylesheet">
+<!--
+  DHQ Player Valuation & Weekly Projections, Lab edition (owner ask 2026-11-11).
+  Same data as the Trade Calculator (lab/trade.html), copied from it so the
+  numbers always match: the engine server's DHQ values for The Psycho League
+  (refined by the league toggles, marked estimated), this season's actual
+  points and games (Sleeper season stats), DHQ's weekly projection, and bye
+  weeks (the app's nfl-scoreboard relay). Published to the Lab as
+  projections.html by scripts/publish-lab.cjs and gated like every page.
+-->
+<style>
+/* Look: the app's Trade Builder (index.html .tc-dhq-panel / .tc-ta-* rules):
+   one quiet panel, blue / red side cards, a filterable list grouped by
+   position, a plain tax table. Owner ask 2026-11-11: elegant, not cartoonish. */
+:root{
+  color-scheme:dark;
+  --page:#08080B; --off-black:#1B1B22; --panel:rgba(16,16,22,.96); --charcoal:#27262E;
+  --white:#F5F2EA; --silver:#BDB8AD; --soft:rgba(207,207,214,.88); --faint:rgba(189,184,173,.6);
+  --gold:#D4AF37; --good:#2ECC71; --warn:#F0A500; --bad:#E74C3C; --info:#5DADE2;
+  --send:#5dade2; --get:#e74c3c;
+  --line:rgba(212,175,55,.16); --line2:rgba(212,175,55,.25); --hair:rgba(255,255,255,.06);
+  --r-xs:5px; --r-sm:8px; --r:10px; --r-lg:14px;
+  --display:'Rajdhani','Arial Narrow',system-ui,sans-serif;
+  --body:'DM Sans',system-ui,-apple-system,'Segoe UI',sans-serif;
+  --mono:'IBM Plex Mono',ui-monospace,Menlo,monospace;
+  --sat:env(safe-area-inset-top,0px); --sab:env(safe-area-inset-bottom,0px);
+}
+*{box-sizing:border-box}
+html,body{background:var(--page)}
+body{margin:0;color:var(--white);font:14.5px/1.5 var(--body);-webkit-font-smoothing:antialiased;padding-inline:max(20px,env(safe-area-inset-left,0px)) max(20px,env(safe-area-inset-right,0px))}
+button,input,select{font:inherit;color:inherit}
+:focus-visible{outline:2px solid var(--gold);outline-offset:2px}
+.brandwash{position:fixed;inset:0;z-index:0;pointer-events:none;background:url("img/logo.png") no-repeat center 16%/min(720px,86vw) auto;opacity:.07;mix-blend-mode:screen;filter:blur(4px);-webkit-mask-image:radial-gradient(125% 105% at 50% 20%,#000 26%,transparent 74%);mask-image:radial-gradient(125% 105% at 50% 20%,#000 26%,transparent 74%)}
+.wrap{position:relative;z-index:1;max-width:1200px;margin:0 auto}
+
+.top{display:flex;align-items:center;justify-content:space-between;gap:16px;padding-block:calc(12px + var(--sat)) 12px;box-shadow:0 0 0 100vmax var(--page),0 1px 0 100vmax #ffffff18;clip-path:inset(0 -100vmax -1px)}
+.brand{display:flex;align-items:center;gap:12px;text-decoration:none;color:var(--white)}
+.brand img{width:44px;height:44px;border-radius:var(--r);box-shadow:0 2px 12px rgba(212,175,55,.3)}
+.brand span{font:700 20px/1 var(--display);letter-spacing:.06em}
+.back{color:#98A1AD;text-decoration:none;font-size:14px;padding:10px 14px;border:1px solid #232932;border-radius:var(--r-sm)}
+.back:hover{color:var(--white);border-color:#333A45}
+
+/* the panel */
+.panel{margin:28px 0 0;border:1px solid var(--line);background:var(--panel);border-radius:var(--r-sm);padding:18px 20px 20px}
+.panel-head{display:flex;align-items:baseline;justify-content:space-between;gap:12px;flex-wrap:wrap;padding-bottom:12px;border-bottom:1px solid rgba(212,175,55,.12)}
+.panel-head h1,.panel-head h2{margin:0;color:var(--gold);font:700 19px/1.1 var(--display);letter-spacing:.1em;text-transform:uppercase}
+.panel-head em{color:var(--faint);font-size:13.5px}
+.source{margin:14px 0;color:var(--soft);font-size:14px}
+.source b{color:var(--gold);font-weight:600}
+.source .est{color:var(--faint)}
+
+.sel{background:var(--charcoal);border:1px solid var(--line2);color:var(--white);font:500 13.5px var(--body);padding:9px 10px;border-radius:var(--r-xs);cursor:pointer;width:100%}
+.sel:focus{outline:none;border-color:var(--gold)}
+.league{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:10px;margin-bottom:16px}
+.fld{display:flex;flex-direction:column;gap:5px;min-width:0}
+.fld > span{font-size:10.5px;color:var(--faint);text-transform:uppercase;letter-spacing:.08em}
+
+.sides{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:20px}
+.side{background:var(--panel);border:1px solid var(--line);border-radius:var(--r-sm);padding:16px;display:flex;flex-direction:column;gap:10px;min-width:0}
+.side.a{border-color:rgba(93,173,226,.35)} .side.b{border-color:rgba(231,76,60,.35)}
+.side-title{font:700 17px/1 var(--display);letter-spacing:.12em;text-transform:uppercase}
+.side.a .side-title{color:var(--send)} .side.b .side-title{color:var(--get)}
+.side-sel{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:8px}
+.side-sel.one{grid-template-columns:minmax(0,1fr)}
+
+.rows{display:flex;flex-direction:column;gap:5px}
+.row{background:var(--charcoal);border-radius:var(--r-xs);padding:9px 11px;display:flex;align-items:center;gap:10px}
+.dot{width:8px;height:8px;border-radius:50%;flex:none}
+.item .face{width:28px;height:28px}
+.face{width:32px;height:32px;border-radius:50%;flex:none;overflow:hidden;background:#15151b;box-shadow:0 0 0 1.5px var(--pc,var(--silver))}
+.face img{display:block;width:100%;height:100%;object-fit:cover;object-position:center 15%}
+.row .face{width:36px;height:36px}
+.row .who{flex:1.4;min-width:0}
+.row .who b{display:block;font-size:14px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.row .who small{display:block;font-size:11.5px;color:var(--faint);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.barw{flex:1;height:4px;background:rgba(255,255,255,.07);border-radius:2px;overflow:hidden;min-width:30px}
+.barw i{display:block;height:100%;border-radius:2px;transition:width .4s ease}
+.row .v{width:56px;text-align:right;font-size:13.5px;font-weight:700;color:var(--gold);font-variant-numeric:tabular-nums;flex:none}
+.rm{background:transparent;border:0;color:rgba(231,76,60,.6);cursor:pointer;font-size:13px;padding:2px;flex:none}
+.rm:hover{color:var(--bad)}
+
+.filter{width:100%;background:var(--charcoal);border:1px solid var(--line2);color:var(--white);font:400 14.5px var(--body);padding:11px 13px;border-radius:var(--r-xs) var(--r-xs) 0 0}
+.filter:focus{outline:none;border-color:var(--gold)}
+.filter::placeholder{color:rgba(255,255,255,.22)}
+.list{max-height:340px;overflow-y:auto;background:var(--charcoal);border:1px solid rgba(212,175,55,.2);border-top:0;border-radius:0 0 var(--r-xs) var(--r-xs);margin-top:-10px}
+.grp{font-size:13px;font-weight:700;padding:6px 11px;background:rgba(255,255,255,.03);letter-spacing:.06em;text-transform:uppercase;position:sticky;top:0;z-index:1;backdrop-filter:blur(6px)}
+.item{width:100%;padding:6px 11px;min-height:42px;cursor:pointer;display:flex;align-items:center;gap:8px;font-size:13px;border:0;border-bottom:1px solid rgba(255,255,255,.04);background:transparent;text-align:left;transition:background .1s}
+.item:hover{background:rgba(212,175,55,.08)}
+.item.added{opacity:.3;cursor:default;pointer-events:none}
+.item .nm{flex:1;min-width:0;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.item .tm{font-size:10.5px;color:var(--faint);flex:none;white-space:nowrap;font-variant-numeric:tabular-nums}
+.item .v{font-size:12.5px;font-weight:700;color:var(--gold);flex:none;min-width:40px;text-align:right;font-variant-numeric:tabular-nums}
+/* columns: photo | name | pos | team | age | proj | value, shared by the group headings */
+.grp,.item{display:grid;grid-template-columns:28px minmax(0,1fr) 25px 32px 23px 37px 21px 31px 32px 62px;column-gap:6px;align-items:center}
+.item .nm{padding-left:4px;font-size:12.5px}
+.grp .gname{grid-column:1 / 3}
+.grp .gc{font-size:9px;font-weight:600;letter-spacing:.08em;color:var(--faint);text-align:center}
+.grp .gv{grid-column:10;text-align:center;white-space:nowrap;justify-self:center}
+.grp .gv,.item .v{grid-column:10}
+.item .v{text-align:center;justify-self:center}
+.item .c.bye{color:var(--warn);font-weight:600;letter-spacing:.04em}
+.item .c{font-size:11px;color:var(--faint);text-align:center;white-space:nowrap;font-variant-numeric:tabular-nums}
+.item .tm{display:none}
+.item.pk .nm{grid-column:2 / 10}
+.item.pk .dot{justify-self:center}
+.list-empty{padding:14px;font-size:13.5px;color:var(--faint);text-align:center}
+.total{display:flex;align-items:center;justify-content:space-between;padding:8px 4px 0;margin-top:auto}
+.total span{font-size:12px;color:var(--soft);text-transform:uppercase;letter-spacing:.06em}
+.total b{font:500 24px/1 var(--body);font-variant-numeric:tabular-nums}
+.side.a .total b{color:var(--send)} .side.b .total b{color:var(--get)}
+.chk{display:flex;align-items:center;gap:8px;font-size:13px;color:var(--soft)}
+.chk input{accent-color:var(--gold);width:15px;height:15px}
+.dna-line{font-size:13px;color:var(--soft);line-height:1.5}
+.dna-line b{color:var(--white);font-weight:600}
+
+/* trade analysis */
+.verdict{margin-top:20px;background:var(--panel);border:1px solid rgba(212,175,55,.2);border-radius:var(--r-sm);padding:16px;display:flex;flex-direction:column;gap:12px}
+.sec{font:500 13.5px var(--body);color:var(--gold);letter-spacing:.12em;border-bottom:1px solid rgba(212,175,55,.2);padding-bottom:6px;text-transform:uppercase}
+.sec-split{display:flex;justify-content:flex-start;align-items:baseline;gap:4px 14px;flex-wrap:wrap}
+.sec-split em{font-style:normal;font-size:12px;letter-spacing:.06em;color:var(--faint)}
+.call{border:1px solid var(--cc);border-radius:var(--r-sm);padding:10px 12px;background:rgba(255,255,255,.02)}
+.call-top{display:flex;align-items:baseline;gap:10px;flex-wrap:wrap}
+.call-top b{font:700 17px/1 var(--display);letter-spacing:.04em;color:var(--cc);text-transform:uppercase}
+.call-top span{margin-left:auto;font:500 13px var(--mono);color:var(--cc)}
+.call p{margin:5px 0 0;font-size:13.5px;line-height:1.45}
+.gline{display:flex;align-items:baseline;gap:12px;flex-wrap:wrap}
+.gline .g{font:500 38px/1 var(--body)}
+.gline .gl{font:700 17px/1 var(--display);letter-spacing:.04em;text-transform:uppercase}
+.gline .gd{font:600 16px var(--mono)}
+.gline .gs{font-size:12.5px;color:var(--faint)}
+.impact{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:8px}
+.impact div{background:rgba(255,255,255,.025);border:1px solid var(--hair);border-radius:6px;padding:9px 10px;min-width:0}
+.impact span{display:block;color:var(--faint);font-size:10.5px;text-transform:uppercase;letter-spacing:.08em;margin-bottom:3px}
+.impact strong{display:block;font:700 16px/1.2 var(--display);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.impact em{display:block;color:var(--faint);font-style:normal;font-size:11.5px;margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.lk{display:flex;align-items:center;gap:10px;font-size:12px;color:var(--faint);text-transform:uppercase;letter-spacing:.06em}
+.lkbar{flex:1;height:10px;background:rgba(255,255,255,.07);border-radius:5px;overflow:hidden}
+.lkbar i{display:block;height:100%;border-radius:5px;transition:width .5s ease}
+.badge{font-size:11.5px;font-weight:700;letter-spacing:.07em;padding:3px 7px;border-radius:3px;border:1px solid;text-transform:uppercase}
+.taxes{display:flex;flex-direction:column;border:1px solid rgba(255,255,255,.07);border-radius:6px;overflow:hidden}
+.tax{display:flex;align-items:center;gap:10px;padding:8px 12px;border-bottom:1px solid rgba(255,255,255,.05);font-size:13px}
+.tax:last-child{border-bottom:0}
+.tax.BONUS{background:rgba(46,204,113,.05)} .tax.TAX{background:rgba(231,76,60,.05)}
+.tax.net{background:rgba(212,175,55,.06);border-top:1px solid rgba(212,175,55,.2);font-weight:700}
+.tax .n{flex:1;font-weight:600}
+.tax .d{flex:2;color:var(--faint)}
+.tax .i{width:48px;text-align:right;font-weight:700;flex:none;font-variant-numeric:tabular-nums}
+.tax.TAX .i{color:var(--bad)} .tax.BONUS .i{color:var(--good)} .tax.net .i{color:var(--gold)}
+.approach{font-size:13.5px;color:var(--soft)}
+.approach b{color:var(--gold);font-weight:600}
+.actions{display:flex;gap:8px;flex-wrap:wrap}
+.btn{padding:9px 14px;border:1px solid var(--line2);background:var(--charcoal);color:var(--gold);border-radius:var(--r-xs);cursor:pointer;font:600 13px var(--body)}
+.btn:hover{border-color:var(--gold)}
+.btn.ghost{color:var(--silver)}
+.empty{color:var(--faint);font-size:13.5px;padding:6px 2px}
+
+/* owner DNA guide */
+.guide{margin-top:20px;border:1px solid var(--line);background:var(--panel);border-radius:var(--r-sm);padding:14px 16px}
+.guide summary{cursor:pointer;color:var(--gold);font:700 15px/1.2 var(--display);letter-spacing:.1em;text-transform:uppercase;list-style:none;display:flex;justify-content:space-between;align-items:center}
+.guide summary::-webkit-details-marker{display:none}
+.guide summary::after{content:"Show";font:500 12px var(--body);letter-spacing:0;text-transform:none;color:var(--faint)}
+.guide[open] summary::after{content:"Hide"}
+.guide-intro{margin:10px 0 14px;color:var(--soft);font-size:13.5px;max-width:84ch}
+.guide-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(270px,1fr));gap:10px}
+.gcard{display:flex;flex-direction:column;gap:7px;padding:13px;background:rgba(255,255,255,.025);border:1px solid var(--hair);border-radius:6px}
+.gcard h3{margin:0;font:700 16px/1 var(--display);letter-spacing:.06em;text-transform:uppercase;display:flex;align-items:center;gap:8px}
+.gcard p{margin:0;font-size:13px;color:var(--soft)}
+.gcard .gl{font-size:10.5px;letter-spacing:.08em;text-transform:uppercase;color:var(--faint);margin-top:4px}
+.gcard ul{margin:0;padding-left:17px;font-size:13px;color:var(--soft)}
+.gcard .tx{font-size:12.5px;font-variant-numeric:tabular-nums}
+.gcard .tx .TAX{color:#F1948A} .gcard .tx .BONUS{color:#7DDCA3}
+.gcard .btn{margin-top:auto;align-self:flex-start}
+
+.foot-note{margin:16px 0 40px;font-size:12px;line-height:1.6;color:var(--faint)}
+.loading{display:flex;align-items:center;gap:10px;color:var(--soft);font-size:13.5px;padding:12px}
+.loading::before{content:"";width:13px;height:13px;border-radius:50%;border:2px solid var(--gold);border-right-color:transparent;animation:spin .8s linear infinite}
+@keyframes spin{to{transform:rotate(360deg)}}
+.err{color:#F1948A;font-size:14px}
+.toast{position:fixed;left:50%;bottom:calc(24px + var(--sab));transform:translate(-50%,20px);opacity:0;pointer-events:none;z-index:50;background:var(--off-black);border:1px solid var(--line2);padding:10px 16px;border-radius:var(--r-sm);font-size:14px;transition:opacity .2s,transform .2s;max-width:calc(100vw - 32px)}
+.toast.on{opacity:1;transform:translate(-50%,0)}
+
+@media (max-width:1100px){
+  .sides{grid-template-columns:minmax(0,1fr)}
+}
+@media (max-width:900px){
+  .sides{grid-template-columns:minmax(0,1fr)}
+  .league{grid-template-columns:repeat(3,minmax(0,1fr))}
+  .impact{grid-template-columns:repeat(2,minmax(0,1fr))}
+  .tax .d{display:none}
+}
+@media (max-width:480px){
+  .league{grid-template-columns:repeat(2,minmax(0,1fr))}
+  .panel{padding:14px 12px}
+  .brand span{font-size:17px}
+  .barw{display:none}
+  /* too narrow for one line: the facts sit under the name */
+  .item{display:grid;grid-template-columns:28px minmax(0,1fr) auto;column-gap:9px;row-gap:1px}
+  .item .c,.grp .gc:not(.gv){display:none}
+  .item .tm{display:block}
+  .grp{grid-template-columns:minmax(0,1fr) auto}
+  .grp .gname{grid-column:1}
+  .grp .gv{grid-column:2}
+  .item.pk .nm{grid-column:2;grid-row:1 / span 2}
+  .item .face{grid-row:1 / span 2;align-self:center}
+  .item .nm{grid-column:2;grid-row:1}
+  .item .tm{grid-column:2;grid-row:2;overflow:hidden;text-overflow:ellipsis}
+  .item .v{grid-column:3;grid-row:1 / span 2;align-self:center}
+}
+@media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
+/* ── the projections table (on top of the Trade Builder look) ── */
+.wrap{max-width:1280px}
+.tabs{display:flex;gap:4px;margin:14px 0 0;border-bottom:1px solid rgba(212,175,55,.16)}
+.tabs a{padding:9px 14px;color:var(--faint);text-decoration:none;font:600 13.5px var(--body);border-bottom:2px solid transparent;margin-bottom:-1px}
+.tabs a:hover{color:var(--white)}
+.fld[hidden]{display:none}
+.tabs a[aria-current="page"]{color:var(--gold);border-bottom-color:var(--gold)}
+.is-weekly .thead,.is-weekly .prow{grid-template-columns:30px 30px minmax(150px,2.2fr) repeat(6,minmax(34px,1fr)) minmax(50px,1.1fr) minmax(76px,1.3fr) repeat(2,minmax(50px,1.1fr))}
+.prow .c.opp{color:var(--white);font-weight:600}
+.weeks{display:flex;gap:4px;overflow-x:auto;padding:2px 0 6px;margin:2px 0 4px;scrollbar-width:thin}
+.weeks[hidden],.weeknote[hidden]{display:none}
+.weeks a{flex:none;padding:6px 11px;border:1px solid var(--line2);border-radius:var(--r-xs);color:var(--silver);text-decoration:none;font:600 12.5px var(--body);white-space:nowrap;background:var(--charcoal)}
+.weeks a:hover{color:var(--white);border-color:rgba(212,175,55,.35)}
+.weeks a[aria-current]{background:rgba(212,175,55,.16);color:var(--gold);border-color:rgba(212,175,55,.45)}
+.weeks a small{font-size:10px;letter-spacing:.06em;text-transform:uppercase;opacity:.8}
+.weeknote{margin:0 0 12px;font-size:12.5px;color:var(--faint)}
+.scorecard{margin:0 0 16px;padding:14px 16px;border:1px solid rgba(212,175,55,.25);border-radius:var(--r-sm);background:linear-gradient(180deg,rgba(212,175,55,.07),rgba(212,175,55,.02))}
+.scorecard[hidden]{display:none}
+.sc-head{display:flex;flex-wrap:wrap;align-items:baseline;justify-content:space-between;gap:4px 14px;margin-bottom:12px}
+.sc-head h2{margin:0;font:700 15px var(--display);letter-spacing:.06em;text-transform:uppercase;color:var(--gold)}
+.sc-head span{font-size:12px;color:var(--faint)}
+.sc-cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:10px}
+.sc-card{display:grid;gap:4px;padding:12px 14px;border:1px solid var(--line2);border-radius:var(--r-sm);background:var(--charcoal)}
+.sc-k{font:600 10.5px var(--body);letter-spacing:.1em;text-transform:uppercase;color:var(--silver)}
+.sc-pct{font:700 30px/1 var(--display);color:var(--white)}
+.sc-pct.up{color:#7DDCA3} .sc-pct.down{color:#F1948A}
+.sc-pct small{font:700 13px var(--body);letter-spacing:.08em;text-transform:uppercase;margin-left:4px}
+.sc-sub{font-size:12px;color:var(--soft)}
+.sc-miss{font-size:12px;color:var(--faint)} .sc-miss b{color:var(--gold);font-weight:600}
+.sc-how{margin:10px 0 0;font-size:11.5px;color:var(--faint);line-height:1.45}
+.sc-empty{margin:0;font-size:13px;color:var(--faint)}
+.prow .c.last{color:var(--white);font-weight:600}
+.prow .c.dhq{color:var(--gold);font-weight:700;font-size:12.5px}
+.prow .c.alt{color:var(--soft)}
+.prow .c.alt.up{color:#7DDCA3} .prow .c.alt.down{color:#F1948A}
+.tools{display:flex;flex-wrap:wrap;align-items:center;gap:10px 14px;margin:4px 0 14px}
+.posseg{display:inline-flex;flex-wrap:wrap;gap:2px;padding:3px;background:var(--charcoal);border:1px solid var(--line2);border-radius:var(--r-xs)}
+.posseg button{border:0;background:transparent;color:var(--silver);font:600 12.5px var(--body);letter-spacing:.04em;padding:6px 11px;border-radius:4px;cursor:pointer}
+.posseg button[aria-pressed="true"]{background:rgba(212,175,55,.16);color:var(--gold)}
+.tools .filter{flex:1;min-width:200px;border-radius:var(--r-xs)}
+.count{font-size:12px;color:var(--faint);white-space:nowrap}
+.idpnote{margin:-6px 0 10px;font-size:11.5px;color:var(--faint)}
+.idpnote[hidden]{display:none}
+.tbl{border:1px solid rgba(212,175,55,.2);border-radius:var(--r-xs);background:var(--charcoal);overflow:hidden}
+.thead,.prow{display:grid;grid-template-columns:30px 30px minmax(170px,2.2fr) repeat(7,minmax(40px,1fr)) minmax(72px,1.3fr);column-gap:8px;align-items:center;padding:0 12px}
+.thead{position:sticky;top:0;z-index:2;background:#24232b;border-bottom:1px solid rgba(212,175,55,.2);min-height:38px}
+.thead button{border:0;background:transparent;color:var(--faint);font:600 10px var(--body);letter-spacing:.08em;text-transform:uppercase;cursor:pointer;padding:10px 0;text-align:center;white-space:nowrap}
+.thead button.l{text-align:left}
+.thead button[aria-sort]{color:var(--gold)}
+.thead button[aria-sort="descending"]::after{content:" \25BE"} .thead button[aria-sort="ascending"]::after{content:" \25B4"}
+.prow{min-height:48px;border-bottom:1px solid rgba(255,255,255,.04);font-size:13px}
+.prow[data-card]{cursor:pointer;transition:background .15s}
+.prow[data-card]:hover{background:rgba(212,175,55,.06)}
+.prow[data-card]:focus-visible{outline:2px solid var(--gold);outline-offset:-2px}
+.prow[data-card] .nm{text-decoration:underline;text-decoration-color:rgba(212,175,55,.35);text-underline-offset:3px}
+.prow:hover{background:rgba(212,175,55,.06)}
+.prow .rk{font-size:11.5px;color:var(--faint);text-align:center;font-variant-numeric:tabular-nums}
+.prow .face{width:28px;height:28px}
+.prow .nm{min-width:0;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;padding-left:4px}
+.prow .nm small{display:none}
+.prow .c{font-size:11.5px;color:var(--soft);text-align:center;white-space:nowrap;font-variant-numeric:tabular-nums}
+.prow .c.pos{font-weight:700}
+.prow .c.proj{color:var(--white);font-weight:600}
+.prow .c.bye{color:var(--warn);font-weight:600;letter-spacing:.04em}
+.prow .v{font-size:13.5px;font-weight:700;color:var(--gold);text-align:center;font-variant-numeric:tabular-nums}
+.more{display:block;width:100%;padding:12px;border:0;background:transparent;color:var(--gold);font:600 13px var(--body);cursor:pointer;border-top:1px solid rgba(255,255,255,.05)}
+.more:hover{background:rgba(212,175,55,.06)}
+.cta{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:10px;margin-top:16px;padding:12px 14px;border:1px solid var(--line);border-radius:var(--r-sm);background:rgba(212,175,55,.04);font-size:13.5px;color:var(--soft)}
+.cta a{color:var(--gold);font-weight:600;text-decoration:none}
+/* tablets: the 15-column weekly table tightens so nothing runs off the edge */
+@media (min-width:761px) and (max-width:1060px){
+  .is-weekly .thead,.is-weekly .prow{grid-template-columns:26px 28px minmax(110px,2fr) repeat(6,minmax(28px,1fr)) minmax(42px,1fr) minmax(60px,1.2fr) repeat(2,minmax(40px,1fr));column-gap:5px;padding:0 8px}
+  .is-weekly .thead button{font-size:9.5px;letter-spacing:.05em;white-space:normal;line-height:1.15}
+  .is-weekly .prow .nm{white-space:normal;line-height:1.2}
+}
+.tbl{overflow-x:auto}
+@media (max-width:760px){
+  .thead{display:none}
+  .prow{grid-template-columns:26px 30px minmax(0,1fr) 62px;padding:6px 10px;row-gap:1px}
+  .prow .c{display:none}
+  .prow .face{grid-row:1}
+  .prow .nm small{display:block;font-weight:400;font-size:11px;color:var(--faint);overflow:hidden;text-overflow:ellipsis}
+  .tools .filter{min-width:0;width:100%;flex:1 1 100%}
+  .is-weekly .prow{grid-template-columns:26px 30px minmax(0,1fr) 42px 42px}
+  .is-weekly .prow .c.dhq,.is-weekly .prow .c.bye.opp,.is-weekly .prow .c.res{display:block}
+  .is-weekly .prow .c.res{font-size:11px}
+  .is-weekly .prow .c.dhq::after,.is-weekly .prow .c.res::after{display:block;margin-top:2px;font:600 8px var(--body);letter-spacing:.06em;color:var(--faint)}
+  .is-weekly .prow .c.dhq::after{content:'DHQ'}
+  .is-weekly .prow .c.res::after{content:'LAST WK'}
+  .is-past .prow .c.res::after{content:'ACTUAL'}
+}
+@media (max-width:600px){
+  /* Phones (owner ask 2026-11-18): players first, settings as one scrolling row of small pills, rows like the
+     War Room app (position badge, bold name, one short line, the number on the right). */
+  body{padding-inline:max(12px,env(safe-area-inset-left,0px)) max(12px,env(safe-area-inset-right,0px))}
+  .top{padding-block:calc(8px + var(--sat)) 8px}
+  .brand{gap:8px}.brand img{width:30px;height:30px;box-shadow:none;border-radius:var(--r-sm)}.brand span{font-size:15px}
+  .back{padding:7px 12px;font-size:13px;border-radius:999px}
+  .panel{margin-top:4px;padding:10px 0 0;border:0;background:transparent}
+  .panel-head{padding-bottom:0;border-bottom:0;flex-wrap:nowrap}
+  .panel-head h1{font-size:17px;white-space:nowrap}
+  .panel-head em{display:none}
+  .tabs{margin-top:6px}.tabs a{padding:9px 10px;font-size:13px;white-space:nowrap}
+  .source{display:none}
+  .league{display:flex;flex-wrap:nowrap;overflow-x:auto;gap:6px;margin:10px -12px 8px;padding:0 12px 2px;scrollbar-width:none;-webkit-overflow-scrolling:touch}
+  .league::-webkit-scrollbar{display:none}
+  .fld{flex:none;flex-direction:row;align-items:center;gap:0;height:34px;padding:0 0 0 12px;border:1px solid var(--line2);border-radius:999px;background:var(--charcoal)}
+  .fld > span{font-size:11px;letter-spacing:0;text-transform:none;white-space:nowrap}
+  .fld .sel{width:auto;height:32px;padding:0 10px 0 6px;border:0;background:transparent;font:600 13px var(--body)}
+  .tools{gap:8px;margin:0 0 6px}
+  .posseg{display:flex;flex-wrap:nowrap;width:100%;overflow-x:auto;scrollbar-width:none;border-radius:999px}
+  .posseg::-webkit-scrollbar{display:none}
+  .posseg button{flex:1 0 auto;min-height:32px;border-radius:999px}
+  .tools .filter{min-height:42px;font-size:16px}
+  .count{display:none}
+    .prow{grid-template-columns:20px auto minmax(0,1fr) 62px;min-height:54px;padding:6px 2px;column-gap:8px}
+  .prow .face{display:none}
+  .prow .c.pos{display:grid;grid-column:2;grid-row:1;place-items:center;min-width:40px;height:28px;padding:0 5px;border-radius:var(--r-xs);font:700 11px var(--mono);letter-spacing:0;background:rgba(255,255,255,.05);border:1px solid currentColor}
+  .prow .nm{font-size:15px;padding-left:0}
+  .prow[data-card] .nm{text-decoration:none}
+  .prow .nm small{font-size:12px;margin-top:1px}
+  .prow .v{font-size:15px}
+  .is-weekly .prow{grid-template-columns:20px auto minmax(0,1fr) 44px 44px}
+  .prow .nm,.prow .nm small{text-decoration:none!important}
+}
+/* Match the War Room header (owner ask 2026-11-18): gold DM Sans wordmark, the app's logo size and
+   its "My Profile" pill shape for the back button (js/hub-v2.css .hv2-header). */
+.top{min-height:68px}
+.brand img{border-radius:var(--r,10px);box-shadow:0 2px 12px rgba(212,175,55,.3)}
+.brand span{font:700 1.1rem/1.1 var(--body,'DM Sans',system-ui,sans-serif);letter-spacing:.06em;background:linear-gradient(135deg,#D4AF37 0%,#F5F2EA 50%,#D4AF37 100%);background-size:200% auto;-webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent;color:#D4AF37;animation:dhq-shimmer 3s linear infinite}
+@keyframes dhq-shimmer{0%{background-position:0% center}100%{background-position:200% center}}
+@media (prefers-reduced-motion:reduce){.brand span{animation:none}}
+.back{display:inline-flex;align-items:center;min-height:44px;padding:0 16px;border:1px solid #ffffff18;border-radius:30px;background:#ffffff08;color:var(--white,#F5F2EA);font:500 13px var(--body,'DM Sans',system-ui,sans-serif)}
+.back:hover{border-color:rgba(212,175,55,.5);color:var(--white,#F5F2EA)}
+@media (max-width:600px){
+  .top{min-height:68px;padding-block:calc(10px + var(--sat,0px)) 10px}
+  .brand{gap:9px}.brand img{width:34px;height:34px;border-radius:var(--r,10px);box-shadow:0 2px 12px rgba(212,175,55,.3)}
+  .brand span{font-size:16px;letter-spacing:.025em;white-space:nowrap}
+  .back{min-height:44px;padding:0 14px;font-size:13px;border-radius:30px}
+}
+</style>
+</head>
+<body>
+<div class="brandwash" aria-hidden="true"></div>
+<div class="wrap">
+  <header class="top">
+    <a class="brand" href="landing.html?home" aria-label="Dynasty HQ front page"><img src="img/logo.png" alt="" width="44" height="44"><span>DYNASTY HQ</span></a>
+    <a class="back" href="landing.html?home">&larr; Front page</a>
+  </header>
+
+  <section class="panel" aria-labelledby="pv-title">
+    <div class="panel-head"><h1 id="pv-title">Player Valuations</h1><em id="weekLabel">Every NFL player. No league or sign-up needed.</em></div>
+    <nav class="tabs" aria-label="View"><a href="#values" data-view="values">Player Valuations</a><a href="#weekly" data-view="weekly">Weekly Player Projections</a></nav>
+    <p class="source" id="sourceLine">Values sourced from <b>DHQ Engine</b> (dynasty valuations)<span class="est" id="basis"></span>.</p>
+
+    <div class="weeks" id="weekSeg" role="group" aria-label="Week" hidden></div>
+    <p class="weeknote" id="weekNote" hidden></p>
+    <section class="scorecard" id="scorecard" aria-label="How DHQ did" hidden></section>
+    <div class="league" id="leagueRow" role="group" aria-label="Your league">
+      <label class="fld"><span>Scoring</span><select class="sel" data-key="scoring"><option value="ppr">PPR</option><option value="half">Half-PPR</option><option value="std">Standard</option></select></label>
+      <label class="fld"><span>Quarterbacks</span><select class="sel" data-key="qb"><option value="sf">Superflex</option><option value="1qb">1QB</option></select></label>
+      <label class="fld"><span>TE premium</span><select class="sel" data-key="tep"><option value="0">Off</option><option value="1">On</option></select></label>
+      <label class="fld"><span>League size</span><select class="sel" data-key="teams"><option value="10">10 teams</option><option value="12">12 teams</option><option value="14">14 teams</option><option value="16">16 teams</option></select></label>
+      <label class="fld"><span>Defenders (IDP)</span><select class="sel" data-key="idp"><option value="0">Off</option><option value="1">On</option></select></label>
+    </div>
+
+    <div class="tools">
+      <div class="posseg" id="posSeg" role="group" aria-label="Position"></div>
+      <input class="filter" id="q" type="search" placeholder="Find a player or team…" autocomplete="off" aria-label="Find a player or team">
+      <span class="count" id="count"></span>
+    </div>
+    <p class="idpnote" id="idpNote" hidden>Defenders are scored with a sample IDP league’s rules (sacks, tackles, turnovers and passes defended).</p>
+
+    <div class="tbl" role="table" aria-label="Players">
+      <div class="thead" role="row" id="thead"></div>
+      <div id="rows" role="rowgroup"><div class="loading">Loading DHQ values, season stats and this week's projections…</div></div>
+    </div>
+
+    <div class="cta"><span id="ctaText">Want to know what a player is worth in a deal?</span><a href="trade.html">Open the Trade Calculator &rarr;</a></div>
+  </section>
+
+  <p class="foot-note" id="footNote"></p>
+</div>
+<div class="toast" id="toast" role="status"></div>
+
+<script>
+(function () {
+  'use strict';
+  // ── Source league: the engine server's finished values ───────────────────
+  // The Psycho League (Sleeper): 16 teams, Superflex, Half-PPR, IDP. Owner
+  // ruling 2026-11-10: its values as-is; the toggles refine them.
+  var SOURCE = { id: '1312100327931019264', teams: 16, qb: 'sf', scoring: 'half', tep: '0' };
+  var VALUES_URL = 'https://hovnqztlbsgsywrbidbh.supabase.co/functions/v1/dhq-league?league=' + SOURCE.id;
+  var PLAYERS_URL = 'https://api.sleeper.app/v1/players/nfl';
+  var VALUES_KEY = 'dhq_tc_values_v1', PLAYERS_KEY = 'dhq_tc_players_v1', PREF_KEY = 'dhq_tc_league_v1', STATS_KEY = 'dhq_tc_stats_v2';
+  // This season's actual points and games (Sleeper season stats, the same feed the app reads; actual results, not projections).
+  var SEASON = 2026, STATS_URL = 'https://api.sleeper.app/v1/stats/nfl/regular/' + SEASON, STATS_TTL = 6 * 3600e3;
+  var STATS = {};
+  // Defenders' points (launch QA 2026-11-17): Sleeper's pts_ppr / half / std leave IDP stats out, so a
+  // DL / LB / DB is scored here from his raw IDP stats with the default league's IDP rules (The Psycho
+  // League's scoring_settings: the idp_* keys and the defensive bonuses), cached a day. Season points,
+  // Last Wk and DHQ's weekly projection (the lock's copy for that league) all use these same rules.
+  var LEAGUE_URL = 'https://api.sleeper.app/v1/league/' + SOURCE.id, IDPR_KEY = 'dhq_tc_idp_rules_v1';
+  var IDPR = { idp_tkl_solo: 0.5, idp_tkl_ast: 0.25, idp_tkl_loss: 2, idp_sack: 5, idp_sack_yd: 0.1, idp_qb_hit: 1.25, idp_int: 5, idp_int_ret_yd: 0.1, idp_pass_def: 5, idp_pass_def_3p: 1, idp_ff: 3, idp_fum_rec: 3, idp_fum_ret_yd: 0.1, idp_def_td: 6, idp_safe: 2, idp_blk_kick: 3 }; // the league's rules on 2026-11-17, used if Sleeper cannot be reached
+  var idprLoading = null;
+  function isDefKey(k) { return /^idp_/.test(k) || /^bonus_(tkl|sack|def)_/.test(k); }
+  function defLine(l) { var o = {}; Object.keys(l || {}).forEach(function (k) { if (isDefKey(k) && l[k]) o[k] = l[k]; }); return o; }
+  function loadIdpRules() {
+    if (idprLoading) return idprLoading;
+    var c = load(IDPR_KEY);
+    if (c && c.rules && Date.now() - c.ts < 86400e3) { IDPR = c.rules; return (idprLoading = Promise.resolve(IDPR)); }
+    return (idprLoading = getJSON(LEAGUE_URL).then(function (lg) {
+      var r = defLine(lg && lg.scoring_settings);
+      if (Object.keys(r).length) { IDPR = r; store(IDPR_KEY, { ts: Date.now(), rules: r }); }
+      return IDPR;
+    }).catch(function () { if (c && c.rules) IDPR = c.rules; return IDPR; }));
+  }
+  function idpPts(line) { var t = 0; for (var k in IDPR) if (line && line[k]) t += line[k] * IDPR[k]; return t; }
+  // This week's bye teams: the app's scoreboard relay (ESPN's slate, nfl-scoreboard) for the current NFL week.
+  var STATE_URL = 'https://api.sleeper.app/v1/state/nfl', SCOREBOARD_URL = 'https://sxshiqyxhhifvtfqawbq.supabase.co/functions/v1/nfl-scoreboard', BYE_KEY = 'dhq_tc_bye_v1';
+  var BYE = {}, ESPN_TEAM = { WSH: 'WAS', JAC: 'JAX', LA: 'LAR' };
+  function loadByes() {
+    var c = load(BYE_KEY);
+    if (c && Date.now() - c.ts < 3 * 3600e3) { BYE = c.teams || {}; return Promise.resolve(); }
+    return getJSON(STATE_URL).then(function (st) {
+      if (!st || st.season_type !== 'regular' || !st.week) return {};
+      return getJSON(SCOREBOARD_URL + '?week=' + st.week + '&seasontype=2').then(function (sb) {
+        var out = {}; ((sb.week && sb.week.teamsOnBye) || []).forEach(function (t) { var a = String(t.abbreviation || '').toUpperCase(); out[ESPN_TEAM[a] || a] = st.week; });
+        return out;
+      });
+    }).then(function (teams) { BYE = teams || {}; store(BYE_KEY, { ts: Date.now(), teams: BYE }); }).catch(function () { BYE = (c && c.teams) || {}; });
+  }
+  function onBye(team) { return !!BYE[String(team || '').toUpperCase()]; }
+  var VALUES_TTL = 3 * 3600e3, PLAYERS_TTL = 3 * 86400e3;
+  var IDP = { DL: 1, LB: 1, DB: 1, DE: 1, DT: 1, CB: 1, S: 1, ILB: 1, OLB: 1 };
+  var MAX = 10000;
+
+  // The app's DNA_TYPES (js/trade-calc.js), word for word.
+  var DNA = [
+    { k: 'FLEECER', l: 'Fleecer', c: '#e74c3c', desc: 'High activity, always hunting asymmetric value. Sends lowball offers constantly. Sharp but impatient — will counter-offer if you decline.', strategy: 'Lead with clean surplus. They respect boldness, but the math still moves linearly.' },
+    { k: 'DOMINATOR', l: 'Dominator', c: '#e67e22', desc: 'High ego, requires visible surplus to pull the trigger. Motivated by status and bragging rights above all else.', strategy: 'Frame your offer as giving them the "better" side. Let them feel like they won.' },
+    { k: 'STALWART', l: 'Stalwart', c: '#5dade2', desc: 'High stability, emotionally attached to their roster. Slow to move but reliable when they engage.', strategy: 'Lead with clear value. Never low-ball. Highlight how the trade improves both sides.' },
+    { k: 'ACCEPTOR', l: 'Acceptor', c: '#2ecc71', desc: 'Low attachment, willing to sell current assets for future picks and young players. Rebuilding or just indifferent.', strategy: 'Offer future assets (picks, young upside). They discount current stars through the tax layer.' },
+    { k: 'DESPERATE', l: 'Desperate', c: '#bb8fce', desc: 'High urgency triggered by injuries, bye-weeks, or playoff push. Will overpay for an immediate starter.', strategy: 'Identify their empty slot or injury. Strike fast — desperation fades after their bye.' },
+    { k: 'NONE', l: 'Not sure', c: '#95a5a6', desc: 'No read on this manager yet. DHQ applies the standard endowment tax only.', strategy: 'Lead with a fair offer and learn how they counter.' }
+  ];
+
+  // How to spot each type: the signals the app's DNA detection reads from a
+  // league's trade history (DHQ-Shared analytics-engine.js), in plain words.
+  var SPOT = {
+    FLEECER: ['Wins most of their trades, usually by twice as often as they lose', 'Sells draft picks for proven players', 'Opens with lowball offers and counters fast when you decline'],
+    DOMINATOR: ['Trades a lot, and comes out ahead more often than not', 'Moves picks aggressively', 'Has to look like the winner of every deal'],
+    STALWART: ['At least half their trades are even swaps', 'Trades rarely and stays loyal to their guys', 'Never takes a lowball seriously'],
+    ACCEPTOR: ['Loses more trades than they win', 'Buys draft picks and young players', 'Happy to move veterans for the future'],
+    DESPERATE: ['Trades late in the season', 'Gives up value to fill a hole now', 'Buying for a playoff push or after an injury'],
+    NONE: ['No trade history to go on yet', 'New to the league, or rarely trades']
+  };
+  var $ = function (id) { return document.getElementById(id); };
+  var esc = function (s) { return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]; }); };
+  var fmt = function (n) { return Math.round(n).toLocaleString('en-US'); };
+  function store(k, v) { try { localStorage.setItem(k, JSON.stringify(v)); } catch (e) { /* full or blocked: run without */ } }
+  function load(k) { try { return JSON.parse(localStorage.getItem(k) || 'null'); } catch (e) { return null; } }
+  var tt; function toast(m) { var t = $('toast'); t.textContent = m; t.classList.add('on'); clearTimeout(tt); tt = setTimeout(function () { t.classList.remove('on'); }, 2400); }
+
+  // ── State ────────────────────────────────────────────────────────────────
+  var S = { scoring: 'ppr', qb: 'sf', tep: '0', teams: '12', idp: '0' };
+  Object.assign(S, load(PREF_KEY) || {});
+  var T = { A: [], B: [], dna: 'NONE', their: '', mine: '', fills: false };
+  var DATA = null;      // { builtAt, week, values:{pid:[value, age, projMedian, ppg]}, picks:{overall:value} }
+  var PLAYERS = null;   // { pid: [name, pos, team] }
+  var SEARCH = [];      // [{ id, name, pos, team, base }]
+
+  // ── Refinements (owner 2026-11-10): estimated, on top of the server values ─
+  // Position factors from the source league's format to the visitor's. They
+  // never touch picks' order and never exceed the 10,000 scale.
+  function factor(pos, base) {
+    var f = 1;
+    var sc = { ppr: { RB: 1.03, WR: 1.06, TE: 1.06 }, half: {}, std: { RB: 0.98, WR: 0.93, TE: 0.93 } };
+    f *= (sc[S.scoring][pos] || 1);
+    if (S.qb === '1qb' && pos === 'QB') f *= 0.42 + 0.22 * Math.min(1, base / 8000);
+    if (S.tep === '1' && pos === 'TE') f *= 1.15;
+    return f;
+  }
+  function teamsCurve(v) {
+    // Fewer teams: depth is easier to find, so lesser players are worth less.
+    var k = 1 + (SOURCE.teams - Number(S.teams)) * 0.025;
+    return MAX * Math.pow(Math.max(0, v) / MAX, k);
+  }
+  function isEstimated() { return S.scoring !== SOURCE.scoring || S.qb !== SOURCE.qb || S.tep !== SOURCE.tep || Number(S.teams) !== SOURCE.teams; }
+  function playerValue(pid) {
+    var r = DATA && DATA.values[pid]; if (!r) return 0;
+    var pos = (PLAYERS && PLAYERS[pid] && PLAYERS[pid][1]) || '';
+    var v = r[0] * factor(pos, r[0]);
+    return Math.round(Math.min(MAX - 1, teamsCurve(v)));
+  }
+  // Picks: the source league's DHQ pick curve (overall pick 1..112), placed by
+  // where the slot sits in the round; later drafts lose 12% a year (the app's
+  // default future-pick discount, reconai-shared/player-value.js).
+  var NEXT_DRAFT = 2027;
+  var SLOT = { early: 0.15, mid: 0.5, late: 0.85 };
+  function pickValue(p) {
+    if (!DATA) return 0;
+    var round = Number(p.round), within = Math.max(1, Math.round(SLOT[p.slot] * SOURCE.teams));
+    var overall = (round - 1) * SOURCE.teams + within;
+    var v = DATA.picks[overall] || 0;
+    v *= Math.pow(0.88, Math.max(0, Number(p.year) - NEXT_DRAFT));
+    return Math.round(v);
+  }
+  function itemValue(it) { return it.type === 'pick' ? pickValue(it) : playerValue(it.id); }
+  function itemLabel(it) {
+    if (it.type === 'pick') return it.year + ' ' + ({ 1: '1st', 2: '2nd', 3: '3rd', 4: '4th' }[it.round] || 'Rd ' + it.round) + ' (' + it.slot + ')';
+    var p = PLAYERS && PLAYERS[it.id]; return p ? p[0] : 'Player ' + it.id;
+  }
+
+  // ── Data loading (finished numbers only; nothing is computed here) ───────
+  function slimValues(d) {
+    var out = { builtAt: d.built_at, week: d.dhq_proj && d.dhq_proj.week, values: {}, picks: {} };
+    var ps = (d.intel && d.intel.playerScores) || {}, pm = (d.intel && d.intel.playerMeta) || {}, pj = (d.dhq_proj && d.dhq_proj.players) || {};
+    Object.keys(ps).forEach(function (pid) {
+      var v = ps[pid]; if (!(v > 0)) return;
+      var m = pm[pid] || {}, j = pj[pid] || {};
+      out.values[pid] = [v, m.age || null, (j.no_line || j.median == null) ? null : Math.round(j.median * 10) / 10, m.ppg != null ? m.ppg : null];
+    });
+    var pv = (d.intel && d.intel.dhqPickValues) || {};
+    Object.keys(pv).forEach(function (n) { if (pv[n] && pv[n].value > 0) out.picks[n] = pv[n].value; });
+    return out;
+  }
+  function slimPlayers(all, keep) {
+    var out = {};
+    Object.keys(keep).forEach(function (pid) {
+      var p = all[pid]; if (!p) return;
+      var name = p.full_name || ((p.first_name || '') + ' ' + (p.last_name || '')).trim();
+      var pos = p.position || (p.fantasy_positions && p.fantasy_positions[0]) || '';
+      if (pos === 'DE' || pos === 'DT') pos = 'DL'; else if (pos === 'CB' || pos === 'S') pos = 'DB'; else if (pos === 'ILB' || pos === 'OLB') pos = 'LB';
+      out[pid] = [name, pos, p.team || 'FA'];
+    });
+    return out;
+  }
+  function getJSON(url) { return fetch(url, { cache: 'no-cache' }).then(function (r) { if (!r.ok) throw new Error(r.status); return r.json(); }); }
+  function loadData() {
+    var cv = load(VALUES_KEY), cp = load(PLAYERS_KEY), now = Date.now();
+    var vP = (cv && now - cv.ts < VALUES_TTL) ? Promise.resolve(cv.data)
+      : getJSON(VALUES_URL).then(function (d) { var s = slimValues(d); store(VALUES_KEY, { ts: now, data: s }); return s; })
+        .catch(function (e) { if (cv) return cv.data; throw e; });
+    return vP.then(function (vals) {
+      DATA = vals;
+      var have = cp && now - cp.ts < PLAYERS_TTL && Object.keys(vals.values).every(function (pid) { return cp.data[pid]; });
+      if (have) return cp.data;
+      return getJSON(PLAYERS_URL).then(function (all) { var s = slimPlayers(all, vals.values); store(PLAYERS_KEY, { ts: now, data: s }); return s; })
+        .catch(function (e) { if (cp) return cp.data; throw e; });
+    }).then(function (pl) {
+      PLAYERS = pl;
+      var cs = load(STATS_KEY);
+      var sP = (cs && Date.now() - cs.ts < STATS_TTL) ? Promise.resolve(cs.data)
+        : getJSON(STATS_URL).then(function (all) {
+            // [PPR, Half, Std, games, catches, defenders' raw IDP stats]
+            var out = {}; Object.keys(DATA.values).forEach(function (pid) { var r = all[pid]; if (r && r.gp > 0) out[pid] = [r.pts_ppr || 0, r.pts_half_ppr || 0, r.pts_std || 0, r.gp, r.rec || 0, IDP[(PLAYERS[pid] || [])[1]] ? defLine(r) : 0]; });
+            store(STATS_KEY, { ts: Date.now(), data: out }); return out;
+          }).catch(function () { return cs ? cs.data : {}; });
+      return Promise.all([sP, loadByes(), loadIdpRules()]).then(function (res) { STATS = res[0] || {}; return pl; });
+    }).then(function (pl) {
+      // Only players on an NFL roster today (owner 2026-11-11): free agents stay out of the lists.
+      SEARCH = Object.keys(DATA.values).filter(function (pid) { return PLAYERS[pid] && PLAYERS[pid][2] && PLAYERS[pid][2] !== 'FA'; }).map(function (pid) {
+        var p = PLAYERS[pid]; return { id: pid, name: p[0], pos: p[1], team: p[2], key: p[0].toLowerCase().replace(/[^a-z0-9 ]/g, '') };
+      });
+    });
+  }
+
+
+  var POS_COLOR = { QB: '#ff6b6b', RB: '#4ecdc4', WR: '#45b7d1', TE: '#f7dc6f', K: '#bb8fce', DL: '#e67e22', LB: '#F0A500', DB: '#5DADE2', PICK: '#D4AF37' };
+  function face(pid, col) { return '<span class="face" style="--pc:' + col + '"><img src="https://sleepercdn.com/content/nfl/players/thumb/' + encodeURIComponent(pid) + '.jpg" alt="" loading="lazy" decoding="async" onerror="this.remove()"></span>'; }
+  // One line of player facts: position, team, age, this week's DHQ projection.
+  // Season points in the visitor's scoring (TE premium: +0.5 a catch for tight ends), games, per game.
+  // Defenders add their IDP stats scored with the league's IDP rules (Sleeper's pts_* leave them out).
+  function season(pid, pos) {
+    var r = STATS[pid]; if (!r) return null;
+    var pts = r[{ ppr: 0, half: 1, std: 2 }[S.scoring]] + (S.tep === '1' && pos === 'TE' ? 0.5 * r[4] : 0) + (IDP[pos] ? idpPts(r[5]) : 0);
+    return { pts: pts, gp: r[3], ppg: r[3] ? pts / r[3] : 0 };
+  }
+  // Phones (owner ask 2026-11-18): one short line under the name; the badge shows the position and rank.
+  var PHONE_MQ = window.matchMedia ? window.matchMedia('(max-width:600px)') : null;
+  function PHONE() { return !!(PHONE_MQ && PHONE_MQ.matches); }
+  function shortMeta(r) { return [r.p.team, r.age ? 'age ' + r.age : '', r.apg != null ? r.apg.toFixed(1) + ' ppg' : '', weekly() ? '' : r.bye ? 'bye' : r.proj != null ? 'proj ' + r.proj.toFixed(1) : ''].filter(Boolean).join(' \u00b7 '); }
+  function metaLine(pid, pos, team, row) { var r = (DATA && DATA.values[pid]) || [], z = season(pid, pos); return [pos, team, r[1] ? 'age ' + r[1] : '', z ? z.pts.toFixed(1) + ' pts / ' + z.gp + ' gp (' + z.ppg.toFixed(1) + ' apg)' : '', row && row.bye ? 'bye' : row && row.proj != null ? 'proj ' + row.proj.toFixed(1) : ''].filter(Boolean).join(' \u00b7 '); }
+  // The same facts as columns, so every row lines up under the group heading.
+
+  // ── League settings (the Trade Calculator's, shared preference) ─────────
+  function syncSel() { document.querySelectorAll('.league .sel').forEach(function (sel) { sel.value = S[sel.dataset.key]; }); }
+  document.querySelectorAll('.league .sel').forEach(function (sel) {
+    sel.addEventListener('change', function () {
+      S[sel.dataset.key] = sel.value; store(PREF_KEY, S);
+      if (sel.dataset.key === 'idp' && S.idp === '0' && IDP[V.pos]) V.pos = 'ALL';
+      render();
+    });
+  });
+
+  // ── Weekly projections: the Lab's weekly lock file (same origin) ─────────
+  // DHQ's and Sleeper's Half-PPR projections (the file's own numbers) plus
+  // ESPN's and CBS's projected stat lines, scored here with the same Half-PPR
+  // rules. Sleeper shown beside DHQ by owner ask 2026-11-11 (this page only).
+  // Week tabs (owner ask 2026-11-11): every week of the season has its own
+  // lock file, so a user can step back and see how each site's projection
+  // compared with what the player actually scored. ESPN / CBS were first saved
+  // in Week 9; earlier weeks show dashes there.
+  var CUR = null, WEEKS = {}, curLoading = null;
+  function scoreLine(line, rules) { var t = 0; if (!line) return null; for (var k in rules) if (line[k]) t += line[k] * rules[k]; return Math.round(t * 100) / 100; }
+  function teamKey(t) { var a = String(t || '').toUpperCase(); return ESPN_TEAM[a] || a; }
+  function loadCurrent() {
+    if (!curLoading) curLoading = getJSON(STATE_URL).then(function (st) { CUR = { week: st && st.week, season: (st && st.season) || SEASON }; return CUR; }).catch(function () { CUR = { failed: true }; return CUR; });
+    return curLoading;
+  }
+  // Byes and opponents (with home / away) for one week from the scoreboard relay.
+  function slate(week) {
+    var out = { opp: {}, away: {}, bye: {} };
+    return getJSON(SCOREBOARD_URL + '?week=' + week + '&seasontype=2').then(function (sb) {
+      ((sb.week && sb.week.teamsOnBye) || []).forEach(function (t) { out.bye[teamKey(t.abbreviation)] = 1; });
+      (sb.events || []).forEach(function (e) {
+        var cs = (e.competitions && e.competitions[0] && e.competitions[0].competitors) || [];
+        if (cs.length !== 2) return;
+        var t = cs.map(function (c) { return teamKey(c.team && c.team.abbreviation); });
+        out.opp[t[0]] = t[1]; out.opp[t[1]] = t[0];
+        if (cs[0].homeAway === 'away') out.away[t[0]] = 1; if (cs[1].homeAway === 'away') out.away[t[1]] = 1;
+      });
+      out.ok = true; return out;
+    }).catch(function () { return out; });
+  }
+  // What each player actually scored in one week: Sleeper's weekly stats for
+  // players who played, scored with the lock's Half-PPR rules, exactly as
+  // Mission Control's score sheets grade them (so the two always agree).
+  // Defenders' results also carry .d: the same line scored with the league's IDP rules (see
+  // IDPR; its offensive part, if any, with the Half-PPR rules), what their Last Wk shows.
+  function actuals(week, rules) {
+    var res = {}, off = {};
+    Object.keys(rules).forEach(function (k) { if (!isDefKey(k)) off[k] = rules[k]; });
+    return Promise.all([getJSON(STATS_URL + '/' + week), loadIdpRules()]).then(function (x) {
+      var s = x[0];
+      Object.keys(s || {}).forEach(function (pid) {
+        var l = s[pid]; if (!(l && l.gp >= 1)) return;
+        res[pid] = { h: scoreLine(l, rules), r: l.rec || 0 };
+        if (Object.keys(defLine(l)).length) res[pid].d = { h: Math.round((scoreLine(l, off) + idpPts(l)) * 100) / 100, r: l.rec || 0 };
+      });
+      return res;
+    }).catch(function () { return res; });
+  }
+  // One week's DHQ (k = 'dhq') or Sleeper ('slp') projection, and one week's result, for a player:
+  // defenders take the lock's copy scored with the league's rules (IDP), everyone else the Half-PPR one.
+  function weekProj(W, k, pid, pos) { return IDP[pos] && W.lg && W.lg[k][pid] ? W.lg[k][pid] : W[k][pid]; }
+  function weekRes(res, pid, pos) { var o = res && res[pid]; return o && IDP[pos] && o.d ? o.d : o; }
+  function loadWeek(n) {
+    if (WEEKS[n]) return WEEKS[n].then ? WEEKS[n] : Promise.resolve(WEEKS[n]);
+    var yr = (CUR && CUR.season) || SEASON, isCur = CUR && n === CUR.week;
+    WEEKS[n] = getJSON((/(^|\.)dhq-lab\.pages\.dev$/.test(location.hostname) ? 'data/locks/' : 'https://dhq-lab.pages.dev/data/locks/') + yr + '-w' + n + '.json').then(function (d) {
+      var half = (d.scorings && d.scorings.half) || {}, rules = half.scoring || {}, hp = half.players || {}, pf = d.platforms || {};
+      var w = { week: n, cur: isCur, built: d.built, rebuilt: !!d.reconstructed, info: d.players || {}, dhq: {}, slp: {}, espn: {}, cbs: {}, hasSites: !!(pf.espn || pf.cbs) };
+      // Every number is kept as { h: Half-PPR points, r: receptions }, so the
+      // scoring and TE-premium switches re-score it exactly (see pts()). DHQ's
+      // and Sleeper's receptions come from the lock's own full-PPR copy of the
+      // same projections (a league whose rules match Half-PPR but for rec = 1):
+      // r = 2 x (PPR - Half). Kickers and defenders score no receptions.
+      var pprSet = null;
+      Object.keys(d.scorings || {}).forEach(function (k) {
+        var sc = d.scorings[k].scoring || {}; if (pprSet || sc.rec !== 1 || sc.bonus_rec_te) return;
+        if (OFF_RULES.every(function (x) { return (sc[x] || 0) === (rules[x] || 0); })) pprSet = d.scorings[k].players || {};
+      });
+      Object.keys(hp).forEach(function (pid) {
+        var r = hp[pid], q = pprSet && pprSet[pid], pos = (w.info[pid] || {}).pos, catches = REC_POS[pos];
+        if (r && r[0] != null) w.dhq[pid] = { h: r[0], r: catches && q && q[0] != null ? Math.max(0, 2 * (q[0] - r[0])) : 0 };
+        if (r && r[1] != null) w.slp[pid] = { h: r[1], r: catches && q && q[1] != null ? Math.max(0, 2 * (q[1] - r[1])) : 0 };
+      });
+      w.exact = !!pprSet;
+      // the lock's copy of the same projections scored with the source league's own rules: used for
+      // defenders, so their projection is on the league's IDP rules like their points (no catches)
+      var lgSet = d.scorings && d.scorings['league_' + SOURCE.id];
+      if (lgSet && lgSet.players) {
+        w.lg = { dhq: {}, slp: {} };
+        Object.keys(lgSet.players).forEach(function (pid) {
+          var r = lgSet.players[pid]; if (!r || !IDP[(w.info[pid] || {}).pos]) return;
+          if (r[0] != null) w.lg.dhq[pid] = { h: r[0], r: 0 };
+          if (r[1] != null) w.lg.slp[pid] = { h: r[1], r: 0 };
+        });
+      }
+      ['espn', 'cbs'].forEach(function (k) { var src = pf[k] || {}; Object.keys(src).forEach(function (pid) { if (pid !== 'fetched' && src[pid] && Object.keys(src[pid]).length) w[k][pid] = { h: scoreLine(src[pid], rules), r: src[pid].rec || 0 }; }); });
+      // The last column: this week shows LAST week's score; a past week shows that week's own result.
+      var resWeek = isCur ? n - 1 : n;
+      return Promise.all([slate(n), resWeek >= 1 ? actuals(resWeek, rules) : {}, isCur && resWeek >= 1 ? slate(resWeek) : null]).then(function (x) {
+        w.slate = x[0]; w.res = x[1]; w.resBye = isCur ? (x[2] ? x[2].bye : {}) : x[0].bye;
+        // the lock file's own matchups fill any gap in the scoreboard's
+        Object.keys(w.info).forEach(function (pid) { var i = w.info[pid]; if (i && i.team && i.opp && !w.slate.opp[teamKey(i.team)]) w.slate.opp[teamKey(i.team)] = teamKey(i.opp); });
+        return (WEEKS[n] = w);
+      });
+    }).catch(function () { return (WEEKS[n] = { failed: true, week: n }); });
+    return WEEKS[n];
+  }
+  // The rules that must match Half-PPR for the lock's PPR copy to be usable.
+  var OFF_RULES = ['pass_yd', 'pass_td', 'pass_int', 'pass_2pt', 'rush_yd', 'rush_td', 'rush_2pt', 'rec_yd', 'rec_td', 'rec_2pt', 'fum_lost'];
+  var REC_POS = { RB: 1, WR: 1, TE: 1, QB: 1 };
+  var REC_PTS = { ppr: 1, half: 0.5, std: 0 };
+  // One projection or result in the page's scoring: Half-PPR points, moved by
+  // the reception value, plus the TE premium (+0.5 a catch) when it is on.
+  function pts(o, pos) {
+    if (o == null) return null;
+    return o.h + (REC_PTS[S.scoring] - 0.5) * o.r + (S.tep === '1' && pos === 'TE' ? 0.5 * o.r : 0);
+  }
+  function scoringName() { return { ppr: 'PPR', half: 'Half-PPR', std: 'Standard' }[S.scoring] + (S.tep === '1' ? ' with TE premium' : ''); }
+
+  // ── View: position, search, sort, how many rows ─────────────────────────
+  var V = { pos: 'ALL', q: '', sort: 'value', dir: -1, shown: 150 };
+  function weekly() { return location.hash.indexOf('#weekly') === 0; }
+  // #weekly = this week; #weekly-7 = Week 7 (shareable)
+  function selWeek() { var m = /^#weekly-(\d+)$/.exec(location.hash), n = m ? +m[1] : null; return CUR && CUR.week ? (n && n >= 1 && n <= CUR.week ? n : CUR.week) : null; }
+  function shownWeek() { var n = selWeek(), w = n && WEEKS[n]; return w && !w.then ? w : null; }
+  var COLS = [
+    { k: 'rank', l: '#', t: 'Rank in this view' }, { k: null, l: '' }, { k: 'name', l: 'Player', cls: 'l' },
+    { k: 'pos', l: 'Pos', t: 'Position and position rank by DHQ value' }, { k: 'team', l: 'Team' }, { k: 'age', l: 'Age' },
+    { k: 'pts', l: 'Pts', t: 'Total points this season, in your scoring' }, { k: 'gp', l: 'GP', t: 'Games played' },
+    { k: 'apg', l: 'APG', t: 'Average points per game' }, { k: 'proj', l: 'Proj', t: "DHQ's projection this week" },
+    { k: 'value', l: 'DHQ Value', t: 'DHQ dynasty value' }
+  ];
+  // Other sites shown next to DHQ on the weekly tab. ESPN and CBS are off for launch (owner
+  // 2026-11-17, "we'll reconnect later"): add 'espn', 'cbs' back here to show them again. Their data
+  // still loads, so nothing else needs to change.
+  var SITE_COLS = ['slp'];
+  var WCOLS = COLS.slice(0, 9).concat([
+    { k: 'opp', l: 'Opp', t: "This week's opponent (@ means away)" },
+    { k: 'dhq', l: 'DHQ Proj', t: "DHQ's projection this week, in your scoring" }, { k: 'slp', l: 'Sleeper', t: "Sleeper's projection, in your scoring" }, { k: 'espn', l: 'ESPN', t: "ESPN's projection, scored in your scoring" }, { k: 'cbs', l: 'CBS', t: "CBS's projection, scored in your scoring" },
+    { k: 'last', l: 'Last Wk', t: 'What the player actually scored last week, in your scoring' }
+  ]).filter(function (c) { return !/^(slp|espn|cbs)$/.test(c.k) || SITE_COLS.indexOf(c.k) >= 0; });
+  function drawHead() {
+    var w = shownWeek(), past = w && !w.cur;
+    $('thead').innerHTML = (weekly() ? WCOLS : COLS).map(function (c) {
+      if (c.k === 'last' && past) c = { k: 'last', l: 'Actual', t: 'What the player actually scored in Week ' + w.week + ', in your scoring' };
+      if (c.k === 'opp' && past) c = { k: 'opp', l: 'Opp', t: 'Opponent in Week ' + w.week + ' (@ means away)' };
+      return c.k ? '<button type="button" class="' + (c.cls || '') + '" data-sort="' + c.k + '"' + (c.t ? ' title="' + esc(c.t) + '"' : '') + '>' + c.l + '</button>' : '<span></span>'; }).join('');
+  }
+  drawHead();
+  $('thead').addEventListener('click', function (e) {
+    var b = e.target.closest('[data-sort]'); if (!b) return;
+    var k = b.dataset.sort === 'rank' ? (weekly() ? 'dhq' : 'value') : b.dataset.sort;
+    if (V.sort === k) V.dir = -V.dir; else { V.sort = k; V.dir = (k === 'name' || k === 'team' || k === 'pos' || k === 'age' || k === 'opp') ? 1 : -1; }
+    V.shown = 150; render();
+  });
+  function posButtons() {
+    var list = ['ALL', 'QB', 'RB', 'WR', 'TE', 'K'].concat(S.idp === '1' ? ['DL', 'LB', 'DB'] : []);
+    $('posSeg').innerHTML = list.map(function (p) { return '<button type="button" data-pos="' + p + '" aria-pressed="' + (V.pos === p) + '">' + (p === 'ALL' ? 'All' : p) + '</button>'; }).join('');
+  }
+  $('posSeg').addEventListener('click', function (e) { var b = e.target.closest('[data-pos]'); if (!b) return; V.pos = b.dataset.pos; V.shown = 150; render(); });
+  $('q').addEventListener('input', function () { V.q = this.value.toLowerCase().replace(/[^a-z0-9 ]/g, '').trim(); V.shown = 150; render(); });
+  $('rows').addEventListener('click', function (e) {
+    if (e.target.closest('.more')) { V.shown += 200; render(); return; }
+    var r = e.target.closest('[data-card]'); if (r) openCard(r.getAttribute('data-card'));
+  });
+  $('rows').addEventListener('keydown', function (e) { var r = e.target.closest && e.target.closest('[data-card]'); if (r && (e.key === 'Enter' || e.key === ' ')) { e.preventDefault(); openCard(r.getAttribute('data-card')); } });
+  // Tapping a player opens his card (the card page closes back to here).
+  // The card gets this page's settings so its value and points match the row (tep: points a TE catch adds).
+  // Coming back from a card puts the list back as it was: filter, search, sort, rows shown and
+  // scroll position (launch QA 2026-11-17: Weekly jumped to the top and the filter reset to All).
+  var RETURN_KEY = 'dhq_pv_return_v1', pendingY = null;
+  function saveReturn() {
+    try { sessionStorage.setItem(RETURN_KEY, JSON.stringify({ hash: location.hash, pos: V.pos, q: V.q, qRaw: $('q').value, sort: V.sort, dir: V.dir, shown: V.shown, y: window.scrollY, t: Date.now() })); } catch (e) { /* private mode */ }
+  }
+  function restoreReturn() {
+    var r = null; try { r = JSON.parse(sessionStorage.getItem(RETURN_KEY) || 'null'); sessionStorage.removeItem(RETURN_KEY); } catch (e) { return; }
+    if (!r || Date.now() - r.t > 30 * 60e3 || r.hash !== location.hash) return;
+    V.pos = r.pos || 'ALL'; V.q = r.q || ''; V.sort = r.sort || V.sort; V.dir = r.dir || V.dir; V.shown = Math.max(150, r.shown || 150);
+    $('q').value = r.qRaw || ''; pendingY = r.y || 0;
+  }
+  function openCard(pid) {
+    saveReturn();
+    location.href = 'player-card.html#p=' + encodeURIComponent(pid) + '&from=' + (weekly() ? 'weekly' : 'values')
+      + '&sc=' + S.scoring + '&tep=' + (S.tep === '1' ? '0.5' : '0') + '&qb=' + S.qb + '&teams=' + S.teams + '&idp=' + (S.idp === '1' ? 1 : 0);
+  }
+
+  // ── This week's DHQ projection (launch QA 2026-11-17) ────────────────────
+  // The Values tab's Proj is the Weekly tab's DHQ Proj for the current NFL week (Sleeper's state
+  // week): the same lock file, the same bye check, rescored to the page's scoring the same way.
+  // While that lock loads, the feed's projection stands in only if it is for the same week.
+  function curWeek() { var w = CUR && CUR.week && WEEKS[CUR.week]; return w && !w.then && !w.failed ? w : null; }
+  function thisWeek(p) {
+    var W = curWeek();
+    if (W) {
+      var tm = teamKey((W.info[p.id] && W.info[p.id].team) || p.team);
+      var bye = W.slate.ok ? !!W.slate.bye[tm] : onBye(p.team);
+      return { bye: bye, proj: bye ? null : pts(weekProj(W, 'dhq', p.id, p.pos), p.pos) };
+    }
+    var r = (DATA && DATA.values[p.id]) || [], same = CUR && CUR.week && DATA && DATA.week === CUR.week, b = onBye(p.team);
+    return { bye: b, proj: !b && same && r[2] != null ? r[2] : null };
+  }
+
+  // ── Rows ─────────────────────────────────────────────────────────────────
+  function rowsData() {
+    var out = SEARCH.filter(function (p) { return S.idp === '1' || !IDP[p.pos]; }).map(function (p) {
+      var W = weekly() ? shownWeek() : null; if (W && W.failed) W = null;
+      // the team he played for THAT week (trades move players mid-season)
+      var tm = teamKey((W && W.info[p.id] && W.info[p.id].team) || p.team);
+      var r = DATA.values[p.id] || [], z = season(p.id, p.pos);
+      var bye = W ? (W.slate.ok ? !!W.slate.bye[tm] : (W.cur && onBye(p.team))) : onBye(p.team);
+      var res = W ? W.res : null, now = thisWeek(p);
+      return { p: p, value: playerValue(p.id), age: r[1] || null, proj: now.proj, bye: W ? bye : now.bye,
+        pts: z ? z.pts : null, gp: z ? z.gp : null, apg: z ? z.ppg : null,
+        dhq: bye || !W ? null : pts(weekProj(W, 'dhq', p.id, p.pos), p.pos), slp: bye || !W ? null : pts(weekProj(W, 'slp', p.id, p.pos), p.pos), espn: bye || !W ? null : pts(W.espn[p.id], p.pos), cbs: bye || !W ? null : pts(W.cbs[p.id], p.pos),
+        last: res && res[p.id] != null && p.pos !== 'DEF' ? pts(weekRes(res, p.id, p.pos), p.pos) : null, // team defense scoring is not in these rules
+        opp: bye || !W ? null : (W.slate.opp[tm] || null), away: !!(W && W.slate.away[tm]),
+        lastBye: !!(W && W.resBye[W.cur ? teamKey(p.team) : tm]) };
+    });
+    // position rank by DHQ value (in your league settings)
+    var byPos = {};
+    out.slice().sort(function (a, b) { return b.value - a.value; }).forEach(function (r) { byPos[r.p.pos] = (byPos[r.p.pos] || 0) + 1; r.posRank = byPos[r.p.pos]; });
+    return out;
+  }
+  // DHQ / ESPN / CBS cells; a site 3+ points above or below DHQ is tinted.
+  function weekCells(r) {
+    var d = '\u2013';
+    var last = r.last != null ? '<span class="c last res">' + r.last.toFixed(1) + '</span>' : r.lastBye ? '<span class="c bye res">BYE</span>' : '<span class="c res">' + d + '</span>';
+    var opp = r.bye ? '<span class="c bye opp">BYE</span>' : '<span class="c opp">' + (r.opp ? (r.away ? '@' : '') + esc(r.opp) : d) + '</span>';
+    if (r.bye) return opp + '<span class="c bye">BYE</span>' + SITE_COLS.map(function () { return '<span class="c bye">BYE</span>'; }).join('') + last;
+    function alt(x) { if (x == null) return '<span class="c alt">' + d + '</span>'; var cls = r.dhq != null && x - r.dhq >= 3 ? ' up' : r.dhq != null && r.dhq - x >= 3 ? ' down' : ''; return '<span class="c alt' + cls + '">' + x.toFixed(1) + '</span>'; }
+    return opp + '<span class="c dhq">' + (r.dhq != null ? r.dhq.toFixed(1) : d) + '</span>' + SITE_COLS.map(function (k) { return alt(r[k]); }).join('') + last;
+  }
+  function cmp(a, b) {
+    var k = V.sort, x, y;
+    if (k === 'name') { x = a.p.name; y = b.p.name; } else if (k === 'team') { x = a.p.team; y = b.p.team; } else if (k === 'pos') { x = a.p.pos + String(1000 + a.posRank); y = b.p.pos + String(1000 + b.posRank); }
+    else { x = a[k]; y = b[k]; }
+    if (x == null && y == null) return b.value - a.value;
+    if (x == null) return 1; if (y == null) return -1;
+    if (typeof x === 'string') return V.dir * x.localeCompare(y) || b.value - a.value;
+    return V.dir * (x - y) || b.value - a.value;
+  }
+  function render() {
+    var wk = weekly();
+    document.body.classList.toggle('is-weekly', wk);
+    document.querySelectorAll('.tabs a').forEach(function (a) { if ((a.dataset.view === 'weekly') === wk) a.setAttribute('aria-current', 'page'); else a.removeAttribute('aria-current'); });
+    $('pv-title').textContent = wk ? 'Weekly Player Projections' : 'Player Valuations';
+    document.title = (wk ? 'Weekly Player Projections' : 'Player Valuations') + ' \u00b7 Dynasty HQ';
+    $('sourceLine').innerHTML = wk ? "DHQ's weekly projections side by side with <b>Sleeper</b>. All projections and points in " + scoringName() + '.' : 'Values sourced from <b>DHQ Engine</b> (dynasty valuations)<span class="est" id="basis"></span>.';
+    $('ctaText').textContent = wk ? 'Deciding between two players this week? Their DHQ value lives in the Trade Calculator too.' : 'Want to know what a player is worth in a deal?';
+    document.querySelectorAll('#leagueRow .fld').forEach(function (f) { var k = f.querySelector('.sel').dataset.key; f.hidden = wk && (k === 'qb' || k === 'teams'); });   // QB format and league size do not change a week's points
+    if (!CUR) { loadCurrent().then(render); }
+    var n = wk ? selWeek() : null, W = n ? WEEKS[n] : null;
+    if (wk && n && !W) { loadWeek(n).then(function () { drawHead(); render(); }); W = WEEKS[n]; }
+    if (!wk && CUR && CUR.week && !WEEKS[CUR.week]) loadWeek(CUR.week).then(render);   // the Values tab's Proj
+    $('idpNote').hidden = S.idp !== '1';
+    if (W && W.then) W = null;
+    weekTabs(n);
+    if (CUR && CUR.week) $('weekLabel').textContent = 'Week ' + (n || CUR.week) + (n && n !== CUR.week ? ' results' : '') + '. No league or sign-up needed.';
+    syncSel(); posButtons();
+    if ($('basis')) $('basis').textContent = isEstimated() ? ', adjusted for your league settings (estimate)' : '';
+    $('thead').querySelectorAll('[data-sort]').forEach(function (b) { var k = b.dataset.sort === 'rank' ? null : b.dataset.sort; if (k && k === V.sort) b.setAttribute('aria-sort', V.dir < 0 ? 'descending' : 'ascending'); else b.removeAttribute('aria-sort'); });
+    if (!DATA) return;
+    if (wk && CUR && CUR.failed) { $('rows').innerHTML = '<p class="err" style="padding:14px">The NFL week could not be loaded right now. Refresh the page to try again.</p>'; return; }
+    if (wk && !W) { $('rows').innerHTML = '<div class="loading">Loading ' + (n ? 'Week ' + n + '\'s' : 'this week\'s') + ' DHQ and Sleeper projections\u2026</div>'; return; }
+    if (wk && W.failed) { $('rows').innerHTML = '<p class="err" style="padding:14px">Week ' + W.week + '\'s projections could not be loaded right now. Refresh the page to try again.</p>'; return; }
+    document.body.classList.toggle('is-past', !!(wk && !W.cur));
+    scorecard(wk ? W : null);
+    if (wk) $('weekNote').hidden = !!W.cur;
+    if (wk && !W.cur) $('weekNote').textContent = 'Week ' + W.week + ': what each site projected before kickoff, and what the player actually scored.' + (W.hasSites || SITE_COLS.length < 2 ? '' : ' ESPN and CBS were first saved in Week 9.') + (W.rebuilt ? ' This week\'s projections were rebuilt after the games.' : '');
+    var all = rowsData().filter(function (r) {
+      if (V.pos !== 'ALL' && r.p.pos !== V.pos) return false;
+      return !V.q || r.p.key.indexOf(V.q) === 0 || r.p.key.indexOf(' ' + V.q) > -1 || r.p.team.toLowerCase() === V.q;
+    }).sort(cmp);
+    $('count').textContent = all.length + ' player' + (all.length === 1 ? '' : 's');
+    var d = '–';
+    if (pendingY != null) { var y = pendingY; pendingY = null; requestAnimationFrame(function () { window.scrollTo(0, y); }); }
+    $('rows').innerHTML = all.length ? all.slice(0, V.shown).map(function (r, i) {
+      var col = POS_COLOR[r.p.pos] || 'var(--silver)';
+      return '<div class="prow" role="row" data-card="' + esc(r.p.id) + '" tabindex="0" title="Open ' + esc(r.p.name) + '\u2019s player card"><span class="rk">' + (i + 1) + '</span>' + face(r.p.id, col)
+        + '<span class="nm">' + esc(r.p.name) + '<small>' + esc(PHONE() ? shortMeta(r) : metaLine(r.p.id, r.p.pos, r.p.team, r)) + '</small></span>'
+        + '<span class="c pos" style="color:' + col + '">' + r.p.pos + r.posRank + '</span><span class="c">' + esc(r.p.team) + '</span><span class="c">' + (r.age || d) + '</span>'
+        + '<span class="c">' + (r.pts != null ? r.pts.toFixed(1) : d) + '</span><span class="c">' + (r.gp != null ? r.gp : d) + '</span><span class="c">' + (r.apg != null ? r.apg.toFixed(1) : d) + '</span>'
+        + (wk ? weekCells(r) : (r.bye ? '<span class="c bye">BYE</span>' : '<span class="c proj">' + (r.proj != null ? r.proj.toFixed(1) : d) + '</span>') + '<span class="v">' + fmt(r.value) + '</span>') + '</div>';
+    }).join('') + (all.length > V.shown ? '<button type="button" class="more">Show ' + Math.min(200, all.length - V.shown) + ' more (' + (all.length - V.shown) + ' left)</button>' : '')
+      : '<div class="list-empty">No player matches "' + esc($('q').value) + '".</div>';
+  }
+
+  // ── How DHQ did (past weeks only) ────────────────────────────────────────
+  // Mission Control's score-sheet method: every player in the week's lock who
+  // played; DHQ is closer to the actual than the other site = a win, the
+  // other site closer = a loss, within 0.05 = even (counts for neither).
+  // ESPN / CBS project no defenders, so DL / LB / DB count only vs Sleeper.
+  // Follows the page's position buttons and the IDP switch.
+  // OFF by owner ruling 2026-11-11: no public scorecard until DHQ wins several
+  // weeks in a row on the players that matter; then back on vs all three sites.
+  // Flip to true to show it again (the record stays in Mission Control meanwhile).
+  var SHOW_SCORECARD = false;
+  var SITES = [['slp', 'Sleeper'], ['espn', 'ESPN'], ['cbs', 'CBS']].filter(function (x) { return SITE_COLS.indexOf(x[0]) >= 0; });
+  function weekScore(W) {
+    var t = {}, n = 0, dm = 0;
+    SITES.forEach(function (x) { t[x[0]] = { w: 0, l: 0, e: 0, n: 0, de: 0, oe: 0 }; });
+    Object.keys(W.dhq).forEach(function (pid) {
+      var pos = (W.info[pid] || {}).pos, a = pts(weekRes(W.res, pid, pos), pos), d = pts(weekProj(W, 'dhq', pid, pos), pos);
+      if (a == null || d == null) return;
+      if (S.idp !== '1' && IDP[pos]) return;
+      if (V.pos !== 'ALL' && pos !== V.pos) return;
+      var de = Math.abs(d - a); n++; dm += de;
+      SITES.forEach(function (x) {
+        var o = pts(x[0] === 'slp' ? weekProj(W, 'slp', pid, pos) : W[x[0]][pid], pos); if (o == null || (x[0] !== 'slp' && IDP[pos])) return;
+        var u = t[x[0]], oe = Math.abs(o - a); u.n++; u.de += de; u.oe += oe;
+        if (de < oe - 0.05) u.w++; else if (oe < de - 0.05) u.l++; else u.e++;
+      });
+    });
+    return { n: n, dm: n ? dm / n : 0, t: t };
+  }
+  function scorecard(W) {
+    var box = $('scorecard');
+    if (!SHOW_SCORECARD || !W || W.cur || W.failed) { box.hidden = true; return; }
+    var r = weekScore(W); box.hidden = false;
+    if (!r.n) { box.innerHTML = '<p class="sc-empty">No graded players for this view.</p>'; return; }
+    var cards = SITES.filter(function (x) { return r.t[x[0]].n; }).map(function (x) {
+      var u = r.t[x[0]], pct = u.w + u.l ? Math.round(100 * u.w / (u.w + u.l)) : null, ahead = pct == null ? '' : pct > 50 ? ' up' : pct < 50 ? ' down' : '';
+      return '<div class="sc-card"><span class="sc-k">DHQ vs ' + x[1] + '</span>'
+        + '<b class="sc-pct' + ahead + '">' + (pct == null ? '\u2013' : pct + '%') + ' <small>Wins</small></b>'
+        + '<span class="sc-sub">DHQ ' + u.w + '-' + u.l + (u.e ? ' with ' + u.e + ' even' : '') + '</span>'
+        + '<span class="sc-miss">Avg miss: <b>DHQ ' + (u.de / u.n).toFixed(1) + '</b> &middot; ' + x[1] + ' ' + (u.oe / u.n).toFixed(1) + ' pts</span></div>';
+    }).join('');
+    var scope = (V.pos === 'ALL' ? 'all positions' : V.pos + 's') + (S.idp === '1' || V.pos !== 'ALL' ? '' : ', no defenders');
+    box.innerHTML = '<div class="sc-head"><h2>How DHQ did in Week ' + W.week + '</h2><span>' + r.n + ' players who played &middot; ' + scope + ' &middot; DHQ avg miss ' + r.dm.toFixed(1) + ' pts</span></div>'
+      + '<div class="sc-cards">' + cards + '</div>'
+      + '<p class="sc-how">Wins: DHQ\'s projection was closer to what the player actually scored. Losses: the other site was closer. Even (within 0.05 pts) counts for neither. Avg miss is the average gap between the projection and the actual score.</p>';
+  }
+  function weekTabs(n) {
+    var seg = $('weekSeg'), note = $('weekNote'), on = !!(n && CUR && CUR.week);
+    seg.hidden = !on; if (!on) { note.hidden = true; $('scorecard').hidden = true; return; }
+    var h = '';
+    for (var i = 1; i <= CUR.week; i++) h += '<a href="' + (i === CUR.week ? '#weekly' : '#weekly-' + i) + '"' + (i === n ? ' aria-current="true"' : '') + '>' + (i === CUR.week ? 'Week ' + i + ' <small>now</small>' : 'Wk ' + i) + '</a>';
+    if (seg.dataset.h !== h) { seg.innerHTML = h; seg.dataset.h = h; var cur = seg.querySelector('[aria-current]'); if (cur && cur.scrollIntoView) cur.scrollIntoView({ block: 'nearest', inline: 'nearest' }); }
+  }
+  var lastView = weekly();
+  function applyView() {
+    if (weekly() !== lastView) { V.sort = weekly() ? 'dhq' : 'value'; V.dir = -1; lastView = weekly(); }
+    V.shown = 150; drawHead(); render();
+  }
+  window.addEventListener('hashchange', applyView);
+
+  // ── Boot ─────────────────────────────────────────────────────────────────
+  if (weekly()) V.sort = 'dhq';
+  restoreReturn();
+  drawHead(); syncSel(); posButtons(); render();
+  if (PHONE_MQ && PHONE_MQ.addEventListener) PHONE_MQ.addEventListener('change', render);   // rotate / resize across the phone width
+  loadData().then(function () {
+    var built = DATA.builtAt ? new Date(DATA.builtAt) : null, wk = Object.keys(BYE).length ? BYE[Object.keys(BYE)[0]] : null;
+    if (wk) $('weekLabel').textContent = 'Week ' + wk + '. No league or sign-up needed.';
+    $('footNote').innerHTML = '<b>Where the numbers come from.</b> DHQ dynasty values from DHQ\'s engine for a 16-team Superflex Half-PPR league'
+      + (built ? ', rebuilt ' + built.toLocaleString([], { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' }) : '')
+      + '; other league settings adjust those values by position and are estimates. Pts, GP and APG are this season\'s actual results in your scoring. Proj is DHQ\'s projection for this week; BYE means the team does not play. Last Wk is what the player actually scored last week.';
+    render();
+  }).catch(function () { $('rows').innerHTML = '<p class="err" style="padding:14px">DHQ values could not be loaded right now. Check your connection and refresh the page.</p>'; });
+})();
+</script>
+</body>
+</html>
