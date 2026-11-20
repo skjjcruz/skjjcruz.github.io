@@ -3,11 +3,11 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="dhq-build" content="b194a-a7b53f2eb0">
+    <meta name="dhq-build" content="b194a-d55fe063a2">
     <meta name="dhq-engine-v" content="15d59f6d2f">
     <meta name="dhq-proj-model" content="00516df75ee1">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, minimum-scale=1.0, viewport-fit=cover">
-    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval' https://dhq-lab.pages.dev/data/; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com data:; img-src 'self' data: blob: https:; connect-src 'self' https://sxshiqyxhhifvtfqawbq.supabase.co https://hovnqztlbsgsywrbidbh.supabase.co https://api.openai.com https://api.anthropic.com https://generativelanguage.googleapis.com https://api.sleeper.app https://api.sleeper.com https://dhq-lab.pages.dev https://site.api.espn.com https://sports.core.api.espn.com https://api.myfantasyleague.com https://*.myfantasyleague.com https://lm-api-reads.fantasy.espn.com https://site.web.api.espn.com https://fantasysports.yahooapis.com https://api.fantasycalc.com https://*.sentry.io; worker-src 'self' blob:; frame-src https://www.youtube-nocookie.com; frame-ancestors 'none'; base-uri 'self'; object-src 'none';">
+    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval' https://dhq-lab.pages.dev/data/; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com data:; img-src 'self' data: blob: https:; connect-src 'self' https://sxshiqyxhhifvtfqawbq.supabase.co https://hovnqztlbsgsywrbidbh.supabase.co https://api.openai.com https://api.anthropic.com https://generativelanguage.googleapis.com https://api.sleeper.app https://api.sleeper.com https://dhq-lab.pages.dev https://site.api.espn.com https://sports.core.api.espn.com https://api.myfantasyleague.com https://*.myfantasyleague.com https://lm-api-reads.fantasy.espn.com https://site.web.api.espn.com https://fantasysports.yahooapis.com https://api.fantasycalc.com https://*.sentry.io; worker-src 'self' blob:; frame-src https://www.youtube-nocookie.com; base-uri 'self'; object-src 'none';">
 
     <!-- Early auth gate: bounce signed-out visitors to the sign-in page BEFORE the
          React/Babel app (~80 modules, multi-second in-browser compile) loads, so
@@ -3210,15 +3210,15 @@ WRShared.preloadMany(WR_SHARED_FILES);
          player-card-handoff.md). WR.openPlayerCard (js/components/player-card.js)
          opens it for everyone; window.DHQ_NEW_CARD = false brings the old
          card back. Team defenses and unsigned players keep the old card. -->
-    <link rel="stylesheet" href="js/vendor/dhq-player-card.css?v=20261116card3">
-    <script src="js/vendor/dhq-player-card.js?v=c81a35ec31"></script>
+    <link rel="stylesheet" href="js/vendor/dhq-player-card.css?v=20261119card4a">
+    <script src="js/vendor/dhq-player-card.js?v=50150e32ce"></script>
     <!-- The Compare drop-in (owner ask 2026-11-18): the Lab's Start/Sit player boxes, copied
          as they are from lab/compare/ on the Lab tools branch (window.DHQCompare). The Compare
          tab (js/tabs/compare.js) shows them above its own comparison. data-dhqss stops the
          module adding its stylesheet a second time. -->
     <link rel="stylesheet" data-dhqss="1" href="js/vendor/dhq-compare.css?v=20261119cmp1a">
     <script src="js/vendor/dhq-compare.js?v=023f84f72a"></script>
-    <script src="js/components/player-card.js?v=0ca001e367"></script>
+    <script src="js/components/player-card.js?v=568a66091d"></script>
 <!-- 2c. Saved List Views (SI-1) — window.WR.SavedViews — shared across list surfaces -->
 <script src="js/shared/saved-views.js?v=48a1747f17"></script>
 <!-- 2c-2. Saved Alex Reports — window.WR.SavedReports — local cache + ai_analysis server sync -->
@@ -3420,7 +3420,7 @@ WRShared.preloadMany(WR_SHARED_FILES);
 <!-- Group "analysis": analytics.js embeds LeagueMapTab, so both defer together
      (league-map.js first — DOM order is execution order within a group). -->
 <script type="text/wr-deferred" data-wr-defer="analysis" src="js/tabs/league-map.js?v=c546cf86c9"></script>
-<script type="text/wr-deferred" data-wr-defer="myteam" src="js/tabs/my-team.js?v=a6750e63c9"></script>
+<script type="text/wr-deferred" data-wr-defer="myteam" src="js/tabs/my-team.js?v=b745ee9e30"></script>
 <!-- Compare: extracted from My Roster's former sub-view, now a top-level ROSTER-group tab. -->
 <script type="text/wr-deferred" data-wr-defer="compare" src="js/tabs/compare.js?v=cd4fe49413"></script>
 <script type="text/wr-deferred" data-wr-defer="analysis" src="js/tabs/analytics.js?v=3dbbe51e8a"></script>
@@ -3439,7 +3439,7 @@ WRShared.preloadMany(WR_SHARED_FILES);
 <!-- 7. League detail: coordinator shell, depends on all above -->
     <script src="js/league-detail.js?v=3989795c34"></script>
 <!-- 8. App: OwnerDashboard + ReactDOM.render (loads last) -->
-<script src="js/app.js?v=d29ee1f479"></script>
+<script src="js/app.js?v=b9ed890812"></script>
 
 <!-- All JSX code extracted to js/ modules. Only bootstrap remains. -->
 <script>

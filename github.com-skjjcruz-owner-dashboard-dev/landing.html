@@ -2,9 +2,9 @@
 <html lang="en">
 <head>
 <meta charset="utf-8">
-<meta name="dhq-build" content="b194a-a7b53f2eb0">
+<meta name="dhq-build" content="b194a-d55fe063a2">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com data:; img-src 'self' data: blob: https:; connect-src 'self' https://sxshiqyxhhifvtfqawbq.supabase.co https://hovnqztlbsgsywrbidbh.supabase.co https://api.anthropic.com https://api.openai.com https://generativelanguage.googleapis.com https://dhq-lab.pages.dev https://api.sleeper.app https://api.myfantasyleague.com https://*.myfantasyleague.com https://lm-api-reads.fantasy.espn.com https://fantasysports.yahooapis.com https://*.sentry.io; worker-src 'self' blob:; frame-ancestors 'none'; base-uri 'self'; object-src 'none';">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com data:; img-src 'self' data: blob: https:; connect-src 'self' https://sxshiqyxhhifvtfqawbq.supabase.co https://hovnqztlbsgsywrbidbh.supabase.co https://api.anthropic.com https://api.openai.com https://generativelanguage.googleapis.com https://dhq-lab.pages.dev https://api.sleeper.app https://api.myfantasyleague.com https://*.myfantasyleague.com https://lm-api-reads.fantasy.espn.com https://fantasysports.yahooapis.com https://*.sentry.io; worker-src 'self' blob:; base-uri 'self'; object-src 'none';">
 <title>Dynasty HQ — Generic advice stops here.</title>
   <meta name="description" content="Dynasty HQ reads your Sleeper, MFL or ESPN league and shows you who to start, which trades your leaguemates will take, and where you really stand. Free this season.">
 <link rel="icon" href="icon-192.png">
@@ -1118,7 +1118,7 @@ a.fg-entry { text-decoration: none; }
         <span id="sleeperHint">Step 1 of 2 — next you'll connect your leagues (Sleeper, MFL or ESPN).</span>
       </p>
       <div class="auth-links">
-        <button class="auth-linkbtn" id="toggleMode" onclick="toggleAuthMode()">Already have an account? Sign in</button>
+        <button class="auth-linkbtn" id="toggleMode" onclick="clearAuthAlert(); toggleAuthMode()">Already have an account? Sign in</button>
         <button class="auth-linkbtn" id="forgotBtn" onclick="handleForgot()" style="display:none">Forgot password?</button>
       </div>
     </section>
@@ -1502,18 +1502,30 @@ a.fg-entry { text-decoration: none; }
       if (LAB_SIGNUP && labGuestLeague()) document.body.classList.add('auth-page');
       setTimeout(() => { try { document.getElementById('btnGoogle').focus(); } catch {} }, 30);
     }
+    // A message from the last attempt must not still be showing when the
+    // person closes and reopens the sheet, opens it from another button, or
+    // switches between sign-up and sign-in. Only these user actions clear it:
+    // messages the page sets itself on arrival (password changed, session
+    // ended, a provider error) are shown after the sheet opens and stay.
+    let _alertTimer = null;
+    function clearAuthAlert() {
+      clearTimeout(_alertTimer);
+      const el = document.getElementById('alertJoin');
+      if (el) { el.className = 'alert'; el.textContent = ''; }
+    }
     function closeAuthSheet() {
       const sheet = document.getElementById('authSheet');
       if (!sheet || sheet.hidden) return;
       if (document.body.classList.contains('auth-page')) { window.location.href = 'index.html'; return; }
       sheet.hidden = true;
+      clearAuthAlert();
       document.body.classList.remove('sheet-open');
       try { if (_sheetReturnFocus && _sheetReturnFocus.focus) _sheetReturnFocus.focus(); } catch {}
     }
     document.addEventListener('click', (e) => {
       if (e.target.closest && e.target.closest('[data-close-sheet]')) closeAuthSheet();
       const opener = e.target.closest && e.target.closest('[data-open-sheet]');
-      if (opener) { e.preventDefault(); setAiSignup(opener.hasAttribute('data-ai-signup')); openAuthSheet(opener.getAttribute('data-open-sheet')); }
+      if (opener) { e.preventDefault(); clearAuthAlert(); setAiSignup(opener.hasAttribute('data-ai-signup')); openAuthSheet(opener.getAttribute('data-open-sheet')); }
     });
     document.addEventListener('keydown', (e) => { if (e.key === 'Escape') closeAuthSheet(); });
 
@@ -1536,7 +1548,8 @@ a.fg-entry { text-decoration: none; }
       const el = document.getElementById('alertJoin');
       el.className = 'alert alert-' + type + ' show';
       el.textContent = message;
-      if (type !== 'success') setTimeout(() => el.classList.remove('show'), 6000);
+      clearTimeout(_alertTimer);
+      if (type !== 'success') _alertTimer = setTimeout(() => el.classList.remove('show'), 6000);
     }
 
     // Where to send a signed-in user: the connect-your-leagues page until a

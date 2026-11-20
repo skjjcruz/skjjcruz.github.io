@@ -25,9 +25,12 @@
   body { font: 16px/1.55 "DM Sans", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; padding: 0 16px calc(48px + env(safe-area-inset-bottom)); }
   a { color: var(--gold); }
   .wrap { max-width: 1080px; margin: 0 auto; }
-  .top { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 18px 0; }
-  .brand { display: flex; align-items: center; gap: 10px; color: var(--fg); text-decoration: none; font: 700 18px/1 Rajdhani, "DM Sans", sans-serif; letter-spacing: .12em; text-transform: uppercase; }
-  .brand img { width: 40px; height: 40px; border-radius: var(--card-radius-sm, 8px); }
+  /* The same header as the other tool pages (projections.html, trade.html): a 68px bar with a
+     hairline under it, the 44px logo, 20px from the screen edge and up to 1200px wide. The
+     margin lines it up with theirs while this page's own content stays 1080px / 16px. */
+  .top { display: flex; align-items: center; justify-content: space-between; gap: 16px; padding-block: calc(12px + env(safe-area-inset-top, 0px)) 12px; margin-inline: calc((min(1080px, 100vw - 32px) - min(1200px, 100vw - 40px)) / 2); box-shadow: 0 0 0 100vmax var(--bg), 0 1px 0 100vmax #ffffff18; clip-path: inset(0 -100vmax -1px); }
+  .brand { display: flex; align-items: center; gap: 12px; color: var(--fg); text-decoration: none; }
+  .brand img { width: 44px; height: 44px; border-radius: var(--card-radius, 10px); }
   .back { color: var(--fg); text-decoration: none; border: 1px solid var(--line); border-radius: var(--card-radius-sm, 8px); padding: 9px 14px; font-size: 15px; }
   .back:hover { border-color: var(--gold-line); }
 
@@ -121,7 +124,7 @@
 .back{display:inline-flex;align-items:center;min-height:44px;padding:0 16px;border:1px solid #ffffff18;border-radius:30px;background:#ffffff08;color:var(--white,#F5F2EA);font:500 13px var(--body,'DM Sans',system-ui,sans-serif)}
 .back:hover{border-color:rgba(212,175,55,.5);color:var(--white,#F5F2EA)}
 @media (max-width:600px){
-  .top{min-height:68px;padding-block:calc(10px + var(--sat,0px)) 10px}
+  .top{min-height:68px;padding-block:calc(10px + env(safe-area-inset-top,0px)) 10px;margin-inline:-4px}
   .brand{gap:9px}.brand img{width:34px;height:34px;border-radius:var(--r,10px);box-shadow:0 2px 12px rgba(212,175,55,.3)}
   .brand span{font-size:16px;letter-spacing:.025em;white-space:nowrap}
   .back{min-height:44px;padding:0 14px;font-size:13px;border-radius:30px}
@@ -131,7 +134,7 @@
 <body>
 <div class="wrap">
   <header class="top">
-    <a class="brand" href="landing.html?home"><img src="img/dhq-crest.jpg" alt=""><span>DYNASTY HQ</span></a>
+    <a class="brand" href="landing.html?home" aria-label="Dynasty HQ front page"><img src="img/logo.png" alt="" width="44" height="44"><span>DYNASTY HQ</span></a>
     <a class="back" href="landing.html?home">&larr; Front page</a>
   </header>
 

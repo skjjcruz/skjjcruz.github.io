@@ -6,11 +6,24 @@
      DHQ PLAYER CARD (module, 2026-11-16; Lab mockup 2026-11-15)
      1.2.0 (2026-11-16): kickers (K) and individual defenders (IDP: DL / LB / DB)
      get their own cards; the offense (QB / RB / WR / TE) is unchanged.
+     1.3.0 (2026-11-17): "this week" is the current NFL week (Sleeper's state)
+     from that week's DHQ lock file, in the card's scoring (the feed's own
+     projection only when its week is the current one); scoring presets
+     (PPR / Half-PPR / Standard, + TE premium) and opts.valueSettings, so a
+     card opened from Player Values / Weekly Projections / Start Sit shows
+     the same numbers as the page; tabs fit on phones (two rows of three).
+     1.3.1 (2026-11-19): opts.projection, so a host shows its own number for
+     this week (the War Room: the Lineup tab's) + DHQPlayerCard.refresh() for a
+     number that arrives late; the demo league's "In my league" strip, League
+     History and "Your team" only on the Lab (dhq-lab.pages.dev), or for a
+     league the host passes itself (leagueId).
 
      One global, nothing else leaks:
        DHQPlayerCard.open(pid, opts)  → Promise<boolean> (true = card shown)
        DHQPlayerCard.close()
        DHQPlayerCard.setLeague(on)    show / hide the league bits on the open card
+       DHQPlayerCard.refresh()        re-read opts.projection for the open card (the host's
+                                      number arrived or changed); → true if the card changed
        DHQPlayerCard.preload(opts)    warm the big data; → Promise<{ leagueId, players }>
        DHQPlayerCard.config(o)        set data bases ({ locksBase, valuesBase, highlightsBase,
                                       valuesUrl, cssUrl, fonts }); → the current config
@@ -19,9 +32,22 @@
      opts (all optional)
        leagueId        Sleeper league whose DHQ values / rosters to use
                        (default the Lab's demo league, Psycho League)
-       league          true: the "In my league" strip + League History tab
+       league          true: the "In my league" strip + League History tab.
+                       Needs the host's own leagueId; the demo league's rosters,
+                       owners and trades are shown only on the Lab (dhq-lab.pages.dev).
+                       Anywhere else, league: true without a leagueId is ignored, and
+                       the card's own "Show my league" button is not offered.
        myUserId        Sleeper user id of "YOUR TEAM" (or myUsername, resolved
-                       through Sleeper). Default: the Lab owner, demo league only.
+                       through Sleeper). Default: the Lab owner, demo league, on the Lab only.
+       projection      function(pid) → this week's points in the host's own scoring:
+                       a number, or { v, lo, hi } (median, floor, ceiling), or null /
+                       undefined when the host has no number (the card then shows its
+                       own, from the week's lock file, exactly as without the option).
+                       The host's number is the card's "this week" number everywhere
+                       (number strip, floor / ceiling, the Stats tab's current week);
+                       without lo / hi, the lock's range is scaled to it. 0 reads as
+                       "no points projected" (or the bye). The "why" stays DHQ's.
+                       Call DHQPlayerCard.refresh() when the number arrives later.
        scoringSettings a Sleeper league scoring_settings object; every fantasy-
                        points number is then scored with it ("League scoring")
                        instead of Sleeper's Half-PPR points. Kickers use it only
@@ -31,11 +57,26 @@
                        40-49 4, 50+ 5, XP 1, misses -1; Sleeper's Half-PPR file
                        already has it) and defenders the demo league's own
                        scoring_settings ("IDP scoring (DHQ demo league)"), since
-                       Sleeper's Half-PPR points leave IDP stats out
+                       Sleeper's Half-PPR points leave IDP stats out.
+                       DHQPlayerCard.scoringSettings('ppr' | 'half' | 'std', tep)
+                       builds the Lab's standard set (lab/commish.html startingRules:
+                       reproduces Sleeper's pts_ppr / pts_half_ppr / pts_std exactly;
+                       tep = points a TE catch adds (0.5), or '1' / true for the Lab's
+                       switch, also +0.5). Settings that match a preset are labelled
+                       "PPR" / "Half-PPR" / "Standard"; with a preset, defenders are
+                       scored with the demo league's IDP rules (its idp_* and
+                       bonus_(tkl|sack|def)_* keys) and projected from the lock's
+                       copy for that league, as lab/projections.html does
+       scoringLabel    the label instead of "League scoring" (optional)
+       valueSettings   { scoring: 'ppr'|'half'|'std', qb: 'sf'|'1qb', tep: '0'|'1',
+                       teams: 10..16 }: DHQ values (demo league only) adjusted
+                       exactly as lab/projections.html does for those settings
+                       (an estimate); without it, the demo league's own values
+                       (16-team superflex, Half-PPR), labelled as such
        tab             'overview' | 'stats' | 'news' | 'league' | 'college' | 'awards'
        onClose         function, runs at the end of close()
        onLeagueChange  function(on), runs when the card's own "Show the demo
-                       league" button turns the league view on
+                       league" button (Lab, or the host's league) turns the league view on
 
      The card builds its own overlay on first open (appended to <body>); all
      its CSS lives under .dhqpc-root (dhq-player-card.css, linked by the host;
@@ -85,7 +126,9 @@
                         /v1/user/{name} (myUsername only)
        ESPN             site.web.api.espn.com common/v3 search, athlete,
                         overview (awards) and college-football stats
-       DHQ locks        {locksBase}{yr}-w{n}.json (DHQ's projection each week)
+       DHQ locks        {locksBase}{yr}-w{n}.json (DHQ's projection each week; the
+                        current week's is the number strip's projection) and
+                        {yr}-w{n}-formula.json (its floor / ceiling and "why")
        DHQ values       {valuesBase}index.json + {leagueId}.json (one value a day,
                         saved by the Lab's value-history job; a league that isn't
                         tracked shows the default league's trend, labelled)
@@ -96,10 +139,15 @@
      ══════════════════════════════════════════════════════════════════════ */
 
   // ── Settings ──────────────────────────────────────────────────────────
-  var VERSION = '1.2.0';
+  var VERSION = '1.3.1';
   var SEASON = 2026;
   var DEMO = { id: '1312100327931019264', name: 'Psycho League', owner: '540392203863576576' };
   var ON_LAB = /(^|\.)dhq-lab\.pages\.dev$/i.test(location.hostname);
+  // The demo league's rosters, owners and trade history are for the Lab only. Any other host has to ask
+  // for its own league: league: true together with its leagueId (a leagueId alone, passed for the
+  // league's values, never offers the league view).
+  function leagueAllowed(opts) { return ON_LAB || !!(opts && opts.league && opts.leagueId != null && String(opts.leagueId) !== ''); }
+  var WARROOM_URL = 'index.html'; // where "Open the War Room" points (the website's app page)
   var SELF = (document.currentScript && document.currentScript.src) || '';
   var CFG = {
     valuesUrl: 'https://hovnqztlbsgsywrbidbh.supabase.co/functions/v1/dhq-league', // + ?league=ID (or put {league} in it)
@@ -115,7 +163,8 @@
   var STATE_URL = 'https://api.sleeper.app/v1/state/nfl';
   var HISTORY_START = 'Nov 16, 2026'; // the value-history job's first day
   // v2 (1.2.0): kickers and defenders (K, DL, LB, DB) are in the feed / players / stats caches too
-  var KEY = { feed: 'dhqpc_feed_v2_', players: 'dhqpc_players_v2', stats: 'dhqpc_stats_v2', scored: 'dhqpc_scored_v2_', espn: 'dhqpc_espn_v1', league: 'dhqpc_league_v2_', lock: 'dhqpc_lock_v2_', user: 'dhqpc_user_v1',
+  // lock v3 (1.3.0): offense rows are [Half-PPR points, catches], rescored to the card's scoring
+  var KEY = { feed: 'dhqpc_feed_v2_', players: 'dhqpc_players_v2', stats: 'dhqpc_stats_v2', scored: 'dhqpc_scored_v2_', espn: 'dhqpc_espn_v1', league: 'dhqpc_league_v2_', lock: 'dhqpc_lock_v3_', user: 'dhqpc_user_v1',
     vidx: 'dhqpc_vidx_v1', vh: 'dhqpc_vh_v1_', hidx: 'dhqpc_hidx_v1', hl: 'dhqpc_hl_v1', dss: 'dhqpc_demo_ss_v1', fin: 'dhqpc_fin_v1' };
   var TTL = { feed: 3 * 3600e3, players: 3 * 86400e3, stats: 3 * 3600e3, league: 12 * 3600e3, values: 3 * 3600e3, hl: 6 * 3600e3 };
   var OFF = { QB: 1, RB: 1, WR: 1, TE: 1 };
@@ -151,7 +200,7 @@
     try {
       var ls = window.localStorage, old = ls.getItem('dhq_card_espn_v1');
       if (old && !ls.getItem(KEY.espn)) ls.setItem(KEY.espn, old);
-      for (var i = ls.length - 1; i >= 0; i--) { var k = ls.key(i); if (k && (/^dhq_card_(feed|players|stats|espn|league|lock)_/.test(k) || /^dhqpc_(feed|players|stats|scored|league|lock)_v1/.test(k))) ls.removeItem(k); }
+      for (var i = ls.length - 1; i >= 0; i--) { var k = ls.key(i); if (k && (/^dhq_card_(feed|players|stats|espn|league|lock)_/.test(k) || /^dhqpc_(feed|players|stats|scored|league|lock)_v1/.test(k) || /^dhqpc_lock_v2_/.test(k))) ls.removeItem(k); }
     } catch (e) { /* storage blocked */ }
   })();
 
@@ -159,7 +208,8 @@
   var $ = function (id) { return document.getElementById('dhqpc-' + id); };
   var esc = function (s) { return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]; }); };
   var fmt = function (n) { return Math.round(n).toLocaleString('en-US'); };
-  var f1 = function (n) { return n == null || isNaN(n) ? '—' : (Math.round(n * 10) / 10).toFixed(1); };
+  // one decimal exactly as the Lab's pages print it (toFixed(1)), so 23.15 reads 23.1 on the card and in the lists alike
+  var f1 = function (n) { if (n == null || isNaN(n)) return '—'; var s = Number(n).toFixed(1); return s === '-0.0' ? '0.0' : s; };
   function store(k, v) { try { localStorage.setItem(k, JSON.stringify(v)); } catch (e) { /* full or blocked: run without */ } }
   function load(k) { try { return JSON.parse(localStorage.getItem(k) || 'null'); } catch (e) { return null; } }
   function getJSON(url) { return fetch(url, { cache: 'no-cache' }).then(function (r) { if (!r.ok) throw new Error(r.status); return r.json(); }); }
@@ -271,11 +321,44 @@
     for (var k in rules) { var v = line[k]; if (typeof v === 'number' && v) t += v * num(rules[k]); }
     return t;
   }
-  function scoring(ss) {
+  function scoring(ss, label) {
     var keys = ss && typeof ss === 'object' ? Object.keys(ss).filter(function (k) { return num(ss[k]) !== 0; }).sort() : [];
     if (!keys.length) return { key: '', rules: null, label: 'Half-PPR' };
     var rules = {}; keys.forEach(function (k) { rules[k] = num(ss[k]); });
-    return { key: keys.map(function (k) { return k + '=' + rules[k]; }).join(','), rules: rules, label: 'League scoring' };
+    var pre = presetOf(rules);
+    return { key: keys.map(function (k) { return k + '=' + rules[k]; }).join(','), rules: rules, preset: pre ? pre.id : null,
+      label: label ? String(label) : pre ? PRESET_NAME[pre.id] + (pre.te ? ' + TE premium' : '') : 'League scoring' };
+  }
+  // ── Scoring presets: the Lab's standard PPR / Half-PPR / Standard ──────
+  // lab/commish.html startingRules (offense + kicking): these reproduce Sleeper's own
+  // pts_ppr / pts_half_ppr / pts_std exactly, so season points, ranks and the game log
+  // match lab/projections.html's lists. Defenders: see scoringFor() (the demo league's IDP rules).
+  var STD_OFF = { pass_yd: 0.04, pass_td: 4, pass_int: -1, pass_2pt: 2, rush_yd: 0.1, rush_td: 6, rush_2pt: 2, rec: 1, rec_yd: 0.1, rec_td: 6, rec_2pt: 2, fum_lost: -2, fum_rec_td: 6, st_td: 6, st_ff: 1, st_fum_rec: 1 };
+  var STD_KICK = { fgm_0_19: 3, fgm_20_29: 3, fgm_30_39: 3, fgm_40_49: 4, fgm_50p: 5, xpm: 1, xpmiss: -1, fgmiss: -1 };
+  var PRESET_NAME = { ppr: 'PPR', half: 'Half-PPR', std: 'Standard' }, PRESET_REC = { ppr: 1, half: 0.5, std: 0 };
+  function presetId(s) { s = String(s == null ? '' : s).toLowerCase().replace(/[^a-z]/g, ''); return { ppr: 'ppr', full: 'ppr', fullppr: 'ppr', half: 'half', halfppr: 'half', std: 'std', standard: 'std', nonppr: 'std' }[s] || null; }
+  // TE premium: '1' / 'on' / true = the Lab's switch (+0.5 a TE catch, as projections.html / startsit.html), or the bonus itself (0.25, 0.5, 0.75 ...)
+  function teBonus(t) {
+    if (t === true) return 0.5;
+    var s = String(t == null ? '' : t).trim().toLowerCase(); if (s === '1' || s === 'on' || s === 'true' || s === 'yes') return 0.5;
+    var n = Number(s); return n > 0 && n <= 2 ? n : 0;
+  }
+  function presetSettings(sc, tep) {
+    var id = presetId(sc); if (!id) return null;
+    var r = {}, k;
+    for (k in STD_OFF) r[k] = STD_OFF[k];
+    for (k in STD_KICK) r[k] = STD_KICK[k];
+    r.rec = PRESET_REC[id];
+    var b = teBonus(tep); if (b) r.bonus_rec_te = b;
+    return r;
+  }
+  // Rules (zeros dropped) that are exactly a preset (+ TE premium) → { id, te }, else null.
+  function presetOf(rules) {
+    var rec = num(rules.rec), id = rec === 1 ? 'ppr' : rec === 0.5 ? 'half' : rec === 0 ? 'std' : null; if (!id) return null;
+    var want = presetSettings(id, 0), k;
+    for (k in rules) if (k !== 'bonus_rec_te' && num(want[k]) !== rules[k]) return null;
+    for (k in want) if (num(want[k]) !== num(rules[k])) return null;
+    return { id: id, te: num(rules.bonus_rec_te) };
   }
   // Kickers and defenders when the host gives no scoring (or scoring with no kicking / IDP rules):
   // kickers get Sleeper's standard kicking (its Half-PPR file already scores kicks: FG 0-39 3, 40-49 4,
@@ -297,10 +380,17 @@
   }
   function hasRules(sc, re) { return !!sc.rules && Object.keys(sc.rules).some(function (k) { return re.test(k); }); }
   // → Promise<scoring> for a player at pos (offense: the host's scoring or Half-PPR, as before)
-  function scoringFor(pos, ss) {
-    var sc = scoring(ss);
+  function scoringFor(pos, ss, label) {
+    var sc = scoring(ss, label);
     if (!KIDP[pos]) return Promise.resolve(sc);
-    if (pos === 'K') return Promise.resolve(hasRules(sc, /^(fgm|fgmiss|xpm|xpmiss)/) ? sc : { key: '', rules: null, label: 'Standard kicking' });
+    // a preset's kicking is standard kicking (Sleeper's own file scores it; the lock's Half-PPR kicker lines)
+    if (pos === 'K') return Promise.resolve(hasRules(sc, /^(fgm|fgmiss|xpm|xpmiss)/) && !sc.preset ? sc : { key: '', rules: null, label: 'Standard kicking' });
+    // a preset (Player Values / Weekly Projections / Start Sit): defenders as those pages score them, with the
+    // demo league's IDP rules only (Sleeper's pts_* leave IDP stats out); their projection is the lock's copy for that league
+    if (sc.preset) return demoScoring().then(function (d) {
+      var r = {}; Object.keys(d || {}).forEach(function (k) { if (/^idp_/.test(k) || /^bonus_(tkl|sack|def)_/.test(k)) r[k] = d[k]; });
+      var x = scoring(Object.keys(r).length ? r : DEMO_IDP); x.label = 'IDP scoring (DHQ demo league)'; x.demo = true; return x;
+    });
     if (hasRules(sc, /^idp_/)) return Promise.resolve(sc);
     return demoScoring().then(function (d) { var x = scoring(d); x.label = 'IDP scoring (DHQ demo league)'; x.demo = true; return x; });
   }
@@ -514,7 +604,7 @@
   }
 
   // Everything the card needs about one player, computed once.
-  function context(pid, ps) {
+  function context(pid, ps, wp) {
     var p = pl(pid), m = meta(pid) || {}, R = RANK[p.pos] || { value: {}, score: {}, ppg: {}, minGP: 3 };
     var s = ST[pid] || [0, 0], gp = s[1], pts = s[0];
     var age = p.birth ? ageOn(p.birth, SEASON, 9, 1) : (p.age || m.age);
@@ -523,15 +613,51 @@
     var c = {
       p: p, m: m, pos: p.pos, age: age, ageX: p.birth ? ageExact(p.birth) : age, exp: p.exp, gp: gp, pts: pts, ppg: gp ? pts / gp : null,
       teamGP: TEAMGP[p.team] || null, minGP: R.minGP,
-      rank: R.ppg[pid] || null, scoreRank: R.score[pid] || null, valueRank: R.value[pid] || null, value: m.value || 0,
+      rank: R.ppg[pid] || null, scoreRank: R.score[pid] || null, valueRank: R.value[pid] || null, value: valueFor(m.value || 0, p.pos),
       prevRank: prev ? prev.rank : null, prevGP: prev ? prev.gp : 0, prevPPG: prev && prev.gp ? prev.pts / prev.gp : null,
       careerPPG: careerGP ? careerPts / careerGP : null, careerSeasons: ps ? ps.seasons.filter(function (x) { return !x.cur; }).length : 0,
-      trend: typeof m.trend === 'number' ? m.trend : null, starterSeasons: m.starterSeasons || 0, proj: FEED.proj[pid] || null, weeks: ps ? ps.weeks : []
+      trend: typeof m.trend === 'number' ? m.trend : null, starterSeasons: m.starterSeasons || 0, weeks: ps ? ps.weeks : [],
+      // this week's DHQ projection (weekProj): [median, floor, ceiling] in the card's scoring, or null
+      wp: wp || null, proj: wp && wp.v > 0 ? [wp.v, wp.lo, wp.hi] : null
     };
+    c.wpOwn = wp || null; // the card's own line (weekProj), kept so refresh() can re-apply the host's number
+    setWeek(c, withHost(wp || null, pid));
     c.stage = careerStage(c);
     c.W = c.stage.W;
     if (p.kidp) kidpCtx(c, ps);
     return c;
+  }
+  // ── DHQ value for other league settings (opts.valueSettings) ─────────────
+  // The feed's values are the demo league's (16-team superflex, Half-PPR). Player Values
+  // (lab/projections.html playerValue / factor / teamsCurve) adjusts them for the visitor's
+  // settings, an estimate; this is the same derivation, number for number:
+  //   v = value × factor(pos)   PPR: RB ×1.03, WR / TE ×1.06 · Standard: RB ×0.98, WR / TE ×0.93
+  //                             1QB: QB ×(0.42 + 0.22 × min(1, value / 8000)) · TE premium: TE ×1.15
+  //   shown = round(min(9999, 10000 × (v / 10000) ^ (1 + (16 − teams) × 0.025)))
+  var VSRC = { teams: 16, qb: 'sf', scoring: 'half', tep: '0' }, VMAX = 10000;
+  var VSET = null; // the open card's value settings (normalised), or null = the league's own values
+  function normValueSettings(o) {
+    if (!o || typeof o !== 'object') return null;
+    var t = Math.round(Number(o.teams));
+    return { scoring: presetId(o.scoring) || 'half', qb: /^1/.test(String(o.qb || '')) ? '1qb' : 'sf', tep: teBonus(o.tep) ? '1' : '0', teams: t >= 4 && t <= 32 ? t : 16 };
+  }
+  function valueAdj(raw, pos, vs) {
+    if (!vs || !(raw > 0)) return raw;
+    var f = ({ ppr: { RB: 1.03, WR: 1.06, TE: 1.06 }, half: {}, std: { RB: 0.98, WR: 0.93, TE: 0.93 } })[vs.scoring][pos] || 1;
+    if (vs.qb === '1qb' && pos === 'QB') f *= 0.42 + 0.22 * Math.min(1, raw / 8000);
+    if (vs.tep === '1' && pos === 'TE') f *= 1.15;
+    var k = 1 + (VSRC.teams - vs.teams) * 0.025;
+    return Math.round(Math.min(VMAX - 1, VMAX * Math.pow(Math.max(0, raw * f) / VMAX, k)));
+  }
+  // only the demo league's values are adjusted (another league's values are already its own)
+  function setWeek(c, wp) { c.wp = wp || null; c.proj = wp && wp.v > 0 ? [wp.v, wp.lo, wp.hi] : null; }
+  function valueFor(raw, pos) { return LEAGUE.id === DEMO.id ? valueAdj(raw, pos, VSET) : raw; }
+  function vsEstimate(vs) { return !!vs && (vs.scoring !== VSRC.scoring || vs.qb !== VSRC.qb || vs.tep !== VSRC.tep || vs.teams !== VSRC.teams); }
+  // "12-team superflex · PPR (estimate)": what the value shown is for
+  function valueFormat() {
+    if (LEAGUE.id !== DEMO.id) return 'Values for ' + (LEAGUE.name || 'your league');
+    var v = VSET || VSRC;
+    return v.teams + '-team ' + (v.qb === '1qb' ? '1QB' : 'superflex') + ' · ' + PRESET_NAME[v.scoring] + (v.tep === '1' ? ' · TE premium' : '') + (vsEstimate(VSET) ? ' (estimate)' : '');
   }
   // Tier word: where his DHQ value ranks at his position in a 16-team superflex league.
   var TIER_CUT = { QB: [5, 24, 40], RB: [8, 32, 56], WR: [8, 40, 72], TE: [4, 16, 28], K: [3, 16, 28], DL: [5, 36, 64], LB: [5, 30, 54], DB: [5, 36, 64] };
@@ -639,7 +765,7 @@
     var gpTxt = c.teamGP ? 'Played ' + c.gp + ' of ' + c.teamGP + ' games' : plural(c.gp, 'game') + ' played';
     var yrs = Math.max(0, W.decline[1] - c.age + 1);
     var winS = c.m.peakYrsLeft > 0 ? plural(c.m.peakYrsLeft, 'peak year') + ' left' : c.age < W.peak[0] ? 'Peak starts at ' + W.peak[0] : 'Past his peak';
-    var pj = c.proj;
+    var pj = c.proj && c.proj[1] != null && c.proj[2] != null ? c.proj : null; // DHQ's range this week (needs the formula file)
     return [
       { k: 'Ceiling', v: pj ? f1(pj[2]) + ' pts' : best != null ? f1(best) + ' pts' : '—', s: (pj ? 'DHQ’s best case this week' : 'His best game') + (best != null && pj ? ' · best game ' + f1(best) : ''), i: '▲', c: '#7DDCA3' },
       { k: 'Floor', v: pj ? f1(pj[1]) + ' pts' : worst != null ? f1(worst) + ' pts' : '—', s: (pj ? 'DHQ’s worst case this week' : 'His worst game') + (worst != null && pj ? ' · worst game ' + f1(worst) : ''), i: '▼', c: '#5DADE2' },
@@ -669,7 +795,7 @@
   function n1(x) { return Math.round(x * 10) % 10 ? (Math.round(x * 10) / 10).toFixed(1) : String(Math.round(x)); }
   function frac(a) { return a[0] + '/' + a[1]; }
   function pct(a) { return a[1] ? Math.round(a[0] / a[1] * 100) + '%' : '—'; }
-  function scoreWords() { return SC.rules ? (SC.demo ? 'IDP scoring, DHQ demo league' : 'league scoring') : SC.label === 'Standard kicking' ? 'standard kicking' : 'Half-PPR'; }
+  function scoreWords() { return SC.rules ? (SC.demo ? 'IDP scoring, DHQ demo league' : SC.preset ? SC.label.replace(/^Standard IDP/, 'standard IDP') : 'league scoring') : SC.label === 'Standard kicking' ? 'standard kicking' : 'Half-PPR'; }
   function kidpCtx(c, ps) {
     var cur = (ps ? ps.seasons : []).filter(function (x) { return x.cur; })[0], st = cur ? cur.st : {};
     var played = c.weeks.filter(function (w) { return w.gp > 0; }), gp = played.length || c.gp || 0;
@@ -896,13 +1022,38 @@
 
   // ── DHQ weekly projections from the lock files (optional) ─────────────
   // which: the lock file's scorings to read, first one present wins ('half' = Half-PPR; for
-  // kickers that is standard kicking). Offense reads 'half' (as before); kickers and defenders
-  // the scoring their card is in (see lockScoring). A 0 for a kicker / defender = no line, left out.
-  var LOCKS = {}, LRAW = {};
+  // kickers that is standard kicking). Offense reads 'half' and is rescored to the card's
+  // scoring (rescore()); kickers and defenders read the scoring their card is in (see
+  // lockScoring). A 0 for a kicker / defender = no line, left out.
+  var LOCKS = {}, LRAW = {}, LFX = {};
   function lockFile(n) {
-    if (!LRAW[n]) LRAW[n] = getJSON(CFG.locksBase + SEASON + '-w' + n + '.json');
+    if (!LRAW[n]) { LRAW[n] = getJSON(CFG.locksBase + SEASON + '-w' + n + '.json'); LRAW[n].catch(function () { delete LRAW[n]; }); }
     return LRAW[n];
   }
+  // The week's formula file (floor / ceiling and every factor behind the Half-PPR median), or null.
+  function formulaFile(n) {
+    if (!LFX[n]) LFX[n] = getJSON(CFG.locksBase + SEASON + '-w' + n + '-formula.json').then(function (x) { return (x && x.players) || {}; }, function () { delete LFX[n]; return null; });
+    return LFX[n];
+  }
+  // The lock's full-PPR copy of the Half-PPR table (a league scored like Half-PPR but rec = 1):
+  // catches = 2 × (PPR − Half). The same as lab/projections.html's loadWeek().
+  var OFF_RULES = ['pass_yd', 'pass_td', 'pass_int', 'pass_2pt', 'rush_yd', 'rush_td', 'rush_2pt', 'rec_yd', 'rec_td', 'rec_2pt', 'fum_lost'];
+  function pprRow(d) {
+    var S = d.scorings || {}, rules = (S.half && S.half.scoring) || {}, out = null;
+    Object.keys(S).forEach(function (k) {
+      var sc = S[k].scoring || {}; if (out || sc.rec !== 1 || sc.bonus_rec_te) return;
+      if (OFF_RULES.every(function (x) { return (sc[x] || 0) === (rules[x] || 0); })) out = S[k].players || {};
+    });
+    return out;
+  }
+  function catches(pp, pid, h) { var q = pp && pp[pid]; return q && q[0] != null && h != null ? Math.max(0, 2 * (q[0] - h)) : 0; }
+  // A Half-PPR projection with r catches, in the card's scoring: projections.html's pts() —
+  // the reception value moves it, the TE premium adds to it (none set: Half-PPR as is).
+  function rescore(h, r, pos) {
+    var R = SC.rules, rec = R ? num(R.rec) : 0.5, te = R && pos === 'TE' ? num(R.bonus_rec_te) : 0;
+    return h + (rec - 0.5) * (r || 0) + te * (r || 0);
+  }
+  // Offense: { pid: [Half-PPR, catches] } (rescore at use); kickers / defenders: { pid: points }.
   function lockWeek(n, which) {
     which = which || ['half'];
     var lk = n + '|' + which.join(',');
@@ -912,21 +1063,116 @@
     LOCKS[lk] = lockFile(n).then(function (d) {
       var sc = d.scorings || {}, use = which.filter(function (w) { return sc[w] && sc[w].players; })[0] || 'half';
       var hp = (sc[use] && sc[use].players) || {}, out = {}, main = which[0] === 'half'; // main: the shared Half-PPR table (offense + kickers)
+      var pp = main ? pprRow(d) : null;
       Object.keys(hp).forEach(function (pid) {
         var f = FEED.p[pid], v = hp[pid] && hp[pid][0]; if (!f || v == null) return;
         var keep = KIDP[f[1]] ? v > 0 && (!main || f[1] === 'K') : main;
-        if (keep) out[pid] = Math.round(v * 10) / 10;
+        if (!keep) return;
+        out[pid] = KIDP[f[1]] ? Math.round(v * 10) / 10 : [Math.round(v * 100) / 100, REC_POS[f[1]] ? Math.round(catches(pp, pid, v) * 100) / 100 : 0];
       });
       if (n < (CUR.week || 99)) store(k, out);
       return out;
     }).catch(function () { return null; });
     return LOCKS[lk];
   }
+  var REC_POS = { QB: 1, RB: 1, WR: 1, TE: 1 };
+  // one week's lock row for a player → points in the card's scoring (null = no line)
+  function lockPts(x, pos) { return x == null ? null : typeof x === 'number' ? x : rescore(x[0], x[1], pos); }
   function lockScoring(pos) {
     if (!KIDP[pos]) return ['half'];
+    // kickers in standard kicking (also under a preset): the lock's Half-PPR table, which scores kicks that way
+    if (pos === 'K' && !SC.rules) return ['half'];
     var lg = 'league_' + (SC.demo ? DEMO.id : LEAGUE.id);
-    return pos === 'K' ? (SC.rules ? [lg, 'half'] : ['half']) : lg === 'league_' + DEMO.id ? [lg] : [lg, 'league_' + DEMO.id];
+    return pos === 'K' ? [lg, 'half'] : lg === 'league_' + DEMO.id ? [lg] : [lg, 'league_' + DEMO.id];
   }
+
+  // ── This week's DHQ projection: the current NFL week's lock ─────────────
+  // → { wk, v (card's scoring) | null, lo, hi, items (the "why"), src: 'lock' | 'feed', state }
+  // state: 'ok' · 'zero' (a line of 0: backup / out) · 'bye' · 'none' (no line) · 'na' (no file for the week)
+  // The feed's own projection is used only when the lock can't be read and the feed is for this same week.
+  function feedProj(pid, wk) {
+    var j = FEED.proj[pid];
+    if (FEED.week !== wk) return { wk: wk, v: null, state: 'na', items: [] };
+    if (!j) return { wk: wk, v: null, state: 'none', items: [], src: 'feed' };
+    return { wk: wk, v: j[0], lo: j[1], hi: j[2], items: feedWhy(j[3]), src: 'feed', state: 'ok' };
+  }
+  function weekProj(pid, pos, team) {
+    var wk = CUR.week || FEED.week;
+    if (!wk) return Promise.resolve({ wk: null, v: null, state: 'na', items: [] });
+    return Promise.all([lockFile(wk).catch(function () { return null; }), formulaFile(wk)]).then(function (r) {
+      var d = r[0], F = r[1] || {};
+      if (!d || !d.scorings || !d.scorings.half) return feedProj(pid, wk);
+      var S = d.scorings, info = (d.players || {})[pid] || null, X = F[pid] || null, v = null;
+      if (KIDP[pos]) {
+        var use = lockScoring(pos).filter(function (w) { return S[w] && S[w].players; })[0];
+        var row = use && S[use].players[pid]; v = row && row[0] != null ? row[0] : null;
+      } else {
+        // a league scoring the lock carries exactly (the host's league): its own number; else Half-PPR rescored
+        var exact = null;
+        if (SC.rules && !SC.preset) Object.keys(S).forEach(function (k) { if (!exact && /^league_/.test(k) && scoring(S[k].scoring).key === SC.key) exact = S[k].players || null; });
+        var hrow = S.half.players[pid];
+        if (exact && exact[pid] && exact[pid][0] != null) v = exact[pid][0];
+        else if (hrow && hrow[0] != null) v = rescore(hrow[0], REC_POS[pos] ? catches(pprRow(d), pid, hrow[0]) : 0, pos);
+      }
+      var kick = d.kickoffs || {}, tm = String((info && info.team) || team || '').toUpperCase();
+      var bye = !!tm && Object.keys(kick).length >= 10 && !kick[tm] && !(info && info.opp);
+      var out = { wk: wk, v: v, lo: null, hi: null, items: whyItems(X, info), src: 'lock', opp: info && info.opp, state: v > 0 ? 'ok' : bye ? 'bye' : v === 0 ? 'zero' : 'none' };
+      if (v > 0 && X && X.pts && X.pts[0] > 0) { var k = v / X.pts[0]; if (X.pts[1] != null) out.lo = X.pts[1] * k; if (X.pts[2] != null) out.hi = X.pts[2] * k; }
+      return out;
+    });
+  }
+  // The host's own number for this week (opts.projection): → { v, lo, hi } | null (no number: the card's own)
+  function hostNum(pid) {
+    if (typeof STATE.projFn !== 'function') return null;
+    var r; try { r = STATE.projFn(String(pid)); } catch (e) { return null; }
+    if (r == null || r === '') return null;
+    var o = typeof r === 'object' ? r : { v: r }, v = o.v == null || o.v === '' ? NaN : +o.v;
+    if (!isFinite(v) || v < 0) return null;
+    var n = function (x) { return x != null && x !== '' && isFinite(+x) ? +x : null; };
+    return { v: v, lo: n(o.lo), hi: n(o.hi) };
+  }
+  // weekProj's result with the host's number in place of the lock's (the "why" and the bye stay the lock's)
+  function withHost(w, pid) {
+    var h = hostNum(pid); if (!h) return w;
+    var base = w || { wk: CUR.week || FEED.week || null, v: null, state: 'na', items: [] };
+    var o = {}; Object.keys(base).forEach(function (k) { o[k] = base[k]; });
+    o.host = true; o.v = h.v; o.lo = null; o.hi = null;
+    if (!(h.v > 0)) { o.state = base.state === 'bye' ? 'bye' : 'zero'; return o; }
+    o.state = 'ok';
+    if (h.lo != null && h.hi != null) { o.lo = Math.min(h.lo, h.v); o.hi = Math.max(h.hi, h.v); }
+    else if (base.v > 0) { var k = h.v / base.v; if (base.lo != null) o.lo = base.lo * k; if (base.hi != null) o.hi = base.hi * k; }
+    return o;
+  }
+  // The "why": every factor that moved his number, biggest first, with the engine's note.
+  // From the formula file ([key, label, weight, multiplier, impact %, note, ruled out, has data]
+  // + the DHQ position-model step), else from the lock's own "why" line.
+  var FACTOR = /^([A-Z][A-Za-z &\/()-]*?) ([+-]?\d+(?:\.\d+)?)%: (.*)$/;
+  function whyItems(X, info) {
+    var out = [];
+    if (X) {
+      if (X.md && X.md.pct != null && Math.abs(X.md.pct) >= 0.05) out.push({ k: X.md.l || 'DHQ model', p: +X.md.pct, n: X.md.n || '' });
+      (X.f || []).forEach(function (f) { if (f[6]) out.push({ k: f[1], out: true, n: f[5] || '' }); else if (f[7] && Math.abs(f[4]) >= 0.05) out.push({ k: f[1], p: +f[4], n: f[5] || '' }); });
+      (X.x || []).forEach(function (e) { if (Math.abs(e[1]) >= 0.05) out.push({ k: e[0], p: +e[1], n: e[2] || '' }); });
+      if (X.q) out.push({ k: 'Questionable', p: Math.round((X.q - 1) * 1000) / 10, n: 'Questionable players sit out about one game in five, so DHQ trims his whole line.' });
+    } else if (info && info.why) {
+      var s = String(info.why), segs = s.split(' · '), cut = s.length >= 280, cur = null;
+      segs.forEach(function (g, i) {
+        var tail = cut && i === segs.length - 1, m = FACTOR.exec(g);
+        if (m) { cur = Math.abs(+m[2]) < 0.05 ? null : { k: m[1], p: +m[2], n: tail ? '' : m[3], more: 0 }; if (cur) out.push(cur); return; }
+        if (/^Baseline: /.test(g)) { cur = null; return; }
+        if (cur && !tail && cur.more < 2) { cur.n += (cur.n ? ' · ' : '') + g; cur.more++; }
+      });
+    }
+    return out.sort(function (a, b) { return (b.out ? 999 : Math.abs(b.p)) - (a.out ? 999 : Math.abs(a.p)); }).slice(0, 6);
+  }
+  // The feed's short form: "DHQ QB model -10% · Role & opportunity +6%"
+  function feedWhy(why) {
+    return String(why || '').split(/\s*·\s*/).filter(Boolean).map(function (x) {
+      var m = /^(.*?)\s*([+\-−]\d+(?:\.\d+)?)%$/.exec(x); return m ? { k: m[1], p: parseFloat(m[2].replace('−', '-')), n: '' } : { k: x, n: '' };
+    });
+  }
+  // DHQ only: the engine's notes mention other sites' projected volume as a reference ("..., Sleeper 31.0")
+  function noSites(t) { return String(t || '').replace(/,?\s*(Sleeper|ESPN|CBS)\s+[\d.]+/g, ''); }
 
   // ── DHQ value history (one value a day per tracked league, optional) ──
   // index.json says which leagues are tracked (so an untracked one costs no 404);
@@ -1092,7 +1338,7 @@
   }
 
   // ═════════════════════════════ RENDER ═════════════════════════════════
-  var STATE = { pid: null, league: false, tab: 'overview', ctx: null, ps: null, seq: 0, open: false, me: null, meName: null, onClose: null, onLeagueChange: null };
+  var STATE = { pid: null, league: false, canLeague: false, projFn: null, L: null, sc: null, tab: 'overview', ctx: null, ps: null, seq: 0, open: false, me: null, meName: null, onClose: null, onLeagueChange: null };
   var TABS = [['overview', 'Overview'], ['stats', 'Stats'], ['news', 'News'], ['league', 'League History'], ['college', 'College'], ['awards', 'Awards']];
   function ht(inches) { var n = +inches; if (!n) return inches || ''; return Math.floor(n / 12) + '′' + (n % 12) + '″'; }
   function initials(n) { return String(n).split(' ').map(function (w) { return w[0]; }).join('').slice(0, 2); }
@@ -1103,8 +1349,9 @@
     var seasonTxt = p.exp === 0 ? 'Rookie' : p.exp != null ? ord(p.exp + 1) + ' NFL season' : '';
     var bio = [c.age != null ? '<span>Age <b>' + c.age + '</b></span>' : '', seasonTxt ? '<span><b>' + seasonTxt + '</b></span>' : '',
       p.height || p.weight ? '<span><b>' + esc(ht(p.height)) + (p.weight ? ' · ' + esc(p.weight) + ' lb' : '') + '</b></span>' : '',
-      p.college ? '<span>' + esc(p.college) + '</span>' : ''].filter(Boolean).join('');
-    var tags = '<button type="button" class="dhqpc-tag" style="--tc:' + c.stage.color + '" title="' + esc(c.stage.why) + '" data-act="stage">' + c.stage.label + '</button>'
+      p.college ? '<span class="dhqpc-col">' + esc(p.college) + '</span>' : ''].filter(Boolean).join('');
+    // phones hide the career-stage tag when it repeats the value tier ("Elite" twice; owner ask 2026-11-18)
+    var tags = '<button type="button" class="dhqpc-tag' + (String(c.stage.label).toLowerCase() === String(tier(c)).toLowerCase() ? ' dhqpc-dup' : '') + '" style="--tc:' + c.stage.color + '" title="' + esc(c.stage.why) + '" data-act="stage">' + c.stage.label + '</button>'
       + (inj ? '<span class="dhqpc-tag ' + (inj.hard ? 'dhqpc-inj' : 'dhqpc-q') + '">' + esc(inj.label) + '</span>' : '');
     var R = RANK[c.pos];
     var ranks = (c.valueRank ? '<span><b>' + c.pos + c.valueRank + '</b> by value</span>' : '')
@@ -1118,7 +1365,7 @@
       + '<div class="dhqpc-tags">' + tags + '</div>'
       + '<button type="button" class="dhqpc-hl-btn" data-act="hl" aria-expanded="false" aria-controls="dhqpc-hl"><i aria-hidden="true">▶</i>Highlights<span class="dhqpc-hl-n" id="dhqpc-hl-n" hidden></span></button></div>'
       + '<div class="dhqpc-val"><span class="dhqpc-val-k">DHQ Value</span><span class="dhqpc-val-n">' + (c.value ? fmt(c.value) : '—') + '</span><span class="dhqpc-val-t" title="Where his DHQ value ranks among ' + POS_NAME[c.pos][1] + '">' + tier(c) + (p.kidp && tier(c) !== '—' ? ' ' + c.pos : '') + ' value</span>'
-      + '<div class="dhqpc-val-r">' + ranks + '</div></div>'
+      + '<div class="dhqpc-val-r">' + ranks + '</div><span class="dhqpc-val-f" title="DHQ value for this league format">' + esc(valueFormat()) + '</span></div>'
       + '</div></header>'
       + '<section class="dhqpc-hl" id="dhqpc-hl" hidden aria-label="Highlights">' + highlightsHTML(c) + '</section>';
   }
@@ -1181,30 +1428,39 @@
   }
   var WHY_NAMES = { 'opponent vs position': 'Opponent’s defense at his position', 'role & opportunity': 'Role and playing time', 'head-to-head history': 'His past games vs this opponent', 'coaching staff': 'Coaching staff', 'weather': 'Weather', 'vegas': 'Game script', 'injury': 'Injury' };
   function whyName(x) { var k = String(x).toLowerCase().trim(); if (/^dhq \w+ model$/.test(k)) return 'His typical game (DHQ model)'; return WHY_NAMES[k] || x; }
-  function whyHTML(why) {
-    var items = String(why || '').split(/\s*·\s*/).filter(Boolean).map(function (x) {
-      var m = /^(.*?)\s*([+\-−]\d+(?:\.\d+)?%)$/.exec(x);
-      if (!m) return '<li>' + esc(x) + '</li>';
-      var up = m[2].charAt(0) === '+';
-      return '<li>' + esc(whyName(m[1])) + ' <span class="' + (up ? 'dhqpc-up' : 'dhqpc-dn') + '">' + esc(m[2].replace('-', '−')) + '</span></li>';
+  function pctTxt(p) { var s = (Math.round(Math.abs(p) * 10) / 10).toString(); return (p > 0 ? '+' : '−') + s + '%'; }
+  function whyHTML(w) {
+    var notes = w.items.some(function (x) { return x.n; });
+    var items = w.items.map(function (x) {
+      var tag = x.out ? '<span class="dhqpc-dn">OUT</span>' : x.p != null ? '<span class="' + (x.p > 0 ? 'dhqpc-up' : 'dhqpc-dn') + '">' + pctTxt(x.p) + '</span>' : '';
+      return '<li><span class="dhqpc-why-k">' + esc(whyName(x.k)) + ' ' + tag + '</span>' + (x.n ? '<small>' + esc(noSites(x.n)) + '</small>' : '') + '</li>';
     }).join('');
-    return '<b>What moved this week’s number:</b> each factor nudges his typical game up or down.<ul>' + items + '</ul>';
+    var off = !(STATE.ctx && STATE.ctx.p.kidp);
+    return '<b>What moved his Week ' + w.wk + ' number:</b> DHQ starts from his typical game; each factor nudges it up or down.<ul' + (notes ? ' class="dhqpc-why-l"' : '') + '>' + items + '</ul>'
+      + (w.src === 'lock' && off && SC.label !== 'Half-PPR' ? '<p class="dhqpc-why-n">The factors are the same in every scoring; the points are ' + esc(SC.label) + '.</p>' : '');
   }
   function stripHTML(c) {
-    var pj = c.proj, wk = FEED.week || CUR.week;
-    var tile = function (k, n, s, cls) { return '<div class="dhqpc-stat' + (cls ? ' dhqpc-' + cls : '') + '"><span class="dhqpc-stat-k">' + k + '</span><span class="dhqpc-stat-n">' + n + '</span>' + (s ? '<span class="dhqpc-stat-s">' + s + '</span>' : '') + '</div>'; };
+    var w = c.wp || { wk: CUR.week, v: null, state: 'na', items: [] }, pj = c.proj, wk = w.wk || CUR.week;
+    // ks / ss: the short label and line a phone shows instead (data-s, see the phone CSS)
+    var tile = function (k, n, s, cls, ks, ss) { return '<div class="dhqpc-stat' + (cls ? ' dhqpc-' + cls : '') + '"><span class="dhqpc-stat-k"' + (ks ? ' data-s="' + ks + '"' : '') + '>' + k + '</span><span class="dhqpc-stat-n">' + n + '</span>' + (s || ss ? '<span class="dhqpc-stat-s"' + (ss != null ? ' data-s="' + ss + '"' : '') + '>' + s + '</span>' : '') + '</div>'; };
     var gpS = c.teamGP ? 'of ' + c.teamGP + ' team games' : '';
+    var why = !!(pj && w.items.length);
+    var inj = injury(c.p, c.m), noTxt = w.state === 'bye' ? 'Bye in week ' + wk
+      : inj && inj.hard ? 'Not expected to play in week ' + wk
+      : w.state === 'zero' ? 'No points projected in week ' + wk
+      : w.state === 'na' ? 'Week ' + wk + ' projection not out yet'
+      : 'No DHQ projection in week ' + wk;
     var projTile = pj
-      ? '<div class="dhqpc-stat dhqpc-proj"><span class="dhqpc-stat-k">DHQ projection</span><span class="dhqpc-stat-n">' + f1(pj[0]) + '<small>pts</small></span><span class="dhqpc-stat-s">Week ' + wk + ' · range ' + f1(pj[1]) + '–' + f1(pj[2]) + '</span>'
-        + (pj[3] ? '<button type="button" class="dhqpc-why-b" data-act="why" aria-expanded="false" aria-controls="dhqpc-why">Why?</button>' : '') + '</div>'
-      : c.p.kidp ? tile('DHQ projection', '—', (function () { var i = injury(c.p, c.m); return i && i.hard ? 'Not expected to play in week ' + wk : 'No DHQ projection this week'; })(), 'proj dhqpc-pnone')
-      : tile('DHQ projection', '—', (function () { var i = injury(c.p, c.m); return i && i.hard ? 'Not expected to play in week ' + wk : 'No game projected in week ' + wk; })(), 'proj');
+      ? '<div class="dhqpc-stat dhqpc-proj"><span class="dhqpc-stat-k" data-s="DHQ proj">DHQ projection</span><span class="dhqpc-stat-n">' + f1(pj[0]) + '<small>pts</small></span><span class="dhqpc-stat-s" data-s="' + esc('Wk ' + wk + (pj[1] != null && pj[2] != null ? ' · ' + f1(pj[1]) + '–' + f1(pj[2]) : '')) + '">Week ' + wk + (pj[1] != null && pj[2] != null ? ' · range ' + f1(pj[1]) + '–' + f1(pj[2]) : w.opp ? ' · vs ' + esc(w.opp) : '') + '</span>'
+        + (why ? '<button type="button" class="dhqpc-why-b" data-act="why" aria-expanded="false" aria-controls="dhqpc-why">Why?</button>' : '') + '</div>'
+      // a line of 0 (out, IR, a backup): 0.0, the number Weekly Projections / Start Sit show
+      : tile('DHQ projection', w.state === 'zero' ? '0.0<small>pts</small>' : '—', noTxt, c.p.kidp || w.state === 'zero' ? 'proj dhqpc-pnone' : 'proj', 'DHQ proj', w.state === 'bye' ? 'Bye' : 'Wk ' + wk);
     return '<div class="dhqpc-strip">'
-      + tile('Season points', c.gp ? f1(c.pts) : '—', SC.label)
-      + tile('Games', c.gp || '0', gpS)
-      + tile('Points per game', c.ppg != null ? f1(c.ppg) : '—', c.rank ? c.pos + c.rank + ' at his position' : c.gp ? 'Too few games to rank' : '')
+      + tile('Season points', c.gp ? f1(c.pts) : '—', esc(SC.label), '', 'Points', esc(SC.label))
+      + tile('Games', (c.gp || '0') + (c.teamGP ? '<small class="dhqpc-of">/' + c.teamGP + '</small>' : ''), gpS, '', '', '')
+      + tile('Points per game', c.ppg != null ? f1(c.ppg) : '—', c.rank ? c.pos + c.rank + ' at his position' : c.gp ? 'Too few games to rank' : '', '', 'Per game', c.rank ? c.pos + c.rank : '')
       + projTile + '</div>'
-      + (pj && pj[3] ? '<div class="dhqpc-why" id="dhqpc-why" hidden>' + whyHTML(pj[3]) + '</div>' : '');
+      + (why ? '<div class="dhqpc-why" id="dhqpc-why" hidden>' + whyHTML(w) + '</div>' : '');
   }
   function mineHTML(c, LHd, loading) {
     var rid = FEED.own[c.p.id], t = rid != null ? FEED.teams[rid] : null;
@@ -1250,7 +1506,13 @@
   var VS_DONE = {}; // league|pid → the series once loaded (null = none), so re-opening the tab is instant
   function vtSub(S) { return S && S.fallback && S.label ? esc(S.label) + ' values' : 'DHQ value over time'; }
   function vtNote(S) { return S && S.fallback ? '<p class="dhqpc-vt-note">Your league’s values aren’t saved yet, so this is DHQ’s ' + esc(S.label || 'default') + ' trend' + (S.name ? ' (' + esc(S.name) + ')' : '') + '.</p>' : ''; }
+  // the saved history in the card's value settings (same derivation as the value shown)
+  function adjSeries(c, S) {
+    if (!S || !VSET || S.lid !== DEMO.id || LEAGUE.id !== DEMO.id) return S;
+    return Object.assign({}, S, { pts: S.pts.map(function (p) { return [p[0], valueAdj(p[1], c.pos, VSET)]; }) });
+  }
   function vtBody(c, S) {
+    S = adjSeries(c, S);
     var none = '<div class="dhqpc-vt"><svg viewBox="0 0 300 60" preserveAspectRatio="none" aria-hidden="true"><path d="M0 46 C40 40 70 50 110 36 S180 22 220 28 S280 14 300 12" fill="none" stroke="#D4AF37" stroke-width="2" stroke-dasharray="4 6"/></svg>';
     if (!S) return none + '<div><b>Value history starts ' + HISTORY_START + '</b><small>DHQ saves every player’s value each day. This chart fills in as the season goes on.</small></div></div>';
     var P = S.pts;
@@ -1329,9 +1591,9 @@
       if (STATE.seq !== seq) return;
       var el = $('vtw'), sub = $('vt-sub'); if (!el) return;
       el.innerHTML = vtBody(c, S); if (sub) sub.innerHTML = vtSub(S);
-      wireValueChart(S);
+      wireValueChart(adjSeries(c, S));
     };
-    if (VS_DONE[k] !== undefined) { wireValueChart(VS_DONE[k]); return; }
+    if (VS_DONE[k] !== undefined) { wireValueChart(adjSeries(c, VS_DONE[k])); return; }
     valueSeries(LEAGUE.id, c.p.id).then(done, function () { done(null); });
   }
   function overviewHTML(c) {
@@ -1463,7 +1725,7 @@
       + gameLog(c, ps, proj)
       + (c.p.kidp
         ? '<h4 class="dhqpc-sub-h">Career by season <small>Finish = his rank among ' + POS_NAME[c.pos][1] + ' by total points (' + scoreWords() + ')' + (ps.later ? ' · working out past finishes…' : '') + '</small></h4>' + careerTableKIDP(c, ps)
-        : '<h4 class="dhqpc-sub-h">Career by season <small>' + (SC.rules ? 'Finish = his rank at the position by total points (this season: league scoring; earlier seasons: Half-PPR)' : 'Finish = his rank at the position by total Half-PPR points') + '</small></h4>'
+        : '<h4 class="dhqpc-sub-h">Career by season <small>' + (SC.rules ? 'Points in ' + esc(SC.preset ? SC.label : 'league scoring') + '. Finish = his rank at the position by total points (this season: ' + esc(SC.preset ? SC.label : 'league scoring') + '; earlier seasons: Half-PPR)' : 'Finish = his rank at the position by total Half-PPR points') + '</small></h4>'
           + careerTable(c, ps));
   }
   function wireChart() {
@@ -1496,9 +1758,16 @@
   }
 
   // League History tab -----------------------------------------------------
+  // already on the War Room page (a league from another platform): no link to itself
+  function onWarRoom() { try { var a = new URL(WARROOM_URL, location.href).pathname, b = location.pathname; return a === b || a.replace(/index\.html$/, '') === b.replace(/index\.html$/, ''); } catch (e) { return false; } }
   function nameOf(pid) { var q = pl(pid); return q ? q.name : PLN[pid] || 'a player'; }
   function leagueHTML(c, LHd, loading) {
-    if (!STATE.league) return empty('🏆', 'Link a league to see his history in your league', 'Who drafted him, every trade he was part of, and how he landed on his current team.', '<button type="button" class="dhqpc-btn dhqpc-gold" data-act="demo" style="margin-top:6px">' + (LEAGUE.id === DEMO.id ? 'Show the demo league' : 'Show ' + esc(LEAGUE.name)) + '</button>');
+    if (!STATE.league) {
+      // the demo league (and any league) only where it is allowed: the Lab, or the host's own league
+      var extra = STATE.canLeague ? '<button type="button" class="dhqpc-btn dhqpc-gold" data-act="demo" style="margin-top:6px">' + (LEAGUE.id === DEMO.id && ON_LAB ? 'Show the demo league' : 'Show ' + esc(LEAGUE.name || 'my league')) + '</button>'
+        : onWarRoom() ? '' : '<a class="dhqpc-btn dhqpc-gold" href="' + WARROOM_URL + '" style="margin-top:6px;text-decoration:none">Open the War Room</a>';
+      return empty('🏆', 'Link a league to see his history in your league', 'Who drafted him, every trade he was part of, and how he landed on his current team.' + (STATE.canLeague ? '' : ' Link your league in the War Room to see it.'), extra);
+    }
     if (loading && !LHd) return '<div class="dhqpc-loading">Reading ' + (LEAGUE.id === DEMO.id ? 'six seasons of ' : 'the ') + esc(LEAGUE.name) + ' history…</div>';
     var ev = custody(c.p.id, LHd);
     var items = ev.map(function (e) {
@@ -1519,7 +1788,7 @@
     if (!items.length && !now) return empty('🏆', 'No history in the ' + esc(LEAGUE.name), 'He has never been drafted, traded or rostered in this league.');
     var list = items.map(function (x) { return '<li><span class="dhqpc-dot" style="--dc:' + x.dc + '" aria-hidden="true">' + x.icon + '</span><div class="dhqpc-when">' + x.when + '</div><h4>' + x.h + '</h4>' + (x.p ? '<p>' + x.p + '</p>' : '') + (x.deal || '') + '</li>'; }).join('');
     list += '<li class="dhqpc-now"><span class="dhqpc-dot" aria-hidden="true">●</span><div class="dhqpc-when">Today</div><h4>' + (now ? 'On ' + esc(now[0]) + (now[1] && now[1] !== now[0] ? ' (' + esc(now[1]) + ')' : '') : 'A free agent in the league') + '</h4></li>';
-    return '<h4 class="dhqpc-sub-h">' + esc(LEAGUE.name) + ' <small>' + (LEAGUE.id === DEMO.id ? 'Demo league · ' : '') + (loading ? 'still reading older seasons…' : 'every draft, trade and pickup since the league began') + '</small></h4><ol class="dhqpc-tl">' + list + '</ol>'
+    return '<h4 class="dhqpc-sub-h">' + esc(LEAGUE.name) + ' <small>' + (LEAGUE.id === DEMO.id && ON_LAB ? 'Demo league · ' : '') + (loading ? 'still reading older seasons…' : 'every draft, trade and pickup since the league began') + '</small></h4><ol class="dhqpc-tl">' + list + '</ol>'
       + '<p class="dhqpc-note">Drafts and pickups from the league’s Sleeper history; trades and trade grades from DHQ.</p>';
   }
 
@@ -1592,9 +1861,11 @@
       Promise.all([pool(wks, 3, function (n) { return lockWeek(n, which); }), fillFinish(pid, ps, sc).catch(function () { ps.later = false; })]).then(function (res) {
         var arr = res[0];
         if (!live()) return;
-        var proj = {}, any = false; arr.forEach(function (x, i) { if (x) { proj[wks[i]] = x; any = true; } });
-        // this week: the engine feed's own projection
-        if (any && CUR.week) { proj[CUR.week] = {}; Object.keys(FEED.proj).forEach(function (id) { proj[CUR.week][id] = FEED.proj[id][0]; }); }
+        // his line each week, in the card's scoring (offense: Half-PPR rescored, as the strip's tile)
+        var proj = {}, any = false;
+        arr.forEach(function (x, i) { if (x) { proj[wks[i]] = {}; var v = lockPts(x[pid], c.pos); if (v != null) proj[wks[i]][pid] = v; any = true; } });
+        // this week: the strip's own number (the current week's lock)
+        if (any && CUR.week && c.proj) { proj[CUR.week] = {}; proj[CUR.week][pid] = c.proj[0]; }
         if (STATE.tab === 'stats') { el.innerHTML = statsHTML(c, ps, any ? proj : null, false); wireChart(); }
       });
     }
@@ -1654,7 +1925,7 @@
       else if (act === 'clip') showClip(+t.getAttribute('data-i'), true);
       else if (act === 'why') { var w = $('why'), o = w.hidden; w.hidden = !o; t.setAttribute('aria-expanded', o); }
       else if (act === 'more') { var li = t.closest('li'); li.classList.toggle('dhqpc-open'); t.textContent = li.classList.contains('dhqpc-open') ? 'Show less' : 'Read more'; }
-      else if (act === 'demo') { setLeague(true); if (STATE.onLeagueChange) STATE.onLeagueChange(true); }
+      else if (act === 'demo') { if (!STATE.canLeague) return; setLeague(true); if (STATE.onLeagueChange) STATE.onLeagueChange(true); }
       else if (act === 'stage') { selectTab('overview'); var sw = CARD.querySelector('#dhqpc-tp-overview .dhqpc-stage-why'); if (sw) sw.scrollIntoView({ behavior: 'smooth', block: 'center' }); }
     });
     document.addEventListener('keydown', function (e) {
@@ -1683,12 +1954,14 @@
     opts = opts || {};
     pid = String(pid == null ? '' : pid);
     build();
-    var lid = String(opts.leagueId || DEMO.id), sc = scoring(opts.scoringSettings), seq = ++STATE.seq;
-    STATE.pid = pid; STATE.league = !!opts.league; STATE.tab = TABS.some(function (t) { return t[0] === opts.tab; }) ? opts.tab : 'overview';
+    var lid = String(opts.leagueId || DEMO.id), sc = scoring(opts.scoringSettings, opts.scoringLabel), seq = ++STATE.seq;
+    VSET = normValueSettings(opts.valueSettings);
+    STATE.canLeague = leagueAllowed(opts); STATE.projFn = typeof opts.projection === 'function' ? opts.projection : null; STATE.L = null; STATE.sc = null;
+    STATE.pid = pid; STATE.league = !!opts.league && STATE.canLeague; STATE.tab = TABS.some(function (t) { return t[0] === opts.tab; }) ? opts.tab : 'overview';
     STATE.ctx = null; STATE.ps = null; STATE.hl = null; STATE.hlI = 0;
     STATE.onClose = typeof opts.onClose === 'function' ? opts.onClose : null;
     STATE.onLeagueChange = typeof opts.onLeagueChange === 'function' ? opts.onLeagueChange : null;
-    STATE.me = opts.myUserId != null && opts.myUserId !== '' ? String(opts.myUserId) : !opts.myUsername && lid === DEMO.id ? DEMO.owner : null;
+    STATE.me = opts.myUserId != null && opts.myUserId !== '' ? String(opts.myUserId) : ON_LAB && !opts.myUsername && lid === DEMO.id ? DEMO.owner : null;
     STATE.meName = opts.myUsername ? String(opts.myUsername).toLowerCase() : null;
     if (!STATE.open) { lastFocus = document.activeElement; STATE.open = true; }
     var known = pl(pid);
@@ -1700,7 +1973,7 @@
     return Promise.all([ensure(lid), meP]).then(function (r) {
       // kickers / defenders may score differently from the offense (see scoringFor)
       var q = pl(pid);
-      return scoringFor(q ? q.pos : '', opts.scoringSettings).then(function (x) { sc = x; return ensureScoring(sc); }).then(function () { return r; });
+      return scoringFor(q ? q.pos : '', opts.scoringSettings, opts.scoringLabel).then(function (x) { sc = x; return ensureScoring(sc); }).then(function () { return r; });
     }).then(function (r) {
       if (STATE.seq !== seq) return false;
       var L = r[0]; if (r[1]) STATE.me = r[1];
@@ -1710,12 +1983,15 @@
       if (!known) message('<div class="dhqpc-loading">Opening ' + esc(p.name) + '’s card…</div>');
       // kickers / defenders: last season's finish in this scoring (the career stage reads it)
       if (p.kidp && p.exp >= 1 && !(p.pos === 'K' && !sc.rules)) yearRanks(SEASON - 1, sc).catch(function () { /* finish stays unknown */ });
-      return playerStats(pid).catch(function () { return { seasons: [], weeks: [] }; }).then(function (ps) {
+      // this week's DHQ projection: the current NFL week's lock, in this scoring (read while activate(L, sc) holds)
+      var wpP = weekProj(pid, p.pos, p.team).catch(function () { return feedProj(pid, CUR.week || FEED.week); });
+      return Promise.all([playerStats(pid).catch(function () { return { seasons: [], weeks: [] }; }).then(function (ps) {
         return p.kidp ? fillFinish(pid, ps, sc, [SEASON - 1]).then(function () { return ps; }, function () { return ps; }) : ps;
-      }).then(function (ps) {
+      }), wpP]).then(function (res) {
+        var ps = res[0];
         if (STATE.seq !== seq) return false;
         activate(L, sc);
-        var c = context(pid, ps); STATE.ctx = c; STATE.ps = ps;
+        var c = context(pid, ps, res[1]); STATE.ctx = c; STATE.ps = ps; STATE.L = L; STATE.sc = sc;
         CARD.setAttribute('aria-label', c.p.name + ' player card');
         SCROLL.innerHTML = shell(c); SCROLL.scrollTop = 0;
         selectTab(STATE.tab);
@@ -1733,7 +2009,7 @@
   }
   function close() {
     if (!STATE.open) return;
-    STATE.open = false; STATE.pid = null; STATE.ctx = null;
+    STATE.open = false; STATE.pid = null; STATE.ctx = null; STATE.projFn = null; STATE.L = null; STATE.sc = null;
     var seq = ++STATE.seq;
     ROOT.classList.remove('dhqpc-on');
     setTimeout(function () { if (STATE.seq === seq) { ROOT.hidden = true; SCROLL.innerHTML = ''; } }, 180);
@@ -1743,25 +2019,49 @@
     var cb = STATE.onClose; STATE.onClose = null;
     if (cb) { try { cb(); } catch (e) { setTimeout(function () { throw e; }); } }
   }
-  function setLeague(on) { STATE.league = !!on; refreshLeagueBits(); }
+  function setLeague(on) { STATE.league = !!on && STATE.canLeague; refreshLeagueBits(); }
+  // The host's number for this week arrived or changed (opts.projection): re-read it and redraw
+  // the number strip and the open tab. → true when the card changed.
+  function refresh() {
+    var c = STATE.ctx;
+    if (!STATE.open || !c || !STATE.pid || !STATE.projFn || !STATE.L || !CARD) return false;
+    var strip = CARD.querySelector('.dhqpc-strip'); if (!strip) return false;
+    var a = c.wp || {}, w = withHost(c.wpOwn, c.p.id), b = w || {};
+    if (a.v === b.v && a.lo === b.lo && a.hi === b.hi && a.state === b.state && !!a.host === !!b.host) return false;
+    activate(STATE.L, STATE.sc);
+    setWeek(c, w);
+    var why = $('why'), wasOpen = !!why && !why.hidden, top = SCROLL.scrollTop;
+    if (why) why.remove();
+    strip.outerHTML = stripHTML(c);
+    var w2 = $('why'), wb = CARD.querySelector('.dhqpc-why-b');
+    if (w2 && wasOpen) { w2.hidden = false; if (wb) wb.setAttribute('aria-expanded', 'true'); }
+    if (STATE.tab === 'overview' || STATE.tab === 'stats') fillTab(STATE.tab); // floor / ceiling, this week's point on the chart
+    SCROLL.scrollTop = top;
+    return true;
+  }
 
   window.DHQPlayerCard = {
     version: VERSION,
     open: open,
     close: close,
     setLeague: setLeague,
+    refresh: refresh,
     // Warm the big data (Sleeper players, DHQ feed, season stats; + league history with { league:true }).
     // Resolves to a small search index: { leagueId, players: [{ id, name, pos, team, teamName, value }] }.
     preload: function (opts) {
       opts = opts || {};
-      var lid = String(opts.leagueId || DEMO.id), sc = scoring(opts.scoringSettings);
+      var lid = String(opts.leagueId || DEMO.id), sc = scoring(opts.scoringSettings), vs = lid === DEMO.id ? normValueSettings(opts.valueSettings) : null;
       return ensure(lid).then(function (L) {
         return ensureScoring(sc).then(function () {
-          if (opts.league) leagueHistory(L);
-          return { leagueId: lid, players: index(L).slice() };
+          if (opts.league && leagueAllowed(opts)) leagueHistory(L);
+          // valueSettings: the values the card shows for those settings (the demo league's only)
+          return { leagueId: lid, players: index(L).map(function (x) { return vs ? Object.assign({}, x, { value: valueAdj(x.value, x.pos, vs) }) : x; }) };
         });
       });
     },
+    // A Sleeper scoring_settings object for the Lab's presets: scoringSettings('ppr' | 'half' | 'std', tep, idp)
+    // (see opts.scoringSettings); null for anything else.
+    scoringSettings: function (preset, tep) { return presetSettings(preset, tep); },
     // Data bases: { locksBase, valuesBase, highlightsBase, valuesUrl, cssUrl, fonts }. Call before the first open.
     config: function (o) {
       Object.keys(o || {}).forEach(function (k) { if (Object.prototype.hasOwnProperty.call(CFG, k)) CFG[k] = o[k]; });

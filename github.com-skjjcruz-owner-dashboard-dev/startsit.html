@@ -3,6 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data: https://sleepercdn.com https://a.espncdn.com https://i.ytimg.com; connect-src 'self' https://dhq-lab.pages.dev https://hovnqztlbsgsywrbidbh.supabase.co https://sxshiqyxhhifvtfqawbq.supabase.co https://api.sleeper.app https://api.sleeper.com https://site.web.api.espn.com https://lm-api-reads.fantasy.espn.com; frame-src https://www.youtube-nocookie.com; base-uri 'self'; object-src 'none'">
 <title>Start Sit Advice · Dynasty HQ</title>
 <meta name="description" content="Put any players side by side and DHQ tells you who to start this week, with DHQ's projection and the full formula behind it. Free, no sign-up.">
 <link rel="icon" href="icon-192.png">
@@ -255,6 +256,14 @@ button,input,select{font:inherit;color:inherit}
   .ss-board.p2.c3{grid-template-columns:repeat(2,minmax(0,1fr))}
   .ss-board.p2 .ss-vs{display:grid}
 }
+@media (min-width:1101px) and (max-width:1320px){
+  /* four players across on a tablet held sideways or a small laptop: the columns are too narrow
+     for week, game and kickoff on one line beside the ×, so the week goes on its own line (the
+     phone layout's treatment). Two and three players are not touched. */
+  .ss-board.c4 .ss-game{white-space:normal}
+  .ss-board.c4 .ss-game .wk{display:block;font:700 10.5px var(--body);letter-spacing:.1em;text-transform:uppercase;color:var(--gold)}
+  .ss-board.c4 .ss-game > .sep{display:none}
+}
 @media (min-width:761px) and (max-width:1100px){
   /* three players on a tablet: the third sits centered under the first two */
   .ss-board.c3 > .ss-col:nth-child(3){grid-column:1 / -1;justify-self:center;width:calc(50% - 7px)}
@@ -367,8 +376,8 @@ button,input,select{font:inherit;color:inherit}
   .back{min-height:44px;padding:0 14px;font-size:13px;border-radius:30px}
 }
 </style>
-<link rel="stylesheet" href="player-card/dhq-player-card.css?v=20261118card3">
-<script src="player-card/dhq-player-card.js?v=20261118card3" defer></script>
+<link rel="stylesheet" href="player-card/dhq-player-card.css?v=20261119card4">
+<script src="player-card/dhq-player-card.js?v=20261119card4" defer></script>
 </head>
 <body>
 <div class="brandwash" aria-hidden="true"></div>

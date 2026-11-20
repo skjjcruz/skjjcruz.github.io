@@ -12,11 +12,18 @@
      (PPR / Half-PPR / Standard, + TE premium) and opts.valueSettings, so a
      card opened from Player Values / Weekly Projections / Start Sit shows
      the same numbers as the page; tabs fit on phones (two rows of three).
+     1.3.1 (2026-11-19): opts.projection, so a host shows its own number for
+     this week (the War Room: the Lineup tab's) + DHQPlayerCard.refresh() for a
+     number that arrives late; the demo league's "In my league" strip, League
+     History and "Your team" only on the Lab (dhq-lab.pages.dev), or for a
+     league the host passes itself (leagueId).
 
      One global, nothing else leaks:
        DHQPlayerCard.open(pid, opts)  → Promise<boolean> (true = card shown)
        DHQPlayerCard.close()
        DHQPlayerCard.setLeague(on)    show / hide the league bits on the open card
+       DHQPlayerCard.refresh()        re-read opts.projection for the open card (the host's
+                                      number arrived or changed); → true if the card changed
        DHQPlayerCard.preload(opts)    warm the big data; → Promise<{ leagueId, players }>
        DHQPlayerCard.config(o)        set data bases ({ locksBase, valuesBase, highlightsBase,
                                       valuesUrl, cssUrl, fonts }); → the current config
@@ -25,9 +32,22 @@
      opts (all optional)
        leagueId        Sleeper league whose DHQ values / rosters to use
                        (default the Lab's demo league, Psycho League)
-       league          true: the "In my league" strip + League History tab
+       league          true: the "In my league" strip + League History tab.
+                       Needs the host's own leagueId; the demo league's rosters,
+                       owners and trades are shown only on the Lab (dhq-lab.pages.dev).
+                       Anywhere else, league: true without a leagueId is ignored, and
+                       the card's own "Show my league" button is not offered.
        myUserId        Sleeper user id of "YOUR TEAM" (or myUsername, resolved
-                       through Sleeper). Default: the Lab owner, demo league only.
+                       through Sleeper). Default: the Lab owner, demo league, on the Lab only.
+       projection      function(pid) → this week's points in the host's own scoring:
+                       a number, or { v, lo, hi } (median, floor, ceiling), or null /
+                       undefined when the host has no number (the card then shows its
+                       own, from the week's lock file, exactly as without the option).
+                       The host's number is the card's "this week" number everywhere
+                       (number strip, floor / ceiling, the Stats tab's current week);
+                       without lo / hi, the lock's range is scaled to it. 0 reads as
+                       "no points projected" (or the bye). The "why" stays DHQ's.
+                       Call DHQPlayerCard.refresh() when the number arrives later.
        scoringSettings a Sleeper league scoring_settings object; every fantasy-
                        points number is then scored with it ("League scoring")
                        instead of Sleeper's Half-PPR points. Kickers use it only
@@ -56,7 +76,7 @@
        tab             'overview' | 'stats' | 'news' | 'league' | 'college' | 'awards'
        onClose         function, runs at the end of close()
        onLeagueChange  function(on), runs when the card's own "Show the demo
-                       league" button turns the league view on
+                       league" button (Lab, or the host's league) turns the league view on
 
      The card builds its own overlay on first open (appended to <body>); all
      its CSS lives under .dhqpc-root (dhq-player-card.css, linked by the host;
@@ -119,10 +139,15 @@
      ══════════════════════════════════════════════════════════════════════ */
 
   // ── Settings ──────────────────────────────────────────────────────────
-  var VERSION = '1.3.0';
+  var VERSION = '1.3.1';
   var SEASON = 2026;
   var DEMO = { id: '1312100327931019264', name: 'Psycho League', owner: '540392203863576576' };
   var ON_LAB = /(^|\.)dhq-lab\.pages\.dev$/i.test(location.hostname);
+  // The demo league's rosters, owners and trade history are for the Lab only. Any other host has to ask
+  // for its own league: league: true together with its leagueId (a leagueId alone, passed for the
+  // league's values, never offers the league view).
+  function leagueAllowed(opts) { return ON_LAB || !!(opts && opts.league && opts.leagueId != null && String(opts.leagueId) !== ''); }
+  var WARROOM_URL = 'index.html'; // where "Open the War Room" points (the website's app page)
   var SELF = (document.currentScript && document.currentScript.src) || '';
   var CFG = {
     valuesUrl: 'https://hovnqztlbsgsywrbidbh.supabase.co/functions/v1/dhq-league', // + ?league=ID (or put {league} in it)
@@ -595,6 +620,8 @@
       // this week's DHQ projection (weekProj): [median, floor, ceiling] in the card's scoring, or null
       wp: wp || null, proj: wp && wp.v > 0 ? [wp.v, wp.lo, wp.hi] : null
     };
+    c.wpOwn = wp || null; // the card's own line (weekProj), kept so refresh() can re-apply the host's number
+    setWeek(c, withHost(wp || null, pid));
     c.stage = careerStage(c);
     c.W = c.stage.W;
     if (p.kidp) kidpCtx(c, ps);
@@ -623,6 +650,7 @@
     return Math.round(Math.min(VMAX - 1, VMAX * Math.pow(Math.max(0, raw * f) / VMAX, k)));
   }
   // only the demo league's values are adjusted (another league's values are already its own)
+  function setWeek(c, wp) { c.wp = wp || null; c.proj = wp && wp.v > 0 ? [wp.v, wp.lo, wp.hi] : null; }
   function valueFor(raw, pos) { return LEAGUE.id === DEMO.id ? valueAdj(raw, pos, VSET) : raw; }
   function vsEstimate(vs) { return !!vs && (vs.scoring !== VSRC.scoring || vs.qb !== VSRC.qb || vs.tep !== VSRC.tep || vs.teams !== VSRC.teams); }
   // "12-team superflex · PPR (estimate)": what the value shown is for
@@ -1093,6 +1121,28 @@
       return out;
     });
   }
+  // The host's own number for this week (opts.projection): → { v, lo, hi } | null (no number: the card's own)
+  function hostNum(pid) {
+    if (typeof STATE.projFn !== 'function') return null;
+    var r; try { r = STATE.projFn(String(pid)); } catch (e) { return null; }
+    if (r == null || r === '') return null;
+    var o = typeof r === 'object' ? r : { v: r }, v = o.v == null || o.v === '' ? NaN : +o.v;
+    if (!isFinite(v) || v < 0) return null;
+    var n = function (x) { return x != null && x !== '' && isFinite(+x) ? +x : null; };
+    return { v: v, lo: n(o.lo), hi: n(o.hi) };
+  }
+  // weekProj's result with the host's number in place of the lock's (the "why" and the bye stay the lock's)
+  function withHost(w, pid) {
+    var h = hostNum(pid); if (!h) return w;
+    var base = w || { wk: CUR.week || FEED.week || null, v: null, state: 'na', items: [] };
+    var o = {}; Object.keys(base).forEach(function (k) { o[k] = base[k]; });
+    o.host = true; o.v = h.v; o.lo = null; o.hi = null;
+    if (!(h.v > 0)) { o.state = base.state === 'bye' ? 'bye' : 'zero'; return o; }
+    o.state = 'ok';
+    if (h.lo != null && h.hi != null) { o.lo = Math.min(h.lo, h.v); o.hi = Math.max(h.hi, h.v); }
+    else if (base.v > 0) { var k = h.v / base.v; if (base.lo != null) o.lo = base.lo * k; if (base.hi != null) o.hi = base.hi * k; }
+    return o;
+  }
   // The "why": every factor that moved his number, biggest first, with the engine's note.
   // From the formula file ([key, label, weight, multiplier, impact %, note, ruled out, has data]
   // + the DHQ position-model step), else from the lock's own "why" line.
@@ -1288,7 +1338,7 @@
   }
 
   // ═════════════════════════════ RENDER ═════════════════════════════════
-  var STATE = { pid: null, league: false, tab: 'overview', ctx: null, ps: null, seq: 0, open: false, me: null, meName: null, onClose: null, onLeagueChange: null };
+  var STATE = { pid: null, league: false, canLeague: false, projFn: null, L: null, sc: null, tab: 'overview', ctx: null, ps: null, seq: 0, open: false, me: null, meName: null, onClose: null, onLeagueChange: null };
   var TABS = [['overview', 'Overview'], ['stats', 'Stats'], ['news', 'News'], ['league', 'League History'], ['college', 'College'], ['awards', 'Awards']];
   function ht(inches) { var n = +inches; if (!n) return inches || ''; return Math.floor(n / 12) + '′' + (n % 12) + '″'; }
   function initials(n) { return String(n).split(' ').map(function (w) { return w[0]; }).join('').slice(0, 2); }
@@ -1708,9 +1758,16 @@
   }
 
   // League History tab -----------------------------------------------------
+  // already on the War Room page (a league from another platform): no link to itself
+  function onWarRoom() { try { var a = new URL(WARROOM_URL, location.href).pathname, b = location.pathname; return a === b || a.replace(/index\.html$/, '') === b.replace(/index\.html$/, ''); } catch (e) { return false; } }
   function nameOf(pid) { var q = pl(pid); return q ? q.name : PLN[pid] || 'a player'; }
   function leagueHTML(c, LHd, loading) {
-    if (!STATE.league) return empty('🏆', 'Link a league to see his history in your league', 'Who drafted him, every trade he was part of, and how he landed on his current team.', '<button type="button" class="dhqpc-btn dhqpc-gold" data-act="demo" style="margin-top:6px">' + (LEAGUE.id === DEMO.id ? 'Show the demo league' : 'Show ' + esc(LEAGUE.name)) + '</button>');
+    if (!STATE.league) {
+      // the demo league (and any league) only where it is allowed: the Lab, or the host's own league
+      var extra = STATE.canLeague ? '<button type="button" class="dhqpc-btn dhqpc-gold" data-act="demo" style="margin-top:6px">' + (LEAGUE.id === DEMO.id && ON_LAB ? 'Show the demo league' : 'Show ' + esc(LEAGUE.name || 'my league')) + '</button>'
+        : onWarRoom() ? '' : '<a class="dhqpc-btn dhqpc-gold" href="' + WARROOM_URL + '" style="margin-top:6px;text-decoration:none">Open the War Room</a>';
+      return empty('🏆', 'Link a league to see his history in your league', 'Who drafted him, every trade he was part of, and how he landed on his current team.' + (STATE.canLeague ? '' : ' Link your league in the War Room to see it.'), extra);
+    }
     if (loading && !LHd) return '<div class="dhqpc-loading">Reading ' + (LEAGUE.id === DEMO.id ? 'six seasons of ' : 'the ') + esc(LEAGUE.name) + ' history…</div>';
     var ev = custody(c.p.id, LHd);
     var items = ev.map(function (e) {
@@ -1731,7 +1788,7 @@
     if (!items.length && !now) return empty('🏆', 'No history in the ' + esc(LEAGUE.name), 'He has never been drafted, traded or rostered in this league.');
     var list = items.map(function (x) { return '<li><span class="dhqpc-dot" style="--dc:' + x.dc + '" aria-hidden="true">' + x.icon + '</span><div class="dhqpc-when">' + x.when + '</div><h4>' + x.h + '</h4>' + (x.p ? '<p>' + x.p + '</p>' : '') + (x.deal || '') + '</li>'; }).join('');
     list += '<li class="dhqpc-now"><span class="dhqpc-dot" aria-hidden="true">●</span><div class="dhqpc-when">Today</div><h4>' + (now ? 'On ' + esc(now[0]) + (now[1] && now[1] !== now[0] ? ' (' + esc(now[1]) + ')' : '') : 'A free agent in the league') + '</h4></li>';
-    return '<h4 class="dhqpc-sub-h">' + esc(LEAGUE.name) + ' <small>' + (LEAGUE.id === DEMO.id ? 'Demo league · ' : '') + (loading ? 'still reading older seasons…' : 'every draft, trade and pickup since the league began') + '</small></h4><ol class="dhqpc-tl">' + list + '</ol>'
+    return '<h4 class="dhqpc-sub-h">' + esc(LEAGUE.name) + ' <small>' + (LEAGUE.id === DEMO.id && ON_LAB ? 'Demo league · ' : '') + (loading ? 'still reading older seasons…' : 'every draft, trade and pickup since the league began') + '</small></h4><ol class="dhqpc-tl">' + list + '</ol>'
       + '<p class="dhqpc-note">Drafts and pickups from the league’s Sleeper history; trades and trade grades from DHQ.</p>';
   }
 
@@ -1868,7 +1925,7 @@
       else if (act === 'clip') showClip(+t.getAttribute('data-i'), true);
       else if (act === 'why') { var w = $('why'), o = w.hidden; w.hidden = !o; t.setAttribute('aria-expanded', o); }
       else if (act === 'more') { var li = t.closest('li'); li.classList.toggle('dhqpc-open'); t.textContent = li.classList.contains('dhqpc-open') ? 'Show less' : 'Read more'; }
-      else if (act === 'demo') { setLeague(true); if (STATE.onLeagueChange) STATE.onLeagueChange(true); }
+      else if (act === 'demo') { if (!STATE.canLeague) return; setLeague(true); if (STATE.onLeagueChange) STATE.onLeagueChange(true); }
       else if (act === 'stage') { selectTab('overview'); var sw = CARD.querySelector('#dhqpc-tp-overview .dhqpc-stage-why'); if (sw) sw.scrollIntoView({ behavior: 'smooth', block: 'center' }); }
     });
     document.addEventListener('keydown', function (e) {
@@ -1899,11 +1956,12 @@
     build();
     var lid = String(opts.leagueId || DEMO.id), sc = scoring(opts.scoringSettings, opts.scoringLabel), seq = ++STATE.seq;
     VSET = normValueSettings(opts.valueSettings);
-    STATE.pid = pid; STATE.league = !!opts.league; STATE.tab = TABS.some(function (t) { return t[0] === opts.tab; }) ? opts.tab : 'overview';
+    STATE.canLeague = leagueAllowed(opts); STATE.projFn = typeof opts.projection === 'function' ? opts.projection : null; STATE.L = null; STATE.sc = null;
+    STATE.pid = pid; STATE.league = !!opts.league && STATE.canLeague; STATE.tab = TABS.some(function (t) { return t[0] === opts.tab; }) ? opts.tab : 'overview';
     STATE.ctx = null; STATE.ps = null; STATE.hl = null; STATE.hlI = 0;
     STATE.onClose = typeof opts.onClose === 'function' ? opts.onClose : null;
     STATE.onLeagueChange = typeof opts.onLeagueChange === 'function' ? opts.onLeagueChange : null;
-    STATE.me = opts.myUserId != null && opts.myUserId !== '' ? String(opts.myUserId) : !opts.myUsername && lid === DEMO.id ? DEMO.owner : null;
+    STATE.me = opts.myUserId != null && opts.myUserId !== '' ? String(opts.myUserId) : ON_LAB && !opts.myUsername && lid === DEMO.id ? DEMO.owner : null;
     STATE.meName = opts.myUsername ? String(opts.myUsername).toLowerCase() : null;
     if (!STATE.open) { lastFocus = document.activeElement; STATE.open = true; }
     var known = pl(pid);
@@ -1933,7 +1991,7 @@
         var ps = res[0];
         if (STATE.seq !== seq) return false;
         activate(L, sc);
-        var c = context(pid, ps, res[1]); STATE.ctx = c; STATE.ps = ps;
+        var c = context(pid, ps, res[1]); STATE.ctx = c; STATE.ps = ps; STATE.L = L; STATE.sc = sc;
         CARD.setAttribute('aria-label', c.p.name + ' player card');
         SCROLL.innerHTML = shell(c); SCROLL.scrollTop = 0;
         selectTab(STATE.tab);
@@ -1951,7 +2009,7 @@
   }
   function close() {
     if (!STATE.open) return;
-    STATE.open = false; STATE.pid = null; STATE.ctx = null;
+    STATE.open = false; STATE.pid = null; STATE.ctx = null; STATE.projFn = null; STATE.L = null; STATE.sc = null;
     var seq = ++STATE.seq;
     ROOT.classList.remove('dhqpc-on');
     setTimeout(function () { if (STATE.seq === seq) { ROOT.hidden = true; SCROLL.innerHTML = ''; } }, 180);
@@ -1961,13 +2019,33 @@
     var cb = STATE.onClose; STATE.onClose = null;
     if (cb) { try { cb(); } catch (e) { setTimeout(function () { throw e; }); } }
   }
-  function setLeague(on) { STATE.league = !!on; refreshLeagueBits(); }
+  function setLeague(on) { STATE.league = !!on && STATE.canLeague; refreshLeagueBits(); }
+  // The host's number for this week arrived or changed (opts.projection): re-read it and redraw
+  // the number strip and the open tab. → true when the card changed.
+  function refresh() {
+    var c = STATE.ctx;
+    if (!STATE.open || !c || !STATE.pid || !STATE.projFn || !STATE.L || !CARD) return false;
+    var strip = CARD.querySelector('.dhqpc-strip'); if (!strip) return false;
+    var a = c.wp || {}, w = withHost(c.wpOwn, c.p.id), b = w || {};
+    if (a.v === b.v && a.lo === b.lo && a.hi === b.hi && a.state === b.state && !!a.host === !!b.host) return false;
+    activate(STATE.L, STATE.sc);
+    setWeek(c, w);
+    var why = $('why'), wasOpen = !!why && !why.hidden, top = SCROLL.scrollTop;
+    if (why) why.remove();
+    strip.outerHTML = stripHTML(c);
+    var w2 = $('why'), wb = CARD.querySelector('.dhqpc-why-b');
+    if (w2 && wasOpen) { w2.hidden = false; if (wb) wb.setAttribute('aria-expanded', 'true'); }
+    if (STATE.tab === 'overview' || STATE.tab === 'stats') fillTab(STATE.tab); // floor / ceiling, this week's point on the chart
+    SCROLL.scrollTop = top;
+    return true;
+  }
 
   window.DHQPlayerCard = {
     version: VERSION,
     open: open,
     close: close,
     setLeague: setLeague,
+    refresh: refresh,
     // Warm the big data (Sleeper players, DHQ feed, season stats; + league history with { league:true }).
     // Resolves to a small search index: { leagueId, players: [{ id, name, pos, team, teamName, value }] }.
     preload: function (opts) {
@@ -1975,7 +2053,7 @@
       var lid = String(opts.leagueId || DEMO.id), sc = scoring(opts.scoringSettings), vs = lid === DEMO.id ? normValueSettings(opts.valueSettings) : null;
       return ensure(lid).then(function (L) {
         return ensureScoring(sc).then(function () {
-          if (opts.league) leagueHistory(L);
+          if (opts.league && leagueAllowed(opts)) leagueHistory(L);
           // valueSettings: the values the card shows for those settings (the demo league's only)
           return { leagueId: lid, players: index(L).map(function (x) { return vs ? Object.assign({}, x, { value: valueAdj(x.value, x.pos, vs) }) : x; }) };
         });

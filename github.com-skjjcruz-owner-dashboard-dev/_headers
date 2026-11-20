@@ -1,0 +1,8 @@
+# Response headers for Cloudflare Pages (dhqfootball.com). GitHub Pages ignores this file.
+#
+# Clickjacking protection: only this site may show its pages inside a frame
+# (landing-editor.html previews landing.html that way). This has to be a real
+# response header: browsers ignore frame-ancestors in a <meta> tag, so the
+# pages' own Content-Security-Policy metas cannot set it.
+/*
+  Content-Security-Policy: frame-ancestors 'self'
