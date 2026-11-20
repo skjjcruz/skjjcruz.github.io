@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data:; connect-src 'self'; base-uri 'self'; object-src 'none'; form-action 'none';">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data:; connect-src 'self' https://sxshiqyxhhifvtfqawbq.supabase.co; base-uri 'self'; object-src 'none'; form-action 'none';">
 <meta name="color-scheme" content="dark">
 <title>The League Wire · sample edition · Dynasty HQ</title>
 <link rel="icon" href="icon-192.png">
@@ -237,6 +237,7 @@
     </section>
   </article>
 </div>
+<script src="js/shared/front-visit.js?v=20261120fv1"></script>
 <script>
 (function () {
   'use strict';
@@ -264,6 +265,8 @@
       v = m ? m[1] : v.replace(/\D/g, '');
       if (!/^\d{3,12}$/.test(v)) { err.textContent = plat === 'mfl' ? 'Type your MFL league ID. It is the number after L= in your MFL web address, like 41208.' : "Type your ESPN league ID. It is the number after leagueId= in your ESPN league's web address."; err.hidden = false; $('getIn').focus(); return; }
     }
+    // Front Door tracking (owner ask 2026-11-20; js/shared/front-visit.js): which site, never what was typed.
+    try { if (window.DHQVisit) window.DHQVisit.track('tool_used', { meta: { action: 'submitted', platform: plat } }); } catch (x) { /* never in the way */ }
     // The War Room opens the real Wire once the league is in.
     try { sessionStorage.setItem('dhq_open_wire_v1', JSON.stringify({ ts: Date.now() })); } catch (x) { /* no auto-open */ }
     // The front page's own War Room box does the rest (accounts, guests, the connect step).

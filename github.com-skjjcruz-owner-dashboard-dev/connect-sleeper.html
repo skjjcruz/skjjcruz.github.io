@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <meta name="dhq-build" content="b194a-d55fe063a2">
+  <meta name="dhq-build" content="b194a-fedcca4f2b">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, minimum-scale=1.0, viewport-fit=cover">
   <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com data:; img-src 'self' data: blob: https:; connect-src 'self' https://sxshiqyxhhifvtfqawbq.supabase.co https://api.sleeper.app https://api.myfantasyleague.com https://*.myfantasyleague.com https://lm-api-reads.fantasy.espn.com https://fantasysports.yahooapis.com https://*.sentry.io; worker-src 'self' blob:; base-uri 'self'; object-src 'none';">
   <title>Dynasty HQ — Connect your leagues</title>
@@ -154,6 +154,8 @@
   </style>
   <!-- Live update: reloads onto a new deploy at a safe moment (js/shared/live-update.js) -->
   <script src="js/shared/live-update.js?v=f09653177c"></script>
+  <!-- Front Door tracking (owner ask 2026-11-20): link a front-page / free-tool visitor to the name they give here. -->
+  <script src="js/shared/front-visit.js?v=1ad33609d7"></script>
 </head>
 <body>
   <main class="card">
@@ -749,6 +751,11 @@
       if (espnAutoEnter) enterApp();
     }
 
+    // Front Door (js/shared/front-visit.js): visitor_linked once the visitor has a name here
+    // (only for someone who came through the front page or a free tool; settles within 900 ms).
+    function visitLink(wait) { try { return window.DHQVisit ? window.DHQVisit.link({ wait: wait }) : null; } catch (e) { return null; } }
+    visitLink(30000);
+
     let entering = false;
     async function enterAppRun() {
       if (!Object.keys(TABS).some(k => linked[k])) return;
@@ -765,7 +772,7 @@
       // The account write must land before we leave (keepalive covers a
       // slow one; the cap keeps a dead network from holding the user here).
       const settle = (p) => (IDN ? IDN.settle(p, 4000) : Promise.resolve());
-      await Promise.all([settle(pushToAccount()), new Promise(r => setTimeout(r, 700))]);
+      await Promise.all([settle(pushToAccount()), new Promise(r => setTimeout(r, 700)), visitLink(0)]);
       window.location.href = destForUser();
     }
 

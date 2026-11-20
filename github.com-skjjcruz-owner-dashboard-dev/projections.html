@@ -403,6 +403,7 @@ button,input,select{font:inherit;color:inherit}
 </div>
 <div class="toast" id="toast" role="status"></div>
 
+<script src="js/shared/front-visit.js?v=20261120fv1"></script>
 <script>
 (function () {
   'use strict';
@@ -963,6 +964,26 @@ button,input,select{font:inherit;color:inherit}
       + '; other league settings adjust those values by position and are estimates. Pts, GP and APG are this season\'s actual results in your scoring. Proj is DHQ\'s projection for this week; BYE means the team does not play. Last Wk is what the player actually scored last week.';
     render();
   }).catch(function () { $('rows').innerHTML = '<p class="err" style="padding:14px">DHQ values could not be loaded right now. Check your connection and refresh the page.</p>'; });
+})();
+</script>
+<script>
+/* Front Door tracking (owner ask 2026-11-20; js/shared/front-visit.js): the tab, search and sort a
+   visitor uses (each at most once per 30 s) and the player cards they open. Listens only. */
+(function () {
+  function t(name, o) { try { if (window.DHQVisit) window.DHQVisit.track(name, o); } catch (e) { /* never in the way */ } }
+  document.addEventListener('click', function (e) {
+    var el = e.target.closest ? e.target : null; if (!el) return;
+    var tab = el.closest('.tabs a[data-view]');
+    if (tab) { t('tool_used', { meta: { action: 'tab', tab: tab.getAttribute('data-view') } }); return; }
+    if (el.closest('#thead [data-sort]')) { t('tool_used', { meta: { action: 'sort' } }); return; }
+    var card = el.closest('#rows [data-card]');
+    if (card && !el.closest('.more')) t('card_opened', { entityType: 'player', entityId: card.getAttribute('data-card') });
+  }, true);
+  document.addEventListener('keydown', function (e) {
+    var card = e.target && e.target.closest && e.target.closest('#rows [data-card]');
+    if (card && (e.key === 'Enter' || e.key === ' ')) t('card_opened', { entityType: 'player', entityId: card.getAttribute('data-card') });
+  }, true);
+  document.addEventListener('input', function (e) { if (e.target && e.target.id === 'q' && e.target.value) t('tool_used', { meta: { action: 'search' } }); }, true);
 })();
 </script>
 </body>

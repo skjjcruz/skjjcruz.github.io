@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="utf-8">
-<meta name="dhq-build" content="b194a-d55fe063a2">
+<meta name="dhq-build" content="b194a-fedcca4f2b">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com data:; img-src 'self' data: blob: https:; connect-src 'self' https://sxshiqyxhhifvtfqawbq.supabase.co https://hovnqztlbsgsywrbidbh.supabase.co https://api.anthropic.com https://api.openai.com https://generativelanguage.googleapis.com https://dhq-lab.pages.dev https://api.sleeper.app https://api.myfantasyleague.com https://*.myfantasyleague.com https://lm-api-reads.fantasy.espn.com https://fantasysports.yahooapis.com https://*.sentry.io; worker-src 'self' blob:; base-uri 'self'; object-src 'none';">
 <title>Dynasty HQ — Generic advice stops here.</title>
@@ -1055,8 +1055,8 @@ a.fg-entry { text-decoration: none; }
 <!-- Lab (owner ask 2026-11-17): the front page's own Ask your AI box. Members open it from
      "Ask your AI" / "Bring your own AI" and ask about any player with their own AI (my-ai/). -->
 <script src="reconai-shared/trade-engine.js?v=e66d5282bb"></script>
-<script src="my-ai/ask.js?v=8998a82062"></script>
-<script src="my-ai/panel.js?v=ab6ea8882f"></script>
+<script src="my-ai/ask.js?v=60dcc192b0"></script>
+<script src="my-ai/panel.js?v=364967a97f"></script>
 
 <!-- Sign-up / sign-in sheet -->
 <div class="sheet" id="authSheet" hidden>
@@ -1125,6 +1125,8 @@ a.fg-entry { text-decoration: none; }
   </div>
 </div>
   <script src="vendor/supabase.min.js?v=7d46902303"></script>
+  <!-- Front Door tracking (owner ask 2026-11-20): one visitor id across the front page and the free tools. -->
+  <script src="js/shared/front-visit.js?v=1ad33609d7"></script>
   <script>
     const FW_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InN4c2hpcXl4aGhpZnZ0ZnFhd2JxIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzI3MTExMzAsImV4cCI6MjA4ODI4NzEzMH0.zJi9W986ZLaANiZN6pt6ReFwaQU6yPeidsERIWo2ibI';
     const SUPABASE_URL = 'https://sxshiqyxhhifvtfqawbq.supabase.co';
@@ -1148,6 +1150,9 @@ a.fg-entry { text-decoration: none; }
 
     const LANDING_ANALYTICS_SESSION_KEY = 'fw_landing_analytics_session_v1';
     function landingAnalyticsSessionId() {
+      // One session id with the tools' tracker (js/shared/front-visit.js), so a front-page visit
+      // and the tools it leads to read as one session in Mission Control.
+      try { if (window.DHQVisit) return window.DHQVisit.session(); } catch (e) { /* the page's own id */ }
       try {
         let sid = sessionStorage.getItem(LANDING_ANALYTICS_SESSION_KEY);
         if (!sid) {
@@ -1199,6 +1204,11 @@ a.fg-entry { text-decoration: none; }
         surface: detectSurface(),
         host: window.location.hostname || null,
       };
+      // Front Door (owner ask 2026-11-20): who (an anonymous visitor id), on what kind of device, where (time zone).
+      try {
+        const c = window.DHQVisit ? window.DHQVisit.common() : null;
+        if (c) Object.keys(c).forEach(k => { if (c[k] != null) out[k] = c[k]; });
+      } catch (e) {}
       const internal = dhqInternalTag();
       if (internal) out.internal = internal;
       // The deploy stamps (scripts/build-deploy.cjs);
@@ -1274,6 +1284,43 @@ a.fg-entry { text-decoration: none; }
         entityType: 'cta',
         entityId: target.id || target.className.split(/\s+/)[0],
       });
+    }, { capture: true });
+    // Front Door (owner ask 2026-11-20): which of the front page's controls a visitor uses
+    // (front_clicked, metadata.target). Sent by js/shared/front-visit.js with keepalive, so a
+    // tap that leaves the page still lands.
+    function frontTarget(el) {
+      const href = el.getAttribute('href') || '';
+      if (el.id === 'wireEntry') return { target: 'wire' };
+      if (el.id === 'btnGuest') {
+        const p = document.querySelector('.platform button[aria-pressed="true"]');
+        return { target: 'war_room', platform: (p && p.dataset.platform) || 'sleeper' };
+      }
+      if (el.id === 'merchBtn') return { target: 'merch' };
+      if (el.id === 'authBack') return { target: 'my_leagues' };
+      if (el.hasAttribute('data-ai-signup')) return { target: 'ask_ai', placement: el.classList.contains('fg-announce') ? 'banner' : 'button' };
+      if (el.id === 'navSignin' || el.matches('[data-open-sheet]')) {
+        const mode = el.getAttribute('data-open-sheet');
+        return { target: mode === 'signup' ? 'join' : mode === 'signin' ? 'signin' : 'my_leagues', placement: el.id === 'navSignin' ? 'header' : 'footer' };
+      }
+      if (/^projections\.html/.test(href)) return { target: 'projections', tab: /#weekly/.test(href) ? 'weekly' : 'values' };
+      if (/^trade\.html/.test(href)) return { target: 'trade' };
+      if (/^startsit\.html/.test(href)) return { target: 'startsit' };
+      if (/^commish\.html/.test(href)) return { target: 'commish' };
+      if (/discord\.gg/.test(href)) return { target: 'discord' };
+      if (/(^|\/\/)(x|twitter)\.com/.test(href)) return { target: 'x' };
+      if (/apps\.apple\.com/.test(href)) return { target: 'appstore' };
+      if (el.id === 'contactLink') return { target: 'other', link: 'contact' };
+      if (href && !/^#/.test(href)) return { target: 'other', link: href.replace(/\.html.*$/, '').replace(/^.*\//, '').slice(0, 40) };
+      return null;
+    }
+    document.addEventListener('click', (evt) => {
+      try {
+        if (!window.DHQVisit || LANDING_EDITOR_PREVIEW) return;
+        const el = evt.target.closest?.('.fg-main a, .fg-footer a, .fg-header button, .fg-footer button, #btnGuest, #authBack, [data-ai-signup]');
+        if (!el) return;
+        const meta = frontTarget(el);
+        if (meta) window.DHQVisit.track('front_clicked', { module: 'landing', widget: null, meta });
+      } catch (e) {}
     }, { capture: true });
 
     const WARROOM_URL = 'index.html';

@@ -168,6 +168,7 @@ a{color:var(--gold)}
 </div>
 
 <script src="player-card/dhq-player-card.js?v=20261119card4"></script>
+<script src="js/shared/front-visit.js?v=20261120fv1"></script>
 <script>
 (function () {
   'use strict';
@@ -235,6 +236,9 @@ a{color:var(--gold)}
   }
   function openP(pid) {
     CUR = pid;
+    // Front Door tracking (js/shared/front-visit.js). A card opened from Player Values / Weekly
+    // Projections (from=) was already counted there.
+    if (!FROM) { try { if (window.DHQVisit) window.DHQVisit.track('card_opened', { entityType: 'player', entityId: pid }); } catch (e) { /* never in the way */ } }
     try { history.replaceState(null, '', '#p=' + pid + (FROM ? '&from=' + FROM : '') + setHash()); } catch (e) { /* file:// */ }
     return PC.open(pid, Object.assign(cardOpts(), {
       league: lgOn(), onClose: onCardClose,

@@ -3,7 +3,7 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="dhq-build" content="b194a-d55fe063a2">
+    <meta name="dhq-build" content="b194a-fedcca4f2b">
     <meta name="dhq-engine-v" content="15d59f6d2f">
     <meta name="dhq-proj-model" content="00516df75ee1">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, minimum-scale=1.0, viewport-fit=cover">
@@ -3198,6 +3198,9 @@ WRShared.preloadMany(WR_SHARED_FILES);
 <script src="js/shared/viewport.js?v=ac8511b9d2"></script>
 <!-- 1a3. Live update — picks up a new deploy in a running page / resumed app (plain JS; replaces update-sentinel.js) -->
 <script src="js/shared/live-update.js?v=f09653177c"></script>
+<!-- 1a4. Front Door tracking: a visitor who came through the front page or a free tool is linked to who they are here (visitor_linked, once). War Room-only users send nothing. -->
+<script src="js/shared/front-visit.js?v=1ad33609d7"></script>
+<script>try { if (window.DHQVisit) window.DHQVisit.link(); } catch (e) { /* never in the way */ }</script>
 <!-- 1b. Format/phase skin contract for league-type-aware modules -->
 <script src="js/league-skin.js?v=4cb12026c6"></script>
 <!-- 2. Shared components: UpgradeGate, GMMessage, PlayerInlineCard -->

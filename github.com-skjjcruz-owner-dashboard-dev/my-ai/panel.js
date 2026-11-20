@@ -173,10 +173,13 @@
           localStorage.removeItem(OLD_KEY); localStorage.removeItem(OLD_PROV);
         } catch (e3) { return say('This browser wouldn\'t store the key (private browsing?). Try a normal tab.', true); }
         $('aipKeyIn').value = '';
+        visit('ai_key_saved', { provider: prov === 'gemini' ? 'google' : prov });   // which AI only, never the key
         show('chat', ok === 'ok' ? 'saved and working' : 'saved');
       });
     });
   }
+  // Front Door tracking (js/shared/front-visit.js, when the page loads it).
+  function visit(name, meta) { try { if (root.DHQVisit) root.DHQVisit.track(name, { module: 'tools', widget: 'ai', meta: meta }); } catch (e) { /* never in the way */ } }
   function say(t, bad) { var m = $('aipMsg'); m.textContent = t; m.classList.toggle('bad', !!bad); }
   function show(state, note) {
     var k = savedKey();
@@ -201,6 +204,7 @@
     try { sessionStorage.removeItem('dhq_ai_signup_v1'); } catch (e) { /* done with the AI sign-up */ }
     el.hidden = false; back.hidden = false;
     show(savedKey() ? 'chat' : 'setup');
+    visit('ai_opened');
     return true;
   }
   function close() { if (el) { el.hidden = true; back.hidden = true; } }

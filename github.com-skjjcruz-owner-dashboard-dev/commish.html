@@ -542,6 +542,7 @@ button{cursor:pointer}
 </div>
 <div class="toast" id="toast" role="status"></div>
 
+<script src="js/shared/front-visit.js?v=20261120fv1"></script>
 <script>
 (function () {
   // ══════════════════════════════════════════════════════════════════════
@@ -1840,6 +1841,8 @@ var MFL_RULES = (function () {
     ST.draft = copyOf(ST.proposal);
   }
 
+  // Front Door tracking (owner ask 2026-11-20; js/shared/front-visit.js). Never changes what the page does.
+  function visit(name, o) { try { if (window.DHQVisit) window.DHQVisit.track(name, o); } catch (e) { /* never in the way */ } }
   // ── A league (optional): its rules, size, rosters and team names ─────
   function openLeague(id) {
     return Promise.all([getJSON(SL + '/league/' + id), getJSON(SL + '/league/' + id + '/rosters'), getJSON(SL + '/league/' + id + '/users')]).then(function (x) {
@@ -1848,6 +1851,7 @@ var MFL_RULES = (function () {
       ST.lg = { site: 'sleeper', skipped: [], league: lg, rosters: x[1] || [], users: x[2] || [], teams: Number(lg.total_rosters) || (x[1] || []).length || 12,
         sf: pos.indexOf('SUPER_FLEX') >= 0 || pos.filter(function (p) { return p === 'QB'; }).length > 1, idp: idpCounts(pos) };
       ST.lgList = null; ST.sweep = null; ST.lgMsg = '';
+      visit('tool_used', { meta: { action: 'league_loaded', site: 'sleeper', league: String(lg.league_id) } });
     });
   }
   // Open whatever a link describes: its league (or none), then its settings and changes.
@@ -1912,6 +1916,7 @@ var MFL_RULES = (function () {
       ST.lg = { site: site, skipped: sk, league: { league_id: String(id), name: o.name || (SITE_NAME[site] + ' league ' + id), scoring_settings: o.rules },
         rosters: [], users: [], teams: Number(o.teams) || 12, sf: !!o.superflex, idp: site === 'mfl' ? o.idpCounts || null : null };
       ST.lgList = null; ST.sweep = null;
+      visit('tool_used', { meta: { action: 'league_loaded', site: site, league: String(id) } });
     });
   }
   // The league finder's status line, kept in state so a redraw doesn't wipe it.
@@ -2348,6 +2353,7 @@ var MFL_RULES = (function () {
     if ((b = t.closest('[data-card]')) && window.DHQPlayerCard) {
       var lgOn = !!(ST.lg && ST.lg.site === 'sleeper' && ST.lg.rosters.length);
       DHQPlayerCard.open(b.getAttribute('data-card'), { leagueId: lgOn ? ST.lg.league.league_id : undefined, league: lgOn, scoringSettings: rules() });
+      visit('card_opened', { entityType: 'player', entityId: b.getAttribute('data-card') });
       return;
     }
     if ((b = t.closest('[data-why]'))) { ST.why = ST.why === b.dataset.why ? null : b.dataset.why; renderResult(); var again = document.querySelector('[data-why="' + b.dataset.why + '"]'); if (again) again.focus({ preventScroll: true }); return; }
@@ -2429,6 +2435,19 @@ var MFL_RULES = (function () {
     var h = hashParams();
     fromLink(h);
   });
+})();
+</script>
+<script>
+/* Front Door tracking (owner ask 2026-11-20): a scoring rule changed (a preset, a new value, the
+   base scoring buttons, or "Add changes"), at most once per 30 s. Listens only. */
+(function () {
+  document.addEventListener('click', function (e) {
+    var t = e.target;
+    if (!t || !t.closest || !window.DHQVisit) return;
+    var how = t.id === 'applyBtn' ? 'apply' : t.id === 'ruleAdd' ? 'value' : t.closest('[data-preset]') ? 'preset'
+      : t.closest('[data-base],[data-td],[data-tep]') ? 'scoring' : null;
+    if (how) { try { window.DHQVisit.track('tool_used', { meta: { action: 'rule_changed', how: how } }); } catch (x) { /* never in the way */ } }
+  }, true);
 })();
 </script>
 </body>

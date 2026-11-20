@@ -450,6 +450,7 @@
   function submit(q) {
     q = String(q || '').trim(); if (!q || busy || !KEY) return;
     busy = true; $('askBtn').disabled = true; $('askIn').value = '';
+    try { if (root.DHQVisit) root.DHQVisit.track('ai_asked', { module: 'tools', widget: 'ai' }); } catch (e) { /* no text is ever sent */ }
     add('me', esc(q));
     $('askChips').hidden = true;   // the examples step aside once the chat starts
     var wait = add('ai pending', '<span class="dots">Thinking</span>'), seen = [];

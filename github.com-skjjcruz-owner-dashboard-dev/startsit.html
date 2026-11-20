@@ -420,6 +420,7 @@ button,input,select{font:inherit;color:inherit}
 </div>
 <div class="toast" id="toast" role="status"></div>
 
+<script src="js/shared/front-visit.js?v=20261120fv1"></script>
 <script>
 (function () {
   // ── Source league: the engine server's finished values ───────────────────
@@ -1067,6 +1068,8 @@ button,input,select{font:inherit;color:inherit}
   function add(pid) {
     if (!pid || PICKS.indexOf(pid) >= 0 || PICKS.length >= MAX_PICKS || !valid(pid)) return;
     PICKS.push(pid); saveState(); $('q').value = ''; render();
+    visit('tool_used', { meta: { action: 'player_added' } });
+    if (PICKS.length >= 2) visit('tool_used', { meta: { action: 'compared', count: PICKS.length } });
     if (TOUCH) { if (PICKS.length >= 2 || PICKS.length >= MAX_PICKS) closeMenu(); else drawMenu(); return; }   // touch: no keyboard; the list stays for the second pick
     if (PICKS.length < MAX_PICKS) { drawMenu(); $('q').focus(); } else { closeMenu(); $('share').focus(); }   // the box is disabled at four
   }
@@ -1117,13 +1120,16 @@ button,input,select{font:inherit;color:inherit}
   document.addEventListener('click', function (e) { if (!e.target.isConnected || e.target.closest('#find') || e.target.closest('[data-slot]')) return; closeMenu(); });
 
   // ── The board's buttons ──────────────────────────────────────────────────
+  // Front Door tracking (owner ask 2026-11-20; js/shared/front-visit.js): players added, a
+  // comparison, the breakdown opened and player cards. Never changes what the page does.
+  function visit(name, o) { try { if (window.DHQVisit) window.DHQVisit.track(name, o); } catch (x) { /* never in the way */ } }
   $('board').addEventListener('click', function (e) {
     var rm = e.target.closest('[data-rm]'), sl = e.target.closest('[data-slot]'), ex = e.target.closest('[data-ex]'), pc = e.target.closest('[data-card]');
-    if (pc && window.DHQPlayerCard) { DHQPlayerCard.open(pc.dataset.card, cardOpts()); return; }
-    if (e.target.closest('[data-fxtog]')) { fxToggle($('board')); equalize(); return; }
+    if (pc && window.DHQPlayerCard) { DHQPlayerCard.open(pc.dataset.card, cardOpts()); visit('card_opened', { entityType: 'player', entityId: pc.dataset.card }); return; }
+    if (e.target.closest('[data-fxtog]')) { fxToggle($('board')); equalize(); if (e.target.closest('[data-fxtog]').getAttribute('aria-expanded') === 'true') visit('tool_used', { meta: { action: 'breakdown_opened' } }); return; }
     if (rm) { PICKS = PICKS.filter(function (p) { return p !== rm.dataset.rm; }); saveState(); render(); return; }
     if (sl) { focusBox(); drawMenu(); try { (TOUCH ? $('menu') : $('find')).scrollIntoView({ block: TOUCH ? 'center' : 'nearest', behavior: 'smooth' }); } catch (x) { /* old browsers */ } return; }
-    if (ex) { var all = JSON.parse($('board').dataset.ex || '[]'); PICKS = (all[+ex.dataset.ex] || []).slice(); saveState(); render(); }
+    if (ex) { var all = JSON.parse($('board').dataset.ex || '[]'); PICKS = (all[+ex.dataset.ex] || []).slice(); saveState(); render(); if (PICKS.length >= 2) visit('tool_used', { meta: { action: 'compared', count: PICKS.length } }); }
   });
   $('clear').addEventListener('click', function () { PICKS = []; saveState(); render(); focusBox(); });
   $('share').addEventListener('click', function () {

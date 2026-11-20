@@ -351,6 +351,7 @@ button,input,select{font:inherit;color:inherit}
 <div class="toast" id="toast" role="status"></div>
 
 <script src="reconai-shared/trade-engine.js"></script>
+<script src="js/shared/front-visit.js?v=20261120fv1"></script>
 <script>
 (function () {
   'use strict';
@@ -866,6 +867,20 @@ button,input,select{font:inherit;color:inherit}
   }).catch(function () {
     $('result').innerHTML = '<p class="err">DHQ values could not be loaded right now. Check your connection and refresh the page.</p>';
     ['A', 'B'].forEach(function (s) { $('list' + s).innerHTML = ''; });
+  });
+})();
+</script>
+<script>
+/* Front Door tracking (owner ask 2026-11-20; js/shared/front-visit.js): players added and a graded
+   deal (each at most once per 30 s). Listens only; runs after the page's own click handler. */
+(function () {
+  function t(name, o) { try { if (window.DHQVisit) window.DHQVisit.track(name, o); } catch (e) { /* never in the way */ } }
+  document.addEventListener('click', function (e) {
+    var el = e.target.closest ? e.target : null; if (!el || !el.closest('[data-add],[data-addpick]')) return;
+    t('tool_used', { meta: { action: 'player_added' } });
+    if (document.querySelector('#result .call')) {
+      t('tool_used', { meta: { action: 'trade_graded', give: document.querySelectorAll('#rowsA > *').length, get: document.querySelectorAll('#rowsB > *').length } });
+    }
   });
 })();
 </script>
