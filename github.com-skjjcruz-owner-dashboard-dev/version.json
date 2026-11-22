@@ -1,10 +1,10 @@
 {
-  "build": "b194a-1ddc58d32d",
+  "build": "b194a-05f9fc8acb",
   "tag": "b194a",
-  "builtAt": "2026-11-21T15:26:05.758Z",
+  "builtAt": "2026-11-22T13:29:50.012Z",
   "critical": false,
   "notes": "",
-  "commit": "a54df7395435",
+  "commit": "90167d615ae6",
   "pages": {
     "index.html": [
       "js/shared/shared-loader.js?v=bd3fd3242c",
@@ -183,10 +183,10 @@
       "js/tabs/strategy-editor.js?v=d3f9750b0c",
       "js/league-detail.js?v=3989795c34",
       "js/app.js?v=b9ed890812",
-      "js/shared/matchup-engine.js?v=c682d9c1c6",
-      "js/shared/dhq-baseline.js?v=c682d9c1c6",
-      "js/shared/matchup-feeds-espn.js?v=c682d9c1c6",
-      "js/shared/matchup-inputs.js?v=c682d9c1c6",
+      "js/shared/matchup-engine.js?v=f53423d878",
+      "js/shared/dhq-baseline.js?v=f53423d878",
+      "js/shared/matchup-feeds-espn.js?v=f53423d878",
+      "js/shared/matchup-inputs.js?v=f53423d878",
       "reconai-shared/ai-dispatch.js?v=2d7ec80fbe",
       "reconai-shared/alex-voice.js?v=2d7ec80fbe",
       "reconai-shared/analytics-engine.js?v=2d7ec80fbe",
@@ -429,7 +429,7 @@
     "js/shared/matchup-engine.js": "28d1dce7cd",
     "js/shared/dhq-baseline.js": "4666971ab7",
     "js/shared/matchup-feeds-espn.js": "c938b17e81",
-    "js/shared/matchup-inputs.js": "f43e7ab886",
+    "js/shared/matchup-inputs.js": "0d62812880",
     "reconai-shared/ai-dispatch.js": "d72094cca8",
     "reconai-shared/alex-voice.js": "50c02cbbff",
     "reconai-shared/analytics-engine.js": "8dcbe1aeae",
@@ -472,11 +472,11 @@
     "reconai-shared/utils.js": "d1d19fd122",
     "reconai-shared/weekly-proj.js": "14f37c2e1b",
     "reconai-shared/yahoo-api.js": "b875759b3a",
-    "index.html": "8e106821b0",
+    "index.html": "54b192552b",
     "my-ai/ask.js": "60dcc192b0",
     "my-ai/panel.js": "364967a97f",
-    "landing.html": "7bdfb01ebe",
-    "connect-sleeper.html": "9104d3be6d",
-    "upgrade.html": "5bbd9ab71c"
+    "landing.html": "4b4e65f638",
+    "connect-sleeper.html": "fe76b736c4",
+    "upgrade.html": "720787ea98"
   }
 }
