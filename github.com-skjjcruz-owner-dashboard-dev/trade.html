@@ -627,8 +627,9 @@ button,input,select{font:inherit;color:inherit}
   // Position buttons above each side's list (owner ask 2026-11-23): All, each position, Picks.
   var SHOW = { A: 'ALL', B: 'ALL' };
   function renderPos(side) {
-    var list = ['ALL'].concat(GROUPS.filter(function (g) { return S.idp === '1' || !IDP[g]; })).concat(['PICKS']);
-    if (list.indexOf(SHOW[side]) < 0) SHOW[side] = 'ALL';
+    // DL, LB and DB always show (owner ask 2026-11-23); tapping one turns Defenders (IDP) on.
+    var list = ['ALL'].concat(GROUPS).concat(['PICKS']);
+    if (list.indexOf(SHOW[side]) < 0 || (S.idp !== '1' && IDP[SHOW[side]])) SHOW[side] = 'ALL';
     $('pos' + side).innerHTML = list.map(function (g) { return '<button type="button" data-showpos="' + g + '" data-side="' + side + '" aria-pressed="' + (SHOW[side] === g) + '">' + (g === 'ALL' ? 'All' : g === 'PICKS' ? 'Picks' : g) + '</button>'; }).join('');
   }
   function renderList(side) {
@@ -667,7 +668,11 @@ button,input,select{font:inherit;color:inherit}
   ['A', 'B'].forEach(function (side) { $('q' + side).addEventListener('input', function () { renderList(side); $('list' + side).scrollTop = 0; }); });
   document.addEventListener('click', function (e) {
     var sp = e.target.closest('[data-showpos]');
-    if (sp) { SHOW[sp.dataset.side] = sp.dataset.showpos; renderList(sp.dataset.side); $('list' + sp.dataset.side).scrollTop = 0; return; }
+    if (sp) {
+      SHOW[sp.dataset.side] = sp.dataset.showpos;
+      if (IDP[sp.dataset.showpos] && S.idp !== '1') { S.idp = '1'; store(PREF_KEY, S); render(); } else renderList(sp.dataset.side);
+      $('list' + sp.dataset.side).scrollTop = 0; return;
+    }
     var a = e.target.closest('[data-add]'), k = e.target.closest('[data-addpick]'), r = e.target.closest('[data-rm]');
     if (a) { T[a.dataset.side].push({ type: 'player', id: a.dataset.add }); render(); }
     else if (k) { var m = k.dataset.addpick.split('.'); T[k.dataset.side].push({ type: 'pick', year: Number(m[0]), round: Number(m[1]), slot: m[2] }); render(); }
