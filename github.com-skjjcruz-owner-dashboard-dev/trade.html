@@ -99,6 +99,9 @@ button,input,select{font:inherit;color:inherit}
 .rm{background:transparent;border:0;color:rgba(231,76,60,.6);cursor:pointer;font-size:13px;padding:2px;flex:none}
 .rm:hover{color:var(--bad)}
 
+.posseg{display:flex;flex-wrap:wrap;gap:2px;padding:3px;background:var(--charcoal);border:1px solid var(--line2);border-radius:var(--r-xs)}
+.posseg button{border:0;background:transparent;color:var(--silver);font:600 12.5px var(--body);letter-spacing:.04em;padding:6px 10px;border-radius:4px;cursor:pointer}
+.posseg button[aria-pressed="true"]{background:rgba(212,175,55,.16);color:var(--gold)}
 .filter{width:100%;background:var(--charcoal);border:1px solid var(--line2);color:var(--white);font:400 14.5px var(--body);padding:11px 13px;border-radius:var(--r-xs) var(--r-xs) 0 0}
 .filter:focus{outline:none;border-color:var(--gold)}
 .filter::placeholder{color:rgba(255,255,255,.22)}
@@ -254,6 +257,9 @@ button,input,select{font:inherit;color:inherit}
   .side-sel,.side-sel.one{display:flex;flex-wrap:nowrap;overflow-x:auto;gap:6px;scrollbar-width:none}
   .side-sel::-webkit-scrollbar{display:none}
   .side .filter{font-size:16px;min-height:42px}
+  .posseg{flex-wrap:nowrap;overflow-x:auto;scrollbar-width:none;border-radius:999px}
+  .posseg::-webkit-scrollbar{display:none}
+  .posseg button{flex:1 0 auto;min-height:34px;border-radius:999px}
   .list{max-height:360px}
   .item{grid-template-columns:auto minmax(0,1fr) auto!important;column-gap:10px;min-height:52px;padding:7px 10px}
   .item .face{display:none}
@@ -310,6 +316,7 @@ button,input,select{font:inherit;color:inherit}
           <label class="fld"><span>Your roster status</span><select class="sel" id="myTeam"><option value="">Not sure</option><option value="ELITE">Elite</option><option value="CONTENDER">Contender</option><option value="CROSSROADS">Crossroads</option><option value="REBUILDING">Rebuilding</option></select></label>
         </div>
         <div class="rows" id="rowsA"></div>
+        <div class="posseg" id="posA" role="group" aria-label="Show players by position or draft picks you send"></div>
         <input class="filter" id="qA" type="search" placeholder="Filter players &amp; picks…" autocomplete="off" aria-label="Filter players and picks you send">
         <div class="list" id="listA"></div>
         <div class="total"><span>Total value</span><b id="totA">––</b></div>
@@ -321,6 +328,7 @@ button,input,select{font:inherit;color:inherit}
           <label class="fld"><span>Opponent roster status</span><select class="sel" id="theirTeam"><option value="">Not sure</option><option value="ELITE">Elite</option><option value="CONTENDER">Contender</option><option value="CROSSROADS">Crossroads</option><option value="REBUILDING">Rebuilding</option></select></label>
         </div>
         <div class="rows" id="rowsB"></div>
+        <div class="posseg" id="posB" role="group" aria-label="Show players by position or draft picks you get"></div>
         <input class="filter" id="qB" type="search" placeholder="Filter players &amp; picks…" autocomplete="off" aria-label="Filter players and picks you get">
         <div class="list" id="listB"></div>
         <label class="chk"><input type="checkbox" id="fills"> My side fills a hole on their roster</label>
@@ -616,8 +624,17 @@ button,input,select{font:inherit;color:inherit}
   }
   function head(label, col, picks) { return '<div class="grp"><span class="gname" style="color:' + col + '">' + label + '</span>' + (picks ? '' : '<span class="gc">Pos</span><span class="gc">Team</span><span class="gc">Age</span><span class="gc" title="Total points this season">Pts</span><span class="gc" title="Games played">GP</span><span class="gc" title="Average points per game">APG</span><span class="gc" title="DHQ projection this week">Proj</span>') + '<span class="gc gv">DHQ Value</span></div>'; }
   function pickKey(it) { return it.year + '.' + it.round + '.' + it.slot; }
+  // Position buttons above each side's list (owner ask 2026-11-23): All, each position, Picks.
+  var SHOW = { A: 'ALL', B: 'ALL' };
+  function renderPos(side) {
+    var list = ['ALL'].concat(GROUPS.filter(function (g) { return S.idp === '1' || !IDP[g]; })).concat(['PICKS']);
+    if (list.indexOf(SHOW[side]) < 0) SHOW[side] = 'ALL';
+    $('pos' + side).innerHTML = list.map(function (g) { return '<button type="button" data-showpos="' + g + '" data-side="' + side + '" aria-pressed="' + (SHOW[side] === g) + '">' + (g === 'ALL' ? 'All' : g === 'PICKS' ? 'Picks' : g) + '</button>'; }).join('');
+  }
   function renderList(side) {
     var box = $('list' + side); if (!DATA) return;
+    renderPos(side);
+    var only = SHOW[side];
     var keep = box.scrollTop; // adding a player must not jump the list back to the top
     var q = $('q' + side).value.toLowerCase().replace(/[^a-z0-9 ]/g, '').trim();
     var used = {}; T.A.concat(T.B).forEach(function (it) { used[it.type === 'pick' ? 'k' + pickKey(it) : it.id] = 1; });
@@ -625,29 +642,32 @@ button,input,select{font:inherit;color:inherit}
     function item(r) { var g = r.p.pos; return '<button type="button" class="item' + (used[r.p.id] ? ' added' : '') + '" style="--pc:' + (POS_COLOR[g] || 'var(--silver)') + '" data-add="' + r.p.id + '" data-side="' + side + '">' + face(r.p.id, POS_COLOR[g]) + '<span class="nm">' + esc(r.p.name) + '</span>' + cols(r.p.id, g, r.p.team) + '<span class="tm">' + esc(PHONE() ? shortMeta(r.p.id, g, r.p.team) : metaLine(r.p.id, g, r.p.team)) + '</span><span class="v">' + fmt(r.v) + '</span></button>'; }
     // A query that is a whole word of a name ("chase") puts those players first, by DHQ value,
     // whatever their position, so Ja'Marr Chase is not under Chase Brown. Other matches stay grouped.
-    var best = {}, bestRows = !q ? [] : SEARCH.filter(function (p) { return (S.idp === '1' || !IDP[p.pos]) && GROUPS.indexOf(p.pos) > -1 && (' ' + p.key + ' ').indexOf(' ' + q + ' ') > -1; })
+    var best = {}, bestRows = !q || only !== 'ALL' ? [] : SEARCH.filter(function (p) { return (S.idp === '1' || !IDP[p.pos]) && GROUPS.indexOf(p.pos) > -1 && (' ' + p.key + ' ').indexOf(' ' + q + ' ') > -1; })
       .map(function (p) { best[p.id] = 1; return { p: p, v: playerValue(p.id) }; }).sort(function (a, b) { return b.v - a.v; });
     if (bestRows.length) { html += head('Best matches', 'var(--gold)') + bestRows.map(item).join(''); shown += bestRows.length; }
     GROUPS.forEach(function (g) {
       if (S.idp === '0' && IDP[g]) return;
+      if (only !== 'ALL' && only !== g) return;
       var rows = SEARCH.filter(function (p) { return p.pos === g && !best[p.id] && (!q || p.key.indexOf(q) === 0 || p.key.indexOf(' ' + q) > -1 || p.team.toLowerCase() === q); })
         .map(function (p) { return { p: p, v: playerValue(p.id) }; }).sort(function (a, b) { return b.v - a.v; });
       if (!rows.length) return;
       html += head(g, POS_COLOR[g]) + rows.map(item).join('');
       shown += rows.length;
     });
-    var picks = ALL_PICKS.filter(function (pk) { return !q || itemLabel(pk).toLowerCase().indexOf(q) > -1 || 'picks'.indexOf(q) === 0; });
+    var picks = only !== 'ALL' && only !== 'PICKS' ? [] : ALL_PICKS.filter(function (pk) { return !q || itemLabel(pk).toLowerCase().indexOf(q) > -1 || 'picks'.indexOf(q) === 0; });
     if (picks.length) {
       html += head('Picks', POS_COLOR.PICK, true) + picks.map(function (pk) {
         return '<button type="button" class="item pk' + (used['k' + pickKey(pk)] ? ' added' : '') + '" data-addpick="' + pickKey(pk) + '" data-side="' + side + '"><span class="dot" style="background:' + POS_COLOR.PICK + '"></span><span class="nm">' + esc(itemLabel(pk)) + '</span><span class="v">' + fmt(pickValue(pk)) + '</span></button>';
       }).join('');
       shown += picks.length;
     }
-    box.innerHTML = shown ? html : '<div class="list-empty">No player or pick matches "' + esc($('q' + side).value) + '".</div>';
+    box.innerHTML = shown ? html : '<div class="list-empty">' + (q ? 'No ' + (only === 'ALL' ? 'player or pick' : only === 'PICKS' ? 'pick' : only) + ' matches "' + esc($('q' + side).value) + '".' : 'Nothing to show here.') + '</div>';
     box.scrollTop = keep;
   }
   ['A', 'B'].forEach(function (side) { $('q' + side).addEventListener('input', function () { renderList(side); $('list' + side).scrollTop = 0; }); });
   document.addEventListener('click', function (e) {
+    var sp = e.target.closest('[data-showpos]');
+    if (sp) { SHOW[sp.dataset.side] = sp.dataset.showpos; renderList(sp.dataset.side); $('list' + sp.dataset.side).scrollTop = 0; return; }
     var a = e.target.closest('[data-add]'), k = e.target.closest('[data-addpick]'), r = e.target.closest('[data-rm]');
     if (a) { T[a.dataset.side].push({ type: 'player', id: a.dataset.add }); render(); }
     else if (k) { var m = k.dataset.addpick.split('.'); T[k.dataset.side].push({ type: 'pick', year: Number(m[0]), round: Number(m[1]), slot: m[2] }); render(); }
