@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="utf-8">
-<meta name="dhq-build" content="b194a-74bd402abd">
+<meta name="dhq-build" content="b194a-64bbf29284">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com data:; img-src 'self' data: blob: https:; connect-src 'self' https://sxshiqyxhhifvtfqawbq.supabase.co https://hovnqztlbsgsywrbidbh.supabase.co https://api.anthropic.com https://api.openai.com https://generativelanguage.googleapis.com https://dhq-lab.pages.dev https://api.sleeper.app https://api.myfantasyleague.com https://*.myfantasyleague.com https://lm-api-reads.fantasy.espn.com https://fantasysports.yahooapis.com https://*.sentry.io; worker-src 'self' blob:; base-uri 'self'; object-src 'none';">
 <title>Dynasty HQ — Generic advice stops here.</title>
@@ -376,6 +376,7 @@
   .auth-google:hover { box-shadow: 0 4px 14px rgba(0,0,0,.25); }
   .auth-apple { width: 100%; display: flex; align-items: center; justify-content: center; gap: 10px; min-height: 48px; border-radius: 10px; border: 1px solid #000; background: #000; color: #fff; font-size: 15px; font-weight: 700; cursor: pointer; margin-bottom: 6px; }
   .auth-apple:hover { box-shadow: 0 4px 14px rgba(0,0,0,.4); }
+  .auth-apple[aria-busy="true"] { opacity: .75; cursor: progress; box-shadow: none; }
   .auth-or { display: flex; align-items: center; text-align: center; color: var(--muted); font-size: 12px; margin: 14px 0; gap: 10px; }
   .auth-or::before, .auth-or::after { content: ''; flex: 1; height: 1px; background: var(--border); }
   .auth-linkbtn { background: none; border: none; color: var(--muted); font-size: 13px; cursor: pointer; text-decoration: underline; font-family: inherit; }
@@ -1758,8 +1759,29 @@ a.fg-entry { text-decoration: none; }
     }
 
     // ── Apple OAuth (account only) ──────────────────────────────────────────
+    // Loading state (owner ask 2026-11-28): Apple's page can take a few seconds
+    // to open, and a button that shows nothing gets tapped again and again (a
+    // visitor tapped it 4 times in 2 seconds on Nov 27). While it opens the
+    // button reads "Opening Apple…" and ignores repeat taps; it comes back on
+    // its own if the visitor returns to this page or after 20 seconds.
+    function appleBusy(on) {
+      const b = document.getElementById('btnApple');
+      if (!b) return;
+      if (on) {
+        b.dataset.busy = '1'; b.dataset.label = b.lastChild.textContent;
+        b.lastChild.textContent = ' Opening Apple\u2026'; b.disabled = true; b.setAttribute('aria-busy', 'true');
+        clearTimeout(appleBusy.t); appleBusy.t = setTimeout(() => appleBusy(false), 20000);
+      } else if (b.dataset.busy) {
+        delete b.dataset.busy; b.lastChild.textContent = b.dataset.label || ' Continue with Apple';
+        b.disabled = false; b.removeAttribute('aria-busy');
+      }
+    }
+    window.addEventListener('pageshow', () => appleBusy(false));
     function handleApple() {
       if (labNeedsLeagueFirst(handleApple)) return; // Lab: league account first
+      const ab = document.getElementById('btnApple');
+      if (ab && ab.dataset.busy) return;   // already opening Apple
+      if (getSbClient()) appleBusy(true);
       const db = getSbClient();
       if (!db) { showAlert('error', 'Sign-in is still loading — try again in a moment.'); return; }
       trackLandingEvent('oauth_started', { provider: 'apple' });

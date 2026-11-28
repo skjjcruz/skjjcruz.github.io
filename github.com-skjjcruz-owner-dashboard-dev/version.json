@@ -1,10 +1,10 @@
 {
-  "build": "b194a-74bd402abd",
+  "build": "b194a-64bbf29284",
   "tag": "b194a",
-  "builtAt": "2026-11-27T13:45:10.700Z",
+  "builtAt": "2026-11-28T11:55:10.852Z",
   "critical": false,
   "notes": "",
-  "commit": "92a84fc56238",
+  "commit": "0c0419a22383",
   "pages": {
     "index.html": [
       "js/shared/shared-loader.js?v=bd3fd3242c",
@@ -472,11 +472,11 @@
     "reconai-shared/utils.js": "d1d19fd122",
     "reconai-shared/weekly-proj.js": "14f37c2e1b",
     "reconai-shared/yahoo-api.js": "b875759b3a",
-    "index.html": "b677206e26",
+    "index.html": "117bff98e2",
     "my-ai/ask.js": "60dcc192b0",
     "my-ai/panel.js": "364967a97f",
-    "landing.html": "e97bbf6416",
-    "connect-sleeper.html": "59255129b9",
-    "upgrade.html": "6a3651b920"
+    "landing.html": "7ca35a5d1c",
+    "connect-sleeper.html": "5410fbb7b3",
+    "upgrade.html": "c1d9587665"
   }
 }
